@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/* Baris ini memaksa Tailwind untuk HANYA mengaktifkan mode gelap jika ada class 'dark' */
+@variant dark (&:where(.dark, .dark *));
+
+@keyframes progress-slide {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(50%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-progress-slide {
+  animation: progress-slide 1.8s ease-in-out infinite;
+}
+
+/* Pastikan semua tombol, link, dan elemen interaktif selalu menampilkan kursor telunjuk */
+button,
+[role="button"],
+a,
+select,
+summary,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+button:disabled,
+input:disabled,
+[disabled],
+.cursor-not-allowed {
+  cursor: not-allowed !important;
+}
+
+/* ==========================================================================
+   SELECT & OPTION DROPDOWN POPUP CONTRAST FIX (LIGHT & DARK MODES)
+   ========================================================================== */
+select {
+  color-scheme: light dark;
+}
+
+html.dark select,
+.dark select {
+  color-scheme: dark !important;
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+html.dark select option,
+.dark select option {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+/* ==========================================================================
+   SCROLLBAR STYLING - VISIBLE IN BOTH LIGHT & DARK MODES
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 9999px;
+}
+
+html.dark ::-webkit-scrollbar-track,
+.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+html.dark ::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 rgba(0, 0, 0, 0.06);
+}
+
+html.dark *,
+.dark * {
+  scrollbar-color: #475569 rgba(255, 255, 255, 0.06);
+}

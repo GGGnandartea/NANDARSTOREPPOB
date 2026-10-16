@@ -1,0 +1,484 @@
+/* ==========================================================================
+   NANDARSTORE 2.0 - PREMIUM ADMIN PANEL LOCAL THEME
+   Zero-Cloud Dependency | High Performance | Elegant Gradients & Glassmorphism
+   ========================================================================== */
+
+:root {
+    --admin-bg-light: #f8fafc;
+    --admin-bg-dark: #0b0f19;
+    --card-bg-light: #ffffff;
+    --card-bg-dark: #111827;
+    --card-border-light: #e2e8f0;
+    --card-border-dark: rgba(255, 255, 255, 0.08);
+    --sidebar-bg-light: #ffffff;
+    --sidebar-bg-dark: #0f172a;
+    --accent-orange: #f97316;
+}
+
+/* Fast Local Font Stack - Zero Cloud Latency */
+body, button, input, select, textarea {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Pastikan semua tombol, link, dan elemen interaktif selalu menampilkan kursor telunjuk */
+button,
+[role="button"],
+a,
+select,
+summary,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+.cursor-pointer {
+    cursor: pointer !important;
+}
+
+button:disabled,
+input:disabled,
+[disabled],
+.cursor-not-allowed {
+    cursor: not-allowed !important;
+}
+
+/* Base Body Styles */
+body.admin-body {
+    background-color: var(--admin-bg-light);
+    color: #1e293b;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark body.admin-body {
+    background-color: var(--admin-bg-dark);
+    color: #f1f5f9;
+}
+
+/* Premium Gradient Utilities */
+.gradient-blue {
+    background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+}
+
+.gradient-green {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+}
+
+.gradient-orange {
+    background: linear-gradient(135deg, #ea580c 0%, #f59e0b 100%);
+}
+
+.gradient-purple {
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+
+.gradient-rose {
+    background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%);
+}
+
+.gradient-dark-card {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+}
+
+/* Stat Cards with Elegant Gradient Glow & Borders */
+.stat-card {
+    position: relative;
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+html.dark .stat-card {
+    background: linear-gradient(145deg, #131b2e 0%, #0f172a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+html.dark .stat-card:hover {
+    box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px 1px rgba(249, 115, 22, 0.12);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Subtle Gradient Glow Top Bar on Cards */
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: transparent;
+    transition: height 0.2s ease;
+}
+
+.stat-card.card-blue::before { background: linear-gradient(90deg, #2563eb, #06b6d4); }
+.stat-card.card-green::before { background: linear-gradient(90deg, #059669, #10b981); }
+.stat-card.card-orange::before { background: linear-gradient(90deg, #ea580c, #f59e0b); }
+.stat-card.card-purple::before { background: linear-gradient(90deg, #7c3aed, #c084fc); }
+
+.stat-card:hover::before {
+    height: 4px;
+}
+
+/* Ambient Background Glow Circles inside Cards */
+.stat-ambient {
+    position: absolute;
+    right: -20px;
+    bottom: -20px;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    filter: blur(35px);
+    opacity: 0.15;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card:hover .stat-ambient {
+    opacity: 0.25;
+}
+
+.card-blue .stat-ambient { background: #3b82f6; }
+.card-green .stat-ambient { background: #10b981; }
+.card-orange .stat-ambient { background: #f97316; }
+.card-purple .stat-ambient { background: #a855f7; }
+
+/* Elegant Admin Glass Cards */
+.admin-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+html.dark .admin-card {
+    background: linear-gradient(145deg, #131b2e 0%, #0f172a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Sidebar Active & Hover States - Immediate Click Responsiveness */
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-radius: 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    border: 1px solid transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html.dark .sidebar-link {
+    color: #94a3b8;
+}
+
+.sidebar-link:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+html.dark .sidebar-link:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #f8fafc;
+}
+
+/* Active Sidebar Link - Vibrant Orange Gradient Pill */
+.sidebar-link.active {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(234, 88, 12, 0.22) 100%);
+    color: #ea580c;
+    border: 1px solid rgba(249, 115, 22, 0.35);
+    box-shadow: 0 2px 8px -1px rgba(249, 115, 22, 0.15);
+}
+
+html.dark .sidebar-link.active {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(234, 88, 12, 0.28) 100%);
+    color: #fb923c;
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    box-shadow: 0 4px 12px -2px rgba(249, 115, 22, 0.25);
+}
+
+/* Distinct WhatsApp Active Link */
+.sidebar-link.active-wa {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.25) 100%);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+html.dark .sidebar-link.active-wa {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+/* Fast, Sleek Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Smooth Table Styles */
+.admin-table th {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.875rem 1rem;
+    color: #64748b;
+    border-bottom: 1px solid #e2e8f0;
+}
+html.dark .admin-table th {
+    color: #94a3b8;
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+.admin-table td {
+    padding: 1rem;
+    font-size: 0.875rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+html.dark .admin-table td {
+    border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+.admin-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+.admin-table tbody tr:hover {
+    background-color: rgba(241, 245, 249, 0.6);
+}
+html.dark .admin-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Glowing Pulse Indicator */
+.pulse-glow {
+    position: relative;
+}
+.pulse-glow::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    background: inherit;
+    opacity: 0.4;
+    animation: pulseRing 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    z-index: -1;
+}
+
+@keyframes pulseRing {
+    0% { transform: scale(0.95); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 0; }
+    100% { transform: scale(0.95); opacity: 0; }
+}
+
+/* Hide scrollbar for clean horizontal mobile filter pill lists */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* ==========================================================================
+   ADMIN PANEL RESPONSIVE SIDEBAR & DUAL LAYOUT ENGINE (PC & MOBILE 100% FIXED)
+   ========================================================================== */
+
+/* DESKTOP (Screen width >= 1024px) */
+@media (min-width: 1024px) {
+    .admin-sidebar {
+        position: relative !important;
+        top: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: auto !important;
+        transform: none !important;
+        z-index: 30 !important;
+        height: 100vh !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        visibility: visible !important;
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .admin-sidebar.sidebar-expanded {
+        width: 16rem !important; /* 256px */
+    }
+
+    .admin-sidebar.sidebar-collapsed {
+        width: 5rem !important; /* 80px */
+    }
+
+    .admin-mobile-only {
+        display: none !important;
+    }
+
+    .admin-desktop-only {
+        display: flex !important;
+    }
+
+    .admin-backdrop {
+        display: none !important;
+    }
+
+    .admin-bottom-nav {
+        display: none !important;
+    }
+
+    .admin-content-scroll {
+        padding-bottom: 2rem !important;
+    }
+}
+
+/* MOBILE & TABLET (Screen width < 1024px) */
+@media (max-width: 1023px) {
+    .admin-sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: auto !important;
+        z-index: 50 !important;
+        width: 18rem !important; /* 288px */
+        height: 100vh !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .admin-sidebar.mobile-open {
+        transform: translateX(0) !important;
+    }
+
+    .admin-sidebar.mobile-closed {
+        transform: translateX(-100%) !important;
+    }
+
+    .admin-desktop-only {
+        display: none !important;
+    }
+
+    .admin-mobile-only {
+        display: flex !important;
+    }
+
+    .admin-bottom-nav {
+        display: flex !important;
+    }
+
+    .admin-content-scroll {
+        padding-bottom: 6rem !important;
+    }
+}
+
+/* ==========================================================================
+   UNIVERSAL SELECT & DROPDOWN POPUP CONTRAST FIX (LIGHT & DARK MODES)
+   Fixes invisible white text on Windows Chromium dropdown popups
+   ========================================================================== */
+select {
+    color-scheme: light dark;
+}
+
+html.dark select,
+.dark select {
+    color-scheme: dark !important;
+    background-color: #111827 !important;
+    color: #f9fafb !important;
+}
+
+select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+html.dark select option,
+.dark select option {
+    background-color: #111827 !important;
+    color: #f9fafb !important;
+}
+
+/* ==========================================================================
+   CLEAR & VISIBLE SCROLLBARS FOR ALL MODES
+   ========================================================================== */
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 9999px;
+}
+
+html.dark ::-webkit-scrollbar-track,
+.dark ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+html.dark ::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Firefox Support */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 rgba(0, 0, 0, 0.06);
+}
+
+html.dark *,
+.dark * {
+    scrollbar-color: #475569 rgba(255, 255, 255, 0.06);
+}
+
+.custom-scrollbar {
+    scrollbar-width: thin;
+}
+
