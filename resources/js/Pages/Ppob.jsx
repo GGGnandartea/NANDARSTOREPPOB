@@ -1340,9 +1340,22 @@ export default function Ppob({ store, initialPulsa }) {
             )}
 
           </div>
-
         </div>
       </main>
+
+      {/* FOOTER */}
+      <footer className="mt-16 border-t border-gray-200/80 dark:border-white/5 py-8 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p>&copy; {new Date().getFullYear()} {store?.name || 'NandarStore'}. Hak Cipta Dilindungi.</p>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-emerald-500 transition">Beranda Toko</Link>
+            <span>•</span>
+            <Link href="/faq" className="hover:text-emerald-500 transition">Pusat Bantuan & FAQ</Link>
+            <span>•</span>
+            <Link href="/syarat-ketentuan" className="hover:text-emerald-500 transition">Syarat & Ketentuan</Link>
+          </div>
+        </div>
+      </footer>
 
       {/* CHECKOUT MODAL DRAWER */}
       {checkoutModal && selectedProduct && (

@@ -1257,14 +1257,24 @@ export default function Home({ products = [], categories = [], manualCategories 
                                     </Link>
                                 </li>
                                 <li>
+                                    <Link href="/ppob" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Layanan PPOB 24 Jam
+                                    </Link>
+                                </li>
+                                <li>
                                     <button onClick={() => setShowTrackModal(true)} className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors cursor-pointer">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Lacak Pesanan
                                     </button>
                                 </li>
                                 <li>
-                                    <button onClick={() => setShowTerms(true)} className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors cursor-pointer">
+                                    <Link href="/faq" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Pusat Bantuan & FAQ
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link href="/syarat-ketentuan" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Syarat & Ketentuan
-                                    </button>
+                                    </Link>
                                 </li>
                             </ul>
                         </div>

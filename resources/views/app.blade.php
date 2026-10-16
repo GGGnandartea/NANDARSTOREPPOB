@@ -147,7 +147,75 @@
         $appStoreFavicon = \App\Models\Setting::where('key', 'store_favicon')->value('value') ?: ($appStoreLogo ?: null);
         $appLoadingLogo = \App\Models\Setting::where('key', 'loading_logo')->value('value') ?: ($appStoreLogo ?: null);
         $appStoreTagline = \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis';
+        $appStoreDesc = \App\Models\Setting::where('key', 'store_description')->value('value') 
+            ?: 'Pusat belanja akun premium murah, pulsa, token listrik PLN, top-up e-wallet DANA/OVO/GoPay, voucher game, dan tagihan PPOB 24 jam otomatis dan terpercaya.';
+
+        // Logika Dynamic SEO & Open Graph Preview
+        $currentUrl = url()->current();
+        $ogTitle = $appStoreName . ' - ' . $appStoreTagline;
+        $ogDescription = $appStoreDesc;
+        $ogImage = asset('images/og-preview.png');
+
+        if (request()->is('product/*')) {
+            $productId = request()->segment(2);
+            $productModel = \App\Models\Product::find($productId);
+            if ($productModel) {
+                $ogTitle = $productModel->name . ' - ' . $appStoreName;
+                $formattedPrice = 'Rp ' . number_format($productModel->price, 0, ',', '.');
+                $ogDescription = 'Beli ' . $productModel->name . ' harga spesial ' . $formattedPrice . '. Proses otomatis 24 jam instan dan bergaransi hanya di ' . $appStoreName . '.';
+                if ($productModel->image) {
+                    $ogImage = str_starts_with($productModel->image, 'http') ? $productModel->image : url($productModel->image);
+                }
+            }
+        } elseif (request()->is('ppob*')) {
+            $ogTitle = 'Pusat Layanan PPOB, Pulsa & Tagihan 24 Jam - ' . $appStoreName;
+            $ogDescription = 'Beli pulsa semua operator, paket data, token PLN, e-wallet DANA/OVO/GoPay, voucher game MLBB/FF, dan tagihan PDAM otomatis detik ini juga.';
+        } elseif (request()->is('faq*')) {
+            $ogTitle = 'Pusat Bantuan & Pertanyaan Umum (FAQ) - ' . $appStoreName;
+            $ogDescription = 'Pertanyaan seputar cara order akun, pembayaran QRIS / Saldo akun, garansi, serta transaksi PPOB otomatis di ' . $appStoreName . '.';
+        } elseif (request()->is('terms*') || request()->is('syarat-ketentuan*')) {
+            $ogTitle = 'Syarat & Ketentuan Layanan - ' . $appStoreName;
+            $ogDescription = 'Syarat, ketentuan garansi, kebijakan privasi, dan aturan transaksi di ' . $appStoreName . '.';
+        } elseif ($appStoreLogo) {
+            $ogImage = str_starts_with($appStoreLogo, 'http') ? $appStoreLogo : url($appStoreLogo);
+        }
+
+        if ($ogImage && !str_starts_with($ogImage, 'http')) {
+            $ogImage = url($ogImage);
+        }
     @endphp
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 160) }}">
+    <meta name="keywords" content="akun premium, netflix murah, spotify premium, canva pro, youtube premium, pulsa murah, token pln, ppob otomatis, {{ $appStoreName }}">
+    <meta name="author" content="{{ $appStoreName }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ $currentUrl }}">
+
+    <!-- Open Graph / WhatsApp / Facebook / Telegram -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ $appStoreName }}">
+    <meta property="og:url" content="{{ $currentUrl }}">
+    <meta property="og:title" content="{{ $ogTitle }}">
+    <meta property="og:description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 200) }}">
+    @if($ogImage)
+    <meta property="og:image" content="{{ $ogImage }}">
+    <meta property="og:image:secure_url" content="{{ $ogImage }}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{ $ogTitle }}">
+    @endif
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ $currentUrl }}">
+    <meta name="twitter:title" content="{{ $ogTitle }}">
+    <meta name="twitter:description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 200) }}">
+    @if($ogImage)
+    <meta name="twitter:image" content="{{ $ogImage }}">
+    @endif
+
     @if($appStoreFavicon)
     <link rel="icon" href="{{ $appStoreFavicon }}">
     @endif

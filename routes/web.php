@@ -29,10 +29,11 @@ Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus']
 // ----------------------------------
 
 
-Route::get('/syarat-ketentuan', function () { 
-    $terms = \App\Models\Setting::where('key', 'terms_and_conditions')->value('value') ?? 'Belum ada syarat dan ketentuan.';
-    return view('front.terms', compact('terms')); 
-})->name('terms');
+// --- PUSAT BANTUAN & SYARAT KETENTUAN (HALAMAN DEDIKASI) ---
+Route::get('/faq', [FrontController::class, 'faq'])->name('faq');
+Route::get('/syarat-ketentuan', [FrontController::class, 'terms'])->name('terms');
+Route::get('/terms', [FrontController::class, 'terms'])->name('terms.alias');
+// -----------------------------------------------------------
 
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
