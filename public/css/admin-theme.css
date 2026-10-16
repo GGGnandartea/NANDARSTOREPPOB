@@ -482,3 +482,29 @@ html.dark *,
     scrollbar-width: thin;
 }
 
+/* ==========================================================================
+   SMOOTH INERTIAL SCROLLING & MOMENTUM PHYSICS
+   Provides buttery smooth scrolling matching the customer dashboard
+   ========================================================================== */
+html {
+    scroll-behavior: smooth !important;
+}
+
+body.admin-body {
+    scroll-behavior: smooth !important;
+}
+
+.admin-content-scroll,
+.admin-sidebar nav,
+.custom-scrollbar {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain;
+}
+
+/* Bypass CSS smooth transition when JS lerp engine handles wheel momentum */
+.admin-content-scroll.is-wheeling,
+.admin-sidebar nav.is-wheeling {
+    scroll-behavior: auto !important;
+}
+

@@ -406,6 +406,117 @@
                 setTimeout(() => toast.remove(), 300);
             }, 3500);
         };
+
+        // ==========================================================
+        // BUTTERY SMOOTH INERTIAL SCROLL ENGINE FOR ADMIN PANEL
+        // Memberikan sensasi scroll super halus & dinamis persis seperti
+        // dashboard storefront utama (Lenis/macOS-like momentum easing)
+        // ==========================================================
+        (function() {
+            function attachSmoothScroll(el) {
+                if (!el || el._smoothWheelAttached) return;
+                el._smoothWheelAttached = true;
+
+                let targetY = el.scrollTop;
+                let currentY = el.scrollTop;
+                let isAnimating = false;
+                let rafId = null;
+                let idleTimer = null;
+
+                // Sinkronisasi posisi jika pengguna scroll dengan drag scrollbar atau keyboard
+                el.addEventListener('scroll', function() {
+                    if (!isAnimating) {
+                        targetY = el.scrollTop;
+                        currentY = el.scrollTop;
+                    }
+                }, { passive: true });
+
+                el.addEventListener('touchstart', function() {
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    isAnimating = false;
+                    el.classList.remove('is-wheeling');
+                    targetY = el.scrollTop;
+                    currentY = el.scrollTop;
+                }, { passive: true });
+
+                el.addEventListener('wheel', function(e) {
+                    // Abaikan jika zoom (Ctrl + wheel) atau scroll horizontal murni
+                    if (e.ctrlKey || e.altKey) return;
+                    if (Math.abs(e.deltaY) < 1) return;
+
+                    const maxScroll = el.scrollHeight - el.clientHeight;
+                    if (maxScroll <= 0) return;
+
+                    // Deteksi wheel fisik (discrete mouse notches) vs precision trackpad
+                    const isDiscreteWheel = e.deltaMode !== 0 || Math.abs(e.deltaY) >= 20 || Number.isInteger(e.deltaY);
+
+                    if (!isDiscreteWheel) {
+                        // Trackpad sudah memiliki akselerasi hardware bawaan
+                        targetY = el.scrollTop;
+                        currentY = el.scrollTop;
+                        return;
+                    }
+
+                    // Hentikan lompatan kaku bawaan browser
+                    e.preventDefault();
+
+                    // Nonaktifkan sementara transition CSS agar animasi frame lerp sinkron 60fps
+                    el.classList.add('is-wheeling');
+
+                    // Hitung langkah scroll dengan multiplier natural
+                    const delta = e.deltaMode === 1 ? e.deltaY * 34 : e.deltaY;
+                    targetY = Math.max(0, Math.min(targetY + delta, maxScroll));
+
+                    if (!isAnimating) {
+                        isAnimating = true;
+                        currentY = el.scrollTop;
+                        rafId = requestAnimationFrame(render);
+                    }
+
+                    clearTimeout(idleTimer);
+                    idleTimer = setTimeout(() => {
+                        targetY = el.scrollTop;
+                        currentY = el.scrollTop;
+                        isAnimating = false;
+                        el.classList.remove('is-wheeling');
+                    }, 350);
+                }, { passive: false });
+
+                function render() {
+                    if (!isAnimating) return;
+
+                    const diff = targetY - currentY;
+                    
+                    // Easing lerp 0.13: Luncuran mulus, responsif, tanpa lag/keterlambatan
+                    currentY += diff * 0.13;
+
+                    el.scrollTop = Math.round(currentY * 10) / 10;
+
+                    if (Math.abs(diff) > 0.4) {
+                        rafId = requestAnimationFrame(render);
+                    } else {
+                        el.scrollTop = targetY;
+                        currentY = targetY;
+                        isAnimating = false;
+                        rafId = null;
+                        el.classList.remove('is-wheeling');
+                    }
+                }
+            }
+
+            function initAllScrolls() {
+                document.querySelectorAll('.admin-content-scroll, .admin-sidebar nav').forEach(attachSmoothScroll);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initAllScrolls);
+            } else {
+                initAllScrolls();
+            }
+        })();
     </script>
 
     <!-- GLOBAL ADMIN TOAST CONTAINER -->
