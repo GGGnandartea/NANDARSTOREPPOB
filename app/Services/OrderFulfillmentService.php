@@ -497,7 +497,7 @@ class OrderFulfillmentService
     /**
      * Ekstrak SN / detail akun dari berbagai kemungkinan format respon API
      */
-    private static function extractSnFromData($data): ?string
+    public static function extractSnFromData($data): ?string
     {
         if (is_string($data)) {
             $trimmed = trim($data);

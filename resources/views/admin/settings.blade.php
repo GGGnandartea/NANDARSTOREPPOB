@@ -402,6 +402,41 @@
                         </p>
                     </div>
 
+                    <!-- Premku API Secret (Verifikasi HMAC-SHA256 Webhook) -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Premku API Secret</label>
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                Webhook HMAC-SHA256
+                            </span>
+                        </div>
+                        <input type="text" name="premku_api_secret" value="{{ $premkuApiSecret }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-purple-500 transition" placeholder="Masukkan API Secret dari halaman Profil premku.com...">
+                        <p class="text-[11px] font-bold mt-1.5 text-gray-500 dark:text-gray-400">
+                            Digunakan untuk memvalidasi header <code class="text-purple-500 font-mono">X-Premku-Signature</code> saat Premku mengirim webhook.
+                        </p>
+                    </div>
+
+                    <!-- Callback Webhook URL Premku (1-Click Copy) -->
+                    <div class="p-4 rounded-2xl bg-purple-50/80 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/30 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+                                URL Callback Webhook Premku (v3.8)
+                            </span>
+                            <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400">Pasang di Profil Premku</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" readonly id="premkuWebhookUrlInput" value="{{ $premkuWebhookUrl }}" class="flex-1 px-3 py-2 bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold text-gray-800 dark:text-gray-200 outline-none select-all shadow-sm">
+                            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('premkuWebhookUrlInput').value); alert('URL Webhook Premku berhasil disalin ke clipboard!');" class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs transition cursor-pointer shrink-0 shadow-sm flex items-center gap-1.5 active:scale-95">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                <span>Salin URL</span>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-gray-600 dark:text-gray-400 leading-relaxed">
+                            Salin URL di atas lalu masukkan ke menu <strong>Profil Pengguna ➜ Callback URL</strong> di <em>premku.com</em>. Sistem NandarStore akan otomatis menerima akun &amp; menyelesaikan pesanan secara asinkron.
+                        </p>
+                    </div>
+
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Preflix ID User</label>

@@ -77,6 +77,8 @@ class AdminController extends Controller
     
     public function settings() {
         $premkuApiKey = Setting::where('key', 'premku_api_key')->value('value');
+        $premkuApiSecret = Setting::where('key', 'premku_api_secret')->value('value') ?? '';
+        $premkuWebhookUrl = url('/api/webhook/premku');
         $preflixIdUser = Setting::where('key', 'preflix_id_user')->value('value');
         $preflixKeyUser = Setting::where('key', 'preflix_key_user')->value('value');
         
@@ -179,7 +181,7 @@ class AdminController extends Controller
         }
 
         return view('admin.settings', compact(
-            'premkuApiKey', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
+            'premkuApiKey', 'premkuApiSecret', 'premkuWebhookUrl', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
             'adminWhatsapp', 'botWhatsapp', 'whatsappGroupLink', 'premkuStatus', 'preflixStatus',
             'storeName', 'storeTagline', 'storeLogo', 'storeFavicon', 'loadingLogo',
             'kiosbankHost', 'kiosbankPort', 'kiosbankProtocol', 'kiosbankUsername', 'kiosbankPassword',
@@ -402,6 +404,9 @@ class AdminController extends Controller
         }
 
         Setting::updateOrCreate(['key' => 'premku_api_key'], ['value' => $request->premku_api_key]);
+        if ($request->has('premku_api_secret')) {
+            Setting::updateOrCreate(['key' => 'premku_api_secret'], ['value' => trim($request->premku_api_secret)]);
+        }
         Setting::updateOrCreate(['key' => 'preflix_id_user'], ['value' => $request->preflix_id_user]);
         Setting::updateOrCreate(['key' => 'preflix_key_user'], ['value' => $request->preflix_key_user]);
         Setting::updateOrCreate(['key' => 'promo_markup_percent'], ['value' => $request->promo_markup_percent]);

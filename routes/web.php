@@ -183,3 +183,7 @@ Route::post('/api/webhook/wa-incoming', [\App\Http\Controllers\WebhookController
 
 // Route Webhook Callback Resmi Kiosbank PPOB
 Route::post('/api/webhook/kiosbank', [\App\Http\Controllers\WebhookController::class, 'handleKiosbank'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Route Webhook Callback Resmi Premku API (v3.8 Instant + Webhook)
+Route::post('/api/webhook/premku', [\App\Http\Controllers\WebhookController::class, 'handlePremku'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+Route::post('/webhook/premku', [\App\Http\Controllers\WebhookController::class, 'handlePremku'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);

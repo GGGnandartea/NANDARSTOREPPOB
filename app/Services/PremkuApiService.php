@@ -79,4 +79,59 @@ class PremkuApiService
             'invoice' => $invoice
         ])->json();
     }
+
+    /**
+     * Alight Motion API - Buy Bulk (Generate masal, max 200)
+     */
+    public function amBuyBulk($qty, $refId = null)
+    {
+        $payload = [
+            'api_key' => $this->apiKey,
+            'action'  => 'buy_bulk',
+            'qty'     => (int) $qty,
+        ];
+        if ($refId) {
+            $payload['ref_id'] = $refId;
+        }
+
+        return Http::post($this->baseUrl . 'am', $payload)->json();
+    }
+
+    /**
+     * Alight Motion API - Buy Single (Kirim link verifikasi ke email)
+     */
+    public function amBuySingle($email)
+    {
+        return Http::post($this->baseUrl . 'am', [
+            'api_key' => $this->apiKey,
+            'action'  => 'buy_single',
+            'email'   => $email,
+        ])->json();
+    }
+
+    /**
+     * Alight Motion API - Verify Single (Verifikasi link aktivasi email)
+     */
+    public function amVerifySingle($invoice, $email, $link)
+    {
+        return Http::post($this->baseUrl . 'am', [
+            'api_key' => $this->apiKey,
+            'action'  => 'verify_single',
+            'invoice' => $invoice,
+            'email'   => $email,
+            'link'    => $link,
+        ])->json();
+    }
+
+    /**
+     * Alight Motion API - Cancel Single (Batalkan order pending)
+     */
+    public function amCancelSingle($invoice)
+    {
+        return Http::post($this->baseUrl . 'am', [
+            'api_key' => $this->apiKey,
+            'action'  => 'cancel_single',
+            'invoice' => $invoice,
+        ])->json();
+    }
 }

@@ -213,6 +213,136 @@ class WebhookController extends Controller
         return response()->json(['rc' => '00', 'message' => 'Success'], 200);
     }
 
+    /**
+     * Webhook Callback Resmi dari Premku API (Versi 3.8 Instant + Webhook)
+     * Menerima notifikasi realtime 'order.success' dari premku.com
+     * Dilengkapi verifikasi keamanan HMAC-SHA256 via X-Premku-Signature
+     */
+    public function handlePremku(Request $request)
+    {
+        $rawPayload = $request->getContent();
+        Log::info('[PREMKU-WEBHOOK-RECEIVED] ' . $rawPayload);
+
+        // 1. Ambil Signature dari Header (X-Premku-Signature)
+        $signature = $request->header('X-Premku-Signature') 
+            ?? $request->header('x-premku-signature') 
+            ?? ($_SERVER['HTTP_X_PREMKU_SIGNATURE'] ?? '');
+
+        // 2. Verifikasi HMAC-SHA256 menggunakan API Secret dari panel Admin
+        $apiSecret = Setting::where('key', 'premku_api_secret')->value('value');
+        if (!empty($apiSecret)) {
+            $expectedSig = hash_hmac('sha256', $rawPayload, $apiSecret);
+            if (empty($signature) || !hash_equals($expectedSig, $signature)) {
+                Log::warning('[PREMKU-WEBHOOK] Akses ditolak: Signature HMAC tidak cocok! Header: ' . $signature);
+                return response()->json(['status' => false, 'message' => 'Invalid Signature'], 403);
+            }
+        } else {
+            Log::info('[PREMKU-WEBHOOK] Catatan: premku_api_secret belum diatur di panel admin. Pemeriksaan signature dilewati.');
+        }
+
+        // 3. Decode Payload JSON
+        $body = json_decode($rawPayload, true);
+        if (!$body || !is_array($body)) {
+            return response()->json(['status' => false, 'message' => 'Invalid JSON payload'], 400);
+        }
+
+        $event = $body['event'] ?? '';
+        $data  = $body['data'] ?? [];
+
+        // 4. Proses Transaksi Sukses ('order.success' atau status 'success')
+        if ($event === 'order.success' || strtolower($data['status'] ?? '') === 'success') {
+            $invoice = $data['invoice'] ?? null; // Invoice transaksi di server Premku
+            $refId   = $data['ref_id'] ?? null;  // Invoice toko NandarStore
+
+            if (!$refId && !$invoice) {
+                return response()->json(['status' => false, 'message' => 'Missing ref_id and invoice'], 400);
+            }
+
+            // Cari pesanan berdasarkan ref_id (invoice toko) atau api_trx_id
+            $order = null;
+            if ($refId) {
+                $order = Order::where('invoice_number', $refId)->first();
+            }
+            if (!$order && $invoice) {
+                $order = Order::where('api_trx_id', $invoice)
+                    ->orWhere('invoice_number', $invoice)
+                    ->first();
+            }
+
+            if (!$order) {
+                Log::warning("[PREMKU-WEBHOOK] Pesanan tidak ditemukan untuk ref_id: {$refId} / invoice: {$invoice}");
+                return response()->json(['status' => true, 'message' => 'Order not found, acknowledged'], 200);
+            }
+
+            // Cek Idempotency: Jika pesanan sudah completed dengan akun valid, jangan proses ulang
+            if ($order->order_status === 'completed' && !empty($order->sn_or_account) && !\App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
+                Log::info("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} sudah selesai (completed). Acknowledged.");
+                return response()->json(['status' => true, 'message' => 'Webhook received (already completed)'], 200);
+            }
+
+            // Ekstrak Akun dari data.accounts
+            $accounts = $data['accounts'] ?? [];
+            $formattedAccounts = [];
+
+            if (is_array($accounts)) {
+                foreach ($accounts as $acc) {
+                    if (is_array($acc)) {
+                        $u = $acc['username'] ?? $acc['email'] ?? $acc['user'] ?? '';
+                        $p = $acc['password'] ?? $acc['pass'] ?? '';
+                        if (!empty($u) || !empty($p)) {
+                            $formattedAccounts[] = "Email / User: {$u}\nPassword: {$p}";
+                        }
+                    } elseif (is_string($acc) && !\App\Services\OrderFulfillmentService::isWaitingText($acc)) {
+                        $formattedAccounts[] = trim($acc);
+                    }
+                }
+            }
+
+            $snText = !empty($formattedAccounts) 
+                ? implode("\n---\n", $formattedAccounts) 
+                : (\App\Services\OrderFulfillmentService::extractSnFromData($data) ?? 'Akun berhasil dikirim oleh provider.');
+
+            // Update status pesanan ke database
+            $order->sn_or_account   = $snText;
+            $order->account_details = $snText;
+            $order->order_status    = 'completed';
+            $order->payment_status  = 'paid';
+            $order->provider        = 'Premku';
+            if ($invoice) {
+                $order->api_trx_id = (string) $invoice;
+            }
+            $order->notes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Premku: SUCCESS (Inv: {$invoice})";
+            $order->save();
+
+            Log::info("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} berhasil diproses & diselesaikan via webhook Premku.");
+
+            // Kirim notifikasi WhatsApp otomatis ke pembeli jika nomor terverifikasi
+            try {
+                self::sendOrderNotification($order);
+            } catch (\Exception $e) {
+                Log::error('[PREMKU-WEBHOOK-WA-ERROR] ' . $e->getMessage());
+            }
+
+        } elseif (in_array(strtolower($data['status'] ?? ''), ['failed', 'canceled', 'gagal'])) {
+            $refId   = $data['ref_id'] ?? null;
+            $invoice = $data['invoice'] ?? null;
+            $order   = $refId ? Order::where('invoice_number', $refId)->first() : null;
+            if (!$order && $invoice) {
+                $order = Order::where('api_trx_id', $invoice)->first();
+            }
+
+            if ($order && $order->order_status !== 'completed') {
+                $order->order_status = 'failed';
+                $order->notes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Premku GAGAL (Inv: {$invoice})";
+                $order->save();
+                Log::warning("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} ditandai gagal dari callback Premku.");
+            }
+        }
+
+        // Response HTTP 200 OK wajib dikembalikan dalam 4 detik
+        return response()->json(['status' => true, 'message' => 'Webhook received'], 200);
+    }
+
     // Webhook Pesan Masuk WA (Bot / Gateway otomatis memverifikasi saat user kirim kode unik)
     public function handleWaIncoming(Request $request) {
         $message = $request->input('message') ?? $request->input('body') ?? $request->input('text') ?? '';
