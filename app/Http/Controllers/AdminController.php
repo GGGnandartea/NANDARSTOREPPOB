@@ -1201,11 +1201,43 @@ class AdminController extends Controller
         // Query dasar berdasar rentang tanggal
         $ordersQuery = Order::whereBetween('created_at', [$startDate, $endDate]);
 
-        // Ringkasan Statistik
+        // Ringkasan Statistik & Analisis Laba Bersih
         $paidStatuses = ['paid', 'success', 'settlement'];
         
-        $totalRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->sum('total_amount');
-        $successOrdersCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->count();
+        $kiosbankMarkupType = Setting::where('key', 'kiosbank_markup_type')->value('value') ?: 'fixed';
+        $kiosbankMarkupVal = (int) (Setting::where('key', 'kiosbank_markup_value')->value('value') ?: 1000);
+
+        // Ambil data pesanan lunas untuk kalkulasi Omset, Modal, dan Keuntungan Bersih
+        $paidOrders = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->with('product')->get();
+
+        $totalRevenue = 0;
+        $totalCost = 0;
+        $totalProfit = 0;
+
+        foreach ($paidOrders as $ord) {
+            $rev = (float) $ord->total_amount;
+            $totalRevenue += $rev;
+
+            $cost = 0;
+            if ($ord->product_type === 'ppob') {
+                $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                $cost = max(0, $rev - $prof);
+            } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
+                $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
+                $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
+            } else {
+                $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
+            }
+
+            $prof = max(0, $rev - $cost);
+            $totalCost += $cost;
+            $totalProfit += $prof;
+        }
+
+        $profitMargin = $totalRevenue > 0 ? round(($totalProfit / $totalRevenue) * 100, 1) : 0;
+
+        $successOrdersCount = $paidOrders->count();
         $pendingOrdersCount = (clone $ordersQuery)->where('payment_status', 'pending')->count();
         $failedOrdersCount = (clone $ordersQuery)->whereIn('payment_status', ['failed', 'canceled', 'expired'])->count();
         $totalOrdersCount = (clone $ordersQuery)->count();
@@ -1213,11 +1245,13 @@ class AdminController extends Controller
         $avgOrderValue = $successOrdersCount > 0 ? round($totalRevenue / $successOrdersCount) : 0;
         $successRate = $totalOrdersCount > 0 ? round(($successOrdersCount / $totalOrdersCount) * 100, 1) : 100;
 
-        // Distribusi Tipe Produk (API vs Local)
+        // Distribusi Tipe Produk (API vs Local vs PPOB)
         $apiRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'api')->sum('total_amount');
         $localRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'local')->sum('total_amount');
+        $ppobRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'ppob')->sum('total_amount');
         $apiCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'api')->count();
         $localCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'local')->count();
+        $ppobCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'ppob')->count();
 
         // Top 5 Produk Terlaris
         $topProducts = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
@@ -1227,9 +1261,10 @@ class AdminController extends Controller
             ->limit(5)
             ->get();
 
-        // Generate Data Grafik Tren Harian
+        // Generate Data Grafik Tren Harian / Periode Terpilih
         $chartLabels = [];
         $chartRevenue = [];
+        $chartProfit = [];
         $chartOrderCount = [];
 
         $diffDays = $startDate->diffInDays($endDate);
@@ -1239,15 +1274,34 @@ class AdminController extends Controller
                 $dayStr = $periodCursor->toDateString();
                 $chartLabels[] = $periodCursor->translatedFormat('d M');
 
-                $dayRev = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
+                $dayOrders = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
                     ->whereDate('created_at', $dayStr)
-                    ->sum('total_amount');
-                $dayCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
-                    ->whereDate('created_at', $dayStr)
-                    ->count();
+                    ->with('product')
+                    ->get();
+
+                $dayRev = 0;
+                $dayProf = 0;
+                foreach ($dayOrders as $ord) {
+                    $rev = (float) $ord->total_amount;
+                    $dayRev += $rev;
+
+                    $cost = 0;
+                    if ($ord->product_type === 'ppob') {
+                        $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                        if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                        $cost = max(0, $rev - $prof);
+                    } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
+                        $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
+                        $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
+                    } else {
+                        $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
+                    }
+                    $dayProf += max(0, $rev - $cost);
+                }
 
                 $chartRevenue[] = (int) $dayRev;
-                $chartOrderCount[] = (int) $dayCount;
+                $chartProfit[] = (int) $dayProf;
+                $chartOrderCount[] = (int) $dayOrders->count();
 
                 $periodCursor->addDay();
             }
@@ -1255,28 +1309,107 @@ class AdminController extends Controller
             // Jika lebih dari 31 hari, kelompokkan per bulan
             $periodCursor = $startDate->copy()->startOfMonth();
             while ($periodCursor->lte($endDate)) {
-                $monthStr = $periodCursor->format('Y-m');
                 $chartLabels[] = $periodCursor->translatedFormat('M Y');
 
-                $monthRev = Order::whereIn('payment_status', $paidStatuses)
+                $monthOrders = Order::whereIn('payment_status', $paidStatuses)
                     ->whereYear('created_at', $periodCursor->year)
                     ->whereMonth('created_at', $periodCursor->month)
-                    ->sum('total_amount');
-                $monthCount = Order::whereIn('payment_status', $paidStatuses)
-                    ->whereYear('created_at', $periodCursor->year)
-                    ->whereMonth('created_at', $periodCursor->month)
-                    ->count();
+                    ->with('product')
+                    ->get();
+
+                $monthRev = 0;
+                $monthProf = 0;
+                foreach ($monthOrders as $ord) {
+                    $rev = (float) $ord->total_amount;
+                    $monthRev += $rev;
+
+                    $cost = 0;
+                    if ($ord->product_type === 'ppob') {
+                        $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                        if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                        $cost = max(0, $rev - $prof);
+                    } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
+                        $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
+                        $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
+                    } else {
+                        $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
+                    }
+                    $monthProf += max(0, $rev - $cost);
+                }
 
                 $chartRevenue[] = (int) $monthRev;
-                $chartOrderCount[] = (int) $monthCount;
+                $chartProfit[] = (int) $monthProf;
+                $chartOrderCount[] = (int) $monthOrders->count();
 
                 $periodCursor->addMonth();
             }
         }
 
+        // Laporan Bulanan Lengkap (12 Bulan Terakhir)
+        $monthlyReports = [];
+        $monthlyLabels = [];
+        $monthlyRevenueData = [];
+        $monthlyProfitData = [];
+
+        for ($i = 11; $i >= 0; $i--) {
+            $mCarbon = now()->copy()->subMonths($i);
+            $mYear = $mCarbon->year;
+            $mMonth = $mCarbon->month;
+            $mLabel = $mCarbon->translatedFormat('F Y');
+            $mShortLabel = $mCarbon->translatedFormat('M Y');
+
+            $mOrders = Order::whereIn('payment_status', $paidStatuses)
+                ->whereYear('created_at', $mYear)
+                ->whereMonth('created_at', $mMonth)
+                ->with('product')
+                ->get();
+
+            $mRev = 0;
+            $mCost = 0;
+            $mProf = 0;
+
+            foreach ($mOrders as $ord) {
+                $rev = (float) $ord->total_amount;
+                $mRev += $rev;
+
+                $cost = 0;
+                if ($ord->product_type === 'ppob') {
+                    $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                    if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                    $cost = max(0, $rev - $prof);
+                } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
+                    $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
+                    $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
+                } else {
+                    $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
+                }
+
+                $mProf += max(0, $rev - $cost);
+                $mCost += $cost;
+            }
+
+            $mMargin = $mRev > 0 ? round(($mProf / $mRev) * 100, 1) : 0;
+
+            $monthlyReports[] = [
+                'year'        => $mYear,
+                'month'       => $mMonth,
+                'label'       => $mLabel,
+                'short_label' => $mShortLabel,
+                'order_count' => $mOrders->count(),
+                'revenue'     => (int) $mRev,
+                'cost'        => (int) $mCost,
+                'profit'      => (int) $mProf,
+                'margin'      => $mMargin,
+            ];
+
+            $monthlyLabels[] = $mShortLabel;
+            $monthlyRevenueData[] = (int) $mRev;
+            $monthlyProfitData[] = (int) $mProf;
+        }
+
         // Tabel Data Pesanan (Paginated)
         $orders = (clone $ordersQuery)
-            ->with('user')
+            ->with(['user', 'product'])
             ->orderBy('created_at', 'desc')
             ->paginate(15)
             ->withQueryString();
@@ -1289,6 +1422,9 @@ class AdminController extends Controller
             'startDate',
             'endDate',
             'totalRevenue',
+            'totalCost',
+            'totalProfit',
+            'profitMargin',
             'successOrdersCount',
             'pendingOrdersCount',
             'failedOrdersCount',
@@ -1297,12 +1433,19 @@ class AdminController extends Controller
             'successRate',
             'apiRevenue',
             'localRevenue',
+            'ppobRevenue',
             'apiCount',
             'localCount',
+            'ppobCount',
             'topProducts',
             'chartLabels',
             'chartRevenue',
+            'chartProfit',
             'chartOrderCount',
+            'monthlyReports',
+            'monthlyLabels',
+            'monthlyRevenueData',
+            'monthlyProfitData',
             'orders'
         ));
     }

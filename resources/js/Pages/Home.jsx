@@ -664,19 +664,19 @@ export default function Home({ products = [], categories = [], manualCategories 
 
 
 
-            {/* LIVE NOTIFICATION TOAST (REALTIME 24H BUYERS LOOP) */}
-            <div className={`fixed bottom-6 left-6 z-50 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showNotif ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-90 pointer-events-none'}`}>
-                <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md p-3 pr-5 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/40 text-green-500 rounded-full flex items-center justify-center shrink-0">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+            {/* LIVE NOTIFICATION TOAST (SUPER COMPACT ON MOBILE, POSITIONED ABOVE NAVBAR) */}
+            <div className={`fixed bottom-[3.8rem] left-2 sm:bottom-6 sm:left-6 z-40 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showNotif ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-10 opacity-0 scale-90 pointer-events-none'}`}>
+                <div className="bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md p-1.5 px-2.5 sm:p-3 sm:pr-5 rounded-xl sm:rounded-2xl shadow-xl border border-gray-200/90 dark:border-white/10 flex items-center gap-2 sm:gap-3 max-w-[210px] sm:max-w-xs">
+                    <div className="w-6 h-6 sm:w-10 sm:h-10 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
                     </div>
-                    <div>
-                        <p className="text-xs font-black text-gray-900 dark:text-white">
-                            <span className="text-orange-500">{activeNotif?.name || 'Pelanggan'}</span> baru saja membeli
+                    <div className="min-w-0">
+                        <p className="text-[10px] sm:text-xs font-black text-gray-900 dark:text-white leading-tight truncate">
+                            <span className="text-orange-500 font-extrabold">{activeNotif?.name || 'Pelanggan'}</span> beli:
                         </p>
-                        <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 truncate max-w-[220px]">{activeNotif?.product}</p>
-                        <span className="text-[9px] font-extrabold text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <p className="text-[9px] sm:text-[11px] font-bold text-gray-600 dark:text-gray-300 truncate max-w-[130px] sm:max-w-[200px] leading-tight">{activeNotif?.product}</p>
+                        <span className="text-[8px] sm:text-[9px] font-extrabold text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             {activeNotif?.time_ago || 'Baru saja'}
                         </span>
                     </div>
@@ -1059,8 +1059,8 @@ export default function Home({ products = [], categories = [], manualCategories 
                     </div>
                 )}
 
-                {/* SLIDER KATEGORI */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-4 sm:p-6 mb-4 relative group/slider">
+                {/* SLIDER KATEGORI & PRODUK */}
+                <div id="katalog-produk" className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-4 sm:p-6 mb-4 relative group/slider scroll-mt-20">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm sm:text-base font-extrabold text-black dark:text-white">Kategori Premium Populer</h2>
                         <button onClick={() => setShowCategoryModal(true)} className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline transition-colors cursor-pointer bg-orange-50 dark:bg-orange-900/30 px-3 py-1.5 rounded-full">
@@ -1311,7 +1311,7 @@ export default function Home({ products = [], categories = [], manualCategories 
             </footer>
 
             {/* FLOATING ACTION BUTTON */}
-            <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3">
+            <div className="fixed bottom-16 sm:bottom-6 right-3.5 sm:right-6 z-40 flex flex-col items-end gap-3">
                 <div className={`flex flex-col gap-3 transition-all duration-300 origin-bottom ${showFabMenu ? 'scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-10 pointer-events-none'}`}>
                     <a href={whatsappGroupLink || "https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H"} target="_blank" rel="noreferrer" className="flex items-center gap-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-xl px-4 py-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group cursor-pointer">
                         <span className="text-xs font-extrabold text-gray-700 dark:text-gray-200">Join Grup WA</span>
@@ -1326,18 +1326,18 @@ export default function Home({ products = [], categories = [], manualCategories 
                         </div>
                     </a>
                 </div>
-                <button onClick={() => setShowFabMenu(!showFabMenu)} className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-[0_10px_30px_-10px_rgba(249,115,22,0.6)] transition-all duration-300 cursor-pointer ${showFabMenu ? 'bg-gray-800 dark:bg-gray-700 rotate-45' : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-1 hover:scale-105'}`}>
+                <button onClick={() => setShowFabMenu(!showFabMenu)} className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white shadow-[0_10px_30px_-10px_rgba(249,115,22,0.6)] transition-all duration-300 cursor-pointer ${showFabMenu ? 'bg-gray-800 dark:bg-gray-700 rotate-45' : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-1 hover:scale-105'}`}>
                     {showFabMenu ? (
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
                     ) : (
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                     )}
                 </button>
             </div>
 
             {/* MODAL LACAK PESANAN */}
             {showTrackModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+                <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pb-20 sm:pb-4 bg-black/60 backdrop-blur-sm transition-opacity">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-fade-in-up border border-gray-100 dark:border-gray-700">
                         <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                             <h3 className="text-lg font-black dark:text-white flex items-center gap-2">
@@ -1461,27 +1461,70 @@ export default function Home({ products = [], categories = [], manualCategories 
                 </div>
             )}
 
-            {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) */}
-            <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 px-2 py-1.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-                <div className="grid grid-cols-4 items-center">
-                    <Link href="/" className="flex flex-col items-center justify-center py-1 text-orange-500 dark:text-orange-400">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-                        <span className="text-[10px] font-extrabold mt-0.5">Beranda</span>
-                    </Link>
-                    <Link href="/ppob" className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 relative">
-                        <div className="relative">
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
-                            <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-emerald-500 text-[8px] font-black text-white leading-none">HOT</span>
-                        </div>
-                        <span className="text-[10px] font-extrabold mt-0.5">PPOB 24 Jam</span>
-                    </Link>
-                    <button type="button" onClick={() => setShowTrackModal(true)} className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500 cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-                        <span className="text-[10px] font-extrabold mt-0.5">Lacak</span>
+            {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) - PERSISTENT & SLEEK */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-xl border-t border-gray-200/90 dark:border-white/10 px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+                <div className="grid grid-cols-5 items-center">
+                    {/* 1. Beranda */}
+                    <button 
+                        type="button" 
+                        onClick={() => { 
+                            setShowTrackModal(false); 
+                            setShowCategoryModal(false); 
+                            window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                        }} 
+                        className={`flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${!showTrackModal && !showCategoryModal ? 'text-orange-500 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400 hover:text-orange-500'}`}
+                    >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                        <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Beranda</span>
                     </button>
-                    <Link href={auth?.user ? (auth.user.role === 'admin' ? '/admin/dashboard' : '/profile') : '/login'} className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        <span className="text-[10px] font-extrabold mt-0.5">{auth?.user ? 'Profil' : 'Masuk'}</span>
+
+                    {/* 2. Aplikasi Premium */}
+                    <button 
+                        type="button" 
+                        onClick={() => { 
+                            setShowTrackModal(false); 
+                            setShowCategoryModal(false); 
+                            const el = document.getElementById('katalog-produk'); 
+                            if (el) { 
+                                el.scrollIntoView({ behavior: 'smooth' }); 
+                            } else { 
+                                setShowCategoryModal(true); 
+                            } 
+                        }} 
+                        className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 cursor-pointer transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="3" y="3" width="7" height="7" rx="2" strokeWidth="2" />
+                            <rect x="14" y="3" width="7" height="7" rx="2" strokeWidth="2" />
+                            <rect x="14" y="14" width="7" height="7" rx="2" strokeWidth="2" />
+                            <rect x="3" y="14" width="7" height="7" rx="2" strokeWidth="2" />
+                        </svg>
+                        <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Aplikasi</span>
+                    </button>
+
+                    {/* 3. PPOB 24 Jam */}
+                    <Link href="/ppob" className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 relative transition-colors">
+                        <div className="relative">
+                            <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
+                            <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-emerald-500 text-[6.5px] font-black text-white leading-none">HOT</span>
+                        </div>
+                        <span className="text-[8.5px] font-black mt-0.5 tracking-tight text-emerald-600 dark:text-emerald-400">PPOB 24H</span>
+                    </Link>
+
+                    {/* 4. Lacak Pesanan */}
+                    <button 
+                        type="button" 
+                        onClick={() => setShowTrackModal(!showTrackModal)} 
+                        className={`flex flex-col items-center justify-center py-1 cursor-pointer transition-colors ${showTrackModal ? 'text-orange-500 dark:text-orange-400 font-black' : 'text-gray-500 dark:text-gray-400 hover:text-orange-500'}`}
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                        <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Lacak</span>
+                    </button>
+
+                    {/* 5. Profil / Masuk */}
+                    <Link href={auth?.user ? (auth.user.role === 'admin' ? '/admin/dashboard' : '/profile') : '/login'} className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span className="text-[8.5px] font-black mt-0.5 tracking-tight">{auth?.user ? 'Profil' : 'Masuk'}</span>
                     </Link>
                 </div>
             </div>

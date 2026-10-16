@@ -284,3 +284,4 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
         </div>
     );
 }
+

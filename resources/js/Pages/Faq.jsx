@@ -497,3 +497,4 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
         </div>
     );
 }
+

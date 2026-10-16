@@ -84,14 +84,14 @@
         </div>
     </div>
 
-    <!-- 4 Kartu Metrik Performa Bisnis -->
+    <!-- 4 Kartu Metrik Performa Bisnis & Laba Bersih -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         
-        <!-- Kartu 1: Total Omset Lunas -->
+        <!-- Kartu 1: Total Omset Lunas (Kotor) -->
         <div class="stat-card card-blue">
             <div class="stat-ambient"></div>
             <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Total Omset (Lunas)</span>
+                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Total Omset (Kotor)</span>
                 <div class="w-10 h-10 rounded-2xl gradient-blue text-white flex items-center justify-center shadow-md shadow-blue-500/25">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
@@ -101,17 +101,54 @@
             </h3>
             <div class="flex items-center gap-2 mt-2">
                 <span class="inline-flex items-center text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800/40">
-                    {{ $successOrdersCount }} Transaksi Lunas
+                    {{ $successOrdersCount }} Pesanan Lunas
                 </span>
             </div>
         </div>
 
-        <!-- Kartu 2: Volume Pesanan Masuk -->
-        <div class="stat-card card-green">
+        <!-- Kartu 2: Estimasi Beban Modal / HPP -->
+        <div class="stat-card card-orange">
             <div class="stat-ambient"></div>
             <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Total Pesanan</span>
-                <div class="w-10 h-10 rounded-2xl gradient-green text-white flex items-center justify-center shadow-md shadow-emerald-500/25">
+                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Estimasi Modal (HPP)</span>
+                <div class="w-10 h-10 rounded-2xl gradient-orange text-white flex items-center justify-center shadow-md shadow-orange-500/25">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                </div>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                Rp {{ number_format($totalCost, 0, ',', '.') }}
+            </h3>
+            <div class="flex items-center gap-2 mt-2">
+                <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Modal API & Provider</span>
+            </div>
+        </div>
+
+        <!-- Kartu 3: KEUNTUNGAN BERSIH (NET PROFIT) -->
+        <div class="stat-card relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-500/15 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-lg shadow-emerald-500/10">
+            <div class="stat-ambient"></div>
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Keuntungan Bersih</span>
+                <div class="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </div>
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                Rp {{ number_format($totalProfit, 0, ',', '.') }}
+            </h3>
+            <div class="flex items-center gap-2 mt-2">
+                <span class="inline-flex items-center text-[10px] font-black text-white bg-emerald-600 px-2.5 py-0.5 rounded-full shadow-sm">
+                    Margin: {{ $profitMargin }}%
+                </span>
+                <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Laba Bersih</span>
+            </div>
+        </div>
+
+        <!-- Kartu 4: Volume & Tingkat Keberhasilan -->
+        <div class="stat-card card-purple">
+            <div class="stat-ambient"></div>
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Total Transaksi Masuk</span>
+                <div class="w-10 h-10 rounded-2xl gradient-purple text-white flex items-center justify-center shadow-md shadow-purple-500/25">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
                 </div>
             </div>
@@ -119,43 +156,9 @@
                 {{ $totalOrdersCount }}
             </h3>
             <div class="flex items-center gap-2 mt-2">
-                <span class="inline-flex items-center text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
+                <span class="inline-flex items-center text-[10px] font-black text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800/40">
                     {{ $successRate }}% Tingkat Sukses
                 </span>
-            </div>
-        </div>
-
-        <!-- Kartu 3: Rata-rata Nilai Pesanan (AOV) -->
-        <div class="stat-card card-purple">
-            <div class="stat-ambient"></div>
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Rata-rata Order (AOV)</span>
-                <div class="w-10 h-10 rounded-2xl gradient-purple text-white flex items-center justify-center shadow-md shadow-purple-500/25">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                </div>
-            </div>
-            <h3 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                Rp {{ number_format($avgOrderValue, 0, ',', '.') }}
-            </h3>
-            <div class="flex items-center gap-2 mt-2">
-                <span class="text-[11px] font-medium text-gray-400">Per Pembelian Lunas</span>
-            </div>
-        </div>
-
-        <!-- Kartu 4: Status Transaksi Tertunda & Batal -->
-        <div class="stat-card card-orange">
-            <div class="stat-ambient"></div>
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-bold text-gray-500 dark:text-gray-400">Pending & Batal</span>
-                <div class="w-10 h-10 rounded-2xl gradient-orange text-white flex items-center justify-center shadow-md shadow-orange-500/25">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </div>
-            </div>
-            <h3 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                {{ $pendingOrdersCount }} <span class="text-xs font-normal text-gray-400">Pending /</span> {{ $failedOrdersCount }} <span class="text-xs font-normal text-rose-500">Batal</span>
-            </h3>
-            <div class="flex items-center gap-2 mt-2">
-                <span class="text-[11px] font-medium text-gray-400">Dalam periode ini</span>
             </div>
         </div>
 
@@ -164,22 +167,40 @@
     <!-- Area Grafik Interaktif (Chart.js Lokal) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Grafik Utama: Tren Omset Penjualan (2 Kolom) -->
+        <!-- Grafik Utama: Tren Omset & Keuntungan Bersih (2 Kolom) -->
         <div class="lg:col-span-2 admin-card p-6 sm:p-7">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                     <h3 class="text-base sm:text-lg font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-                        <span>📈 Tren Penjualan Harian</span>
+                        <span>📈 Tren Penjualan &amp; Laba Bersih</span>
                         <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
                             Realtime
                         </span>
                     </h3>
-                    <p class="text-xs text-gray-400 font-medium">Grafik omset harian yang berhasil dibayarkan pelanggan</p>
+                    <p class="text-xs text-gray-400 font-medium">Monitoring perbandingan omset kotor vs keuntungan bersih riil toko</p>
                 </div>
-                <div class="flex items-center gap-3 text-xs font-bold text-gray-500">
-                    <div class="flex items-center gap-1.5">
-                        <span class="w-3 h-3 rounded-full bg-orange-500"></span>
-                        <span class="dark:text-gray-300">Omset (Rp)</span>
+                
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Toggle Periode vs 12 Bulan -->
+                    <div class="inline-flex p-1 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200/80 dark:border-white/10 text-xs font-bold">
+                        <button type="button" id="btnChartPeriod" class="px-2.5 py-1 rounded-lg transition-all cursor-pointer bg-orange-500 text-white shadow-sm font-black">
+                            Periode Ini
+                        </button>
+                        <button type="button" id="btnChartMonthly" class="px-2.5 py-1 rounded-lg transition-all cursor-pointer text-gray-600 dark:text-gray-300 hover:text-orange-500 font-bold">
+                            12 Bulan
+                        </button>
+                    </div>
+
+                    <!-- Legend Indikator -->
+                    <div class="flex items-center gap-3 text-[11px] font-black pl-2">
+                        <div class="flex items-center gap-1.5 text-orange-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                            <span>Omset</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-emerald-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span>Laba Bersih</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -253,6 +274,94 @@
 
         </div>
 
+    </div>
+
+    <!-- TABEL REKAP KEUNTUNGAN BERSIH BULANAN -->
+    <div class="admin-card overflow-hidden bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/5 rounded-3xl shadow-sm">
+        <div class="p-5 sm:p-6 border-b border-gray-100 dark:border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-lg">
+                    💰
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                        <span>Laporan Keuntungan Bersih Bulanan</span>
+                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                            12 Bulan Terakhir
+                        </span>
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                        Rincian riil omset kotor, modal provider (HPP), dan laba bersih per bulan
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left admin-table">
+                <thead>
+                    <tr>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400">Bulan &amp; Tahun</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400 text-center">Pesanan Lunas</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400">Total Omset Kotor</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400">Modal Provider (HPP)</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400">Keuntungan Bersih</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400 text-center">Margin Laba</th>
+                        <th class="py-3.5 px-4 text-xs font-black uppercase text-gray-500 dark:text-gray-400 text-right">Status Profit</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                    @forelse(array_reverse($monthlyReports) as $mr)
+                        <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                            <td class="py-3.5 px-4 font-black text-xs text-gray-900 dark:text-white">
+                                {{ $mr['label'] }}
+                                @if($mr['year'] == now()->year && $mr['month'] == now()->month)
+                                    <span class="ml-1.5 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400">
+                                        Bulan Berjalan
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="py-3.5 px-4 text-center">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-white/5 text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    {{ $mr['order_count'] }} Order
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 font-bold text-xs text-blue-600 dark:text-blue-400">
+                                Rp {{ number_format($mr['revenue'], 0, ',', '.') }}
+                            </td>
+                            <td class="py-3.5 px-4 font-bold text-xs text-gray-500 dark:text-gray-400">
+                                Rp {{ number_format($mr['cost'], 0, ',', '.') }}
+                            </td>
+                            <td class="py-3.5 px-4 font-black text-sm text-emerald-600 dark:text-emerald-400">
+                                Rp {{ number_format($mr['profit'], 0, ',', '.') }}
+                            </td>
+                            <td class="py-3.5 px-4 text-center">
+                                <span class="inline-flex items-center text-[11px] font-black {{ $mr['margin'] >= 25 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400' }}">
+                                    {{ $mr['margin'] }}%
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 text-right">
+                                @if($mr['profit'] > 0)
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                                        <span>✓</span> Laba Sehat
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 border border-gray-200 dark:border-white/10">
+                                        Belum Ada
+                                    </span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-gray-400 text-xs font-bold">
+                                Belum ada data transaksi bulanan yang terekam.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Tabel Rincian Data Transaksi Periode Ini -->
@@ -406,6 +515,45 @@
         const ctx = canvas.getContext('2d');
         
         let chartInstance = null;
+        let currentMode = 'period'; // 'period' atau 'monthly'
+
+        const periodLabels = {!! json_encode($chartLabels) !!};
+        const periodRevenue = {!! json_encode($chartRevenue) !!};
+        const periodProfit = {!! json_encode($chartProfit) !!};
+
+        const monthlyLabels = {!! json_encode($monthlyLabels) !!};
+        const monthlyRevenue = {!! json_encode($monthlyRevenueData) !!};
+        const monthlyProfit = {!! json_encode($monthlyProfitData) !!};
+
+        const btnPeriod = document.getElementById('btnChartPeriod');
+        const btnMonthly = document.getElementById('btnChartMonthly');
+
+        function updateToggleButtons() {
+            if (!btnPeriod || !btnMonthly) return;
+            if (currentMode === 'period') {
+                btnPeriod.className = 'px-2.5 py-1 rounded-lg transition-all cursor-pointer bg-orange-500 text-white shadow-sm font-black';
+                btnMonthly.className = 'px-2.5 py-1 rounded-lg transition-all cursor-pointer text-gray-600 dark:text-gray-300 hover:text-orange-500 font-bold';
+            } else {
+                btnMonthly.className = 'px-2.5 py-1 rounded-lg transition-all cursor-pointer bg-emerald-500 text-white shadow-sm font-black';
+                btnPeriod.className = 'px-2.5 py-1 rounded-lg transition-all cursor-pointer text-gray-600 dark:text-gray-300 hover:text-emerald-500 font-bold';
+            }
+        }
+
+        if (btnPeriod) {
+            btnPeriod.addEventListener('click', function() {
+                currentMode = 'period';
+                updateToggleButtons();
+                renderChart();
+            });
+        }
+
+        if (btnMonthly) {
+            btnMonthly.addEventListener('click', function() {
+                currentMode = 'monthly';
+                updateToggleButtons();
+                renderChart();
+            });
+        }
 
         function renderChart() {
             const isDark = document.documentElement.classList.contains('dark');
@@ -413,11 +561,16 @@
             const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
 
             const orangeGradient = ctx.createLinearGradient(0, 0, 0, 320);
-            orangeGradient.addColorStop(0, 'rgba(249, 115, 22, 0.40)');
+            orangeGradient.addColorStop(0, 'rgba(249, 115, 22, 0.35)');
             orangeGradient.addColorStop(1, 'rgba(249, 115, 22, 0.00)');
 
-            const labels = {!! json_encode($chartLabels) !!};
-            const revenueData = {!! json_encode($chartRevenue) !!};
+            const emeraldGradient = ctx.createLinearGradient(0, 0, 0, 320);
+            emeraldGradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            emeraldGradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
+
+            const labels = currentMode === 'period' ? periodLabels : monthlyLabels;
+            const revenueData = currentMode === 'period' ? periodRevenue : monthlyRevenue;
+            const profitData = currentMode === 'period' ? periodProfit : monthlyProfit;
 
             if (chartInstance) {
                 chartInstance.destroy();
@@ -429,7 +582,7 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Omset Lunas (Rp)',
+                            label: 'Omset Kotor',
                             data: revenueData,
                             borderColor: '#f97316',
                             backgroundColor: orangeGradient,
@@ -439,6 +592,20 @@
                             pointRadius: 4,
                             pointHoverRadius: 7,
                             pointBackgroundColor: '#f97316',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2
+                        },
+                        {
+                            label: 'Keuntungan Bersih',
+                            data: profitData,
+                            borderColor: '#10b981',
+                            backgroundColor: emeraldGradient,
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#10b981',
                             pointBorderColor: '#ffffff',
                             pointBorderWidth: 2
                         }
@@ -464,7 +631,7 @@
                             usePointStyle: true,
                             callbacks: {
                                 label: function(context) {
-                                    return ' Omset: Rp ' + Number(context.parsed.y).toLocaleString('id-ID');
+                                    return ' ' + context.dataset.label + ': Rp ' + Number(context.parsed.y).toLocaleString('id-ID');
                                 }
                             }
                         }
