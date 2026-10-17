@@ -132,3 +132,4 @@ class SecurityFirewallMiddleware
         abort(403, 'Akses Ditolak: Permintaan terdeteksi berbahaya oleh Firewall Sistem.');
     }
 }
+

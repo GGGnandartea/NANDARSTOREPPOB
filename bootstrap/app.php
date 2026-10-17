@@ -19,24 +19,62 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
         ]);
         $middleware->validateCsrfTokens(except: [
-            'api/*',
             'api/webhook/*',
             'webhook/*',
-            'checkout/process',
-            'register',
-            'topup/create',
-            'profile/buy-balance',
-            'profile/change-whatsapp',
-            'profile/wa-verify/*',
-            'reseller/upgrade-*',
-            'order/*/resend-wa',
-            'forgot-password/*',
-            'forgot-password',
-            'ppob/*',
-            'ppob/checkout',
-            'ppob/inquiry',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Tangani Rate Limiting (Too Many Requests / 429) dengan pesan ramah & detail detik tersisa
+        $exceptions->render(function (\Illuminate\Http\Exceptions\ThrottleRequestsException $e, $request) {
+            $retryAfter = $e->getHeaders()['Retry-After'] ?? 60;
+            $msg = "Terlalu banyak permintaan. Mohon tunggu {$retryAfter} detik sebelum mencoba kembali.";
+
+            if ($request->header('X-Inertia')) {
+                return back()->withErrors([
+                    'email'   => $msg,
+                    'general' => $msg,
+                    'message' => $msg,
+                ])->with('error', $msg);
+            }
+
+            if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'status'      => 'error',
+                    'message'     => $msg,
+                    'retry_after' => (int) $retryAfter,
+                    'errors'      => [
+                        'general' => [$msg],
+                        'email'   => [$msg],
+                    ],
+                ], 429, $e->getHeaders());
+            }
+
+            return back()->with('error', $msg);
+        });
+
+        // Tangani CSRF Token Mismatch (419 Page Expired) dengan pesan jelas
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, $request) {
+            if ($e->getStatusCode() === 419) {
+                $msg = 'Sesi keamanan Anda telah berakhir. Silakan muat ulang (refresh) halaman untuk melanjutkan.';
+
+                if ($request->header('X-Inertia')) {
+                    return back()->withErrors([
+                        'general' => $msg,
+                        'message' => $msg,
+                    ])->with('error', $msg);
+                }
+
+                if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => $msg,
+                        'errors'  => [
+                            'general' => [$msg],
+                        ],
+                    ], 419);
+                }
+
+                return back()->with('error', $msg);
+            }
+        });
     })->create();

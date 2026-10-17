@@ -10,18 +10,18 @@ Route::get('/', [FrontController::class, 'index'])->name('home');
 Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.detail')->whereNumber('id');
 
 Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
-Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process');
-Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process')->middleware('throttle:payments');
+Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling');
 Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+');
 Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+');
-Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:resend_wa');
 
 // --- RUTE LAYANAN PPOB KIOSBANK ---
 Route::get('/ppob', [PpobController::class, 'index'])->name('ppob.index');
 Route::get('/ppob/products', [PpobController::class, 'getProducts'])->name('ppob.products');
-Route::post('/ppob/inquiry', [PpobController::class, 'inquiry'])->name('ppob.inquiry');
-Route::post('/ppob/checkout', [PpobController::class, 'checkout'])->name('ppob.checkout');
-Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::post('/ppob/inquiry', [PpobController::class, 'inquiry'])->name('ppob.inquiry')->middleware('throttle:ppob_inquiry');
+Route::post('/ppob/checkout', [PpobController::class, 'checkout'])->name('ppob.checkout')->middleware('throttle:payments');
+Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling');
 // ----------------------------------
 
 
@@ -32,36 +32,36 @@ Route::get('/terms', [FrontController::class, 'terms'])->name('terms.alias');
 // -----------------------------------------------------------
 
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Reset Password via WhatsApp OTP
 Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
-Route::post('/forgot-password/request', [AuthController::class, 'requestPasswordResetOtp'])->name('password.request.otp');
-Route::post('/forgot-password/reset', [AuthController::class, 'resetPasswordWithOtp'])->name('password.reset.otp');
+Route::post('/forgot-password/request', [AuthController::class, 'requestPasswordResetOtp'])->name('password.request.otp')->middleware('throttle:auth_otp_request');
+Route::post('/forgot-password/reset', [AuthController::class, 'resetPasswordWithOtp'])->name('password.reset.otp')->middleware('throttle:auth_otp_reset');
 
 Route::middleware(['auth'])->prefix('reseller')->name('reseller.')->group(function () {
     Route::get('/dashboard', function() { return view('reseller.dashboard'); })->name('dashboard');
 });
 
-Route::get('/reseller/payment-status/{orderId}', [AuthController::class, 'checkResellerPaymentStatus'])->name('reseller.payment_status');
+Route::get('/reseller/payment-status/{orderId}', [AuthController::class, 'checkResellerPaymentStatus'])->name('reseller.payment_status')->middleware('throttle:polling');
 
 // Halaman Profil User (login wajib)
 Route::middleware(['auth'])->group(function () {
     Route::get('/profile', [FrontController::class, 'profile'])->name('profile');
-    Route::post('/profile/buy-balance', [FrontController::class, 'buyWithBalance'])->name('buy.balance');
-    Route::post('/topup/create', [FrontController::class, 'createTopup'])->name('topup.create');
-    Route::get('/topup/status/{orderId}', [FrontController::class, 'checkTopupStatus'])->name('topup.status');
-    Route::post('/reseller/upgrade-balance', [FrontController::class, 'upgradeResellerWithBalance'])->name('reseller.upgrade_balance');
-    Route::post('/reseller/upgrade-qris', [FrontController::class, 'upgradeResellerWithQris'])->name('reseller.upgrade_qris');
+    Route::post('/profile/buy-balance', [FrontController::class, 'buyWithBalance'])->name('buy.balance')->middleware('throttle:payments');
+    Route::post('/topup/create', [FrontController::class, 'createTopup'])->name('topup.create')->middleware('throttle:payments');
+    Route::get('/topup/status/{orderId}', [FrontController::class, 'checkTopupStatus'])->name('topup.status')->middleware('throttle:polling');
+    Route::post('/reseller/upgrade-balance', [FrontController::class, 'upgradeResellerWithBalance'])->name('reseller.upgrade_balance')->middleware('throttle:payments');
+    Route::post('/reseller/upgrade-qris', [FrontController::class, 'upgradeResellerWithQris'])->name('reseller.upgrade_qris')->middleware('throttle:payments');
     Route::get('/profile/reset-password', [\App\Http\Controllers\Auth\ResetPasswordController::class, 'showForm'])->name('password.reset.form');
-    Route::post('/profile/reset-password', [\App\Http\Controllers\Auth\ResetPasswordController::class, 'update'])->name('password.reset.update');
+    Route::post('/profile/reset-password', [\App\Http\Controllers\Auth\ResetPasswordController::class, 'update'])->name('password.reset.update')->middleware('throttle:profile_security');
     Route::post('/profile/update', [FrontController::class, 'updateProfile'])->name('profile.update');
-    Route::post('/profile/change-whatsapp', [FrontController::class, 'changeWhatsapp'])->name('profile.change_whatsapp');
-    Route::post('/profile/wa-verify/request', [FrontController::class, 'requestWaVerification'])->name('profile.wa_verify.request');
-    Route::post('/profile/wa-verify/confirm', [FrontController::class, 'confirmWaVerification'])->name('profile.wa_verify.confirm');
+    Route::post('/profile/change-whatsapp', [FrontController::class, 'changeWhatsapp'])->name('profile.change_whatsapp')->middleware('throttle:profile_security');
+    Route::post('/profile/wa-verify/request', [FrontController::class, 'requestWaVerification'])->name('profile.wa_verify.request')->middleware('throttle:profile_security');
+    Route::post('/profile/wa-verify/confirm', [FrontController::class, 'confirmWaVerification'])->name('profile.wa_verify.confirm')->middleware('throttle:profile_security');
     Route::get('/profile/wa-verify/status', [FrontController::class, 'checkWaVerificationStatus'])->name('profile.wa_verify.status');
 });
 
@@ -152,7 +152,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 });
 
 // Route API untuk Frontend (Cek Voucher)
-Route::post('/api/check-voucher', [\App\Http\Controllers\FrontController::class, 'checkVoucher']);
+Route::post('/api/check-voucher', [\App\Http\Controllers\FrontController::class, 'checkVoucher'])->middleware('throttle:voucher_check');
 
 // Route API untuk Produk Paling Banyak Dibeli Hari Ini (Realtime Harian)
 Route::get('/api/top-selling-today', function() {
@@ -162,7 +162,7 @@ Route::get('/api/top-selling-today', function() {
         'status' => 'success',
         'data' => $controller->getTopSellingTodayProducts($apiData),
     ]);
-});
+})->middleware('throttle:polling');
 
 // Route Webhook untuk Node.js Payment Gateway Lokal
 // (Tanpa Middleware CSRF agar server Node.js bisa menembaknya langsung)
