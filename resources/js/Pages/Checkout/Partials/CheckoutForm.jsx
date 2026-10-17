@@ -5,6 +5,11 @@ export default function CheckoutForm({
   user,
   userBalance,
   product,
+  quantity = 1,
+  setQuantity,
+  maxStock = 999,
+  unitPrice,
+  subtotal,
   buyerName,
   setBuyerName,
   email,
@@ -167,6 +172,64 @@ export default function CheckoutForm({
         />
       </div>
 
+      {/* Kuantitas Pembelian */}
+      <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/80 p-3.5 rounded-2xl">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+            Jumlah Pembelian
+          </label>
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">
+            {product.type === 'local' ? (
+              product.stock > 0 ? (
+                <span>Tersedia: <strong className="text-emerald-500 font-black">{product.stock} pcs</strong></span>
+              ) : (
+                <span className="text-red-500 font-bold">Stok Habis</span>
+              )
+            ) : (
+              <span>Maksimal 100 pcs</span>
+            )}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center border-2 border-gray-200 dark:border-gray-700 rounded-2xl bg-white dark:bg-gray-900 p-1 shadow-sm">
+            <button
+              type="button"
+              disabled={quantity <= 1}
+              onClick={() => setQuantity && setQuantity(quantity - 1)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={maxStock}
+              value={quantity}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (setQuantity) {
+                  if (isNaN(val) || val < 1) setQuantity(1);
+                  else setQuantity(Math.min(val, maxStock));
+                }
+              }}
+              className="w-14 text-center font-black text-base text-gray-900 dark:text-white bg-transparent outline-none focus:ring-0"
+            />
+            <button
+              type="button"
+              disabled={quantity >= maxStock}
+              onClick={() => setQuantity && setQuantity(quantity + 1)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              +
+            </button>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Subtotal</p>
+            <p className="text-base font-black text-gray-900 dark:text-white">{fmt.rp(subtotal || (unitPrice * quantity))}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Voucher */}
       <div>
         <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">
@@ -184,7 +247,7 @@ export default function CheckoutForm({
           {discountAmount === 0 ? (
             <button
               type="button"
-              onClick={checkVoucher}
+              onClick={() => checkVoucher && checkVoucher(quantity)}
               disabled={!voucher || voucherLoading}
               className="px-4 bg-gray-900 dark:bg-gray-700 hover:bg-black text-white font-bold rounded-2xl transition cursor-pointer disabled:opacity-50"
             >
@@ -212,20 +275,32 @@ export default function CheckoutForm({
           <div className="mb-3 bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30 p-2.5 rounded-xl flex items-center justify-between">
             <span className="text-xs font-bold text-amber-500 flex items-center gap-1.5">👑 Diskon Reseller VIP</span>
             <span className="text-xs font-black text-amber-500">
-              Hemat {fmt.rp(product.price - product.reseller_price)}
+              Hemat {fmt.rp((product.price - product.reseller_price) * quantity)}
             </span>
           </div>
         )}
         <div className="flex justify-between text-sm mb-1">
-          <span className="font-bold text-gray-400">Harga {isReseller ? 'Normal' : ''}</span>
+          <span className="font-bold text-gray-400">Harga Satuan {isReseller ? 'Normal' : ''}</span>
           <span className={`font-bold ${isReseller ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
             {fmt.rp(product.price)}
           </span>
         </div>
         {isReseller && (
           <div className="flex justify-between text-sm mb-1">
-            <span className="font-bold text-amber-500">Harga Khusus Reseller</span>
+            <span className="font-bold text-amber-500">Harga Satuan Reseller</span>
             <span className="font-bold text-amber-500">{fmt.rp(product.reseller_price)}</span>
+          </div>
+        )}
+        {quantity > 1 && (
+          <div className="flex justify-between text-sm mb-1">
+            <span className="font-bold text-gray-400">Jumlah Beli</span>
+            <span className="font-black text-gray-900 dark:text-white">{quantity} pcs</span>
+          </div>
+        )}
+        {quantity > 1 && (
+          <div className="flex justify-between text-sm mb-1">
+            <span className="font-bold text-gray-400">Subtotal</span>
+            <span className="font-bold text-gray-900 dark:text-white">{fmt.rp(subtotal || (unitPrice * quantity))}</span>
           </div>
         )}
         {discountAmount > 0 && (

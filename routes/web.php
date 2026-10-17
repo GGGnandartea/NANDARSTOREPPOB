@@ -123,6 +123,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::post('/products/local/accounts/{id}/delete', [AdminController::class, 'deleteLocalAccount'])->name('products.local.accounts.delete');
     
     Route::get('/resellers', [AdminController::class, 'resellers'])->name('resellers');
+    Route::get('/resellers/settings', [AdminController::class, 'resellerSettings'])->name('resellers.settings');
+    Route::post('/resellers/settings', [AdminController::class, 'saveResellerSettings'])->name('resellers.settings.save');
+    Route::post('/resellers/settings/toggle-free', [AdminController::class, 'toggleResellerFreePromo'])->name('resellers.settings.toggle_free');
     Route::post('/resellers', [AdminController::class, 'storeReseller'])->name('resellers.store');
     Route::post('/resellers/{id}/balance', [AdminController::class, 'manageResellerBalance'])->name('resellers.balance');
     Route::post('/resellers/{id}/toggle', [AdminController::class, 'toggleResellerStatus'])->name('resellers.toggle');

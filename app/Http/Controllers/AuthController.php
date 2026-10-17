@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use App\Models\ResellerRegistration;
+use App\Models\Setting;
+use App\Models\TransactionLog;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -28,11 +30,17 @@ class AuthController extends Controller
 
             // CEK APAKAH RESELLER BELUM LUNAS / BELUM AKTIF
             if ($user->role === 'reseller' && !$user->is_active) {
-                Auth::logout();
-                $pendingReg = ResellerRegistration::where('user_id', $user->id)->where('status', 'pending')->latest()->first();
-                return back()->withErrors([
-                    'email' => 'Akun Reseller Anda belum aktif karena belum menyelesaikan pembayaran pendaftaran Rp 20.000.',
-                ])->with('pending_order_id', $pendingReg ? $pendingReg->order_id_gateway : null);
+                $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+                if ($isFree) {
+                    $user->update(['is_active' => true]);
+                } else {
+                    $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+                    Auth::logout();
+                    $pendingReg = ResellerRegistration::where('user_id', $user->id)->where('status', 'pending')->latest()->first();
+                    return back()->withErrors([
+                        'email' => 'Akun Reseller Anda belum aktif karena belum menyelesaikan pembayaran pendaftaran Rp ' . number_format($fee, 0, ',', '.') . '.',
+                    ])->with('pending_order_id', $pendingReg ? $pendingReg->order_id_gateway : null);
+                }
             }
 
             $request->session()->regenerate();
@@ -51,7 +59,21 @@ class AuthController extends Controller
     }
 
     public function showRegisterForm() {
-        return Inertia::render('Register');
+        $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+        $promoTitle = Setting::where('key', 'reseller_promo_title')->value('value') ?: 'PROMO SPESIAL: DAFTAR RESELLER VIP GRATIS!';
+        $promoMessage = Setting::where('key', 'reseller_promo_message')->value('value') ?: 'Nikmati harga modal termurah khusus mitra Reseller VIP langsung aktif tanpa biaya aktivasi!';
+        $promoBadge = Setting::where('key', 'reseller_promo_badge')->value('value') ?: 'PROMO TERBATAS';
+
+        return Inertia::render('Register', [
+            'resellerSettings' => [
+                'is_free'       => $isFree,
+                'fee'           => $fee,
+                'promo_title'   => $promoTitle,
+                'promo_message' => $promoMessage,
+                'promo_badge'   => $promoBadge,
+            ]
+        ]);
     }
 
     public function register(Request $request) {
@@ -68,6 +90,11 @@ class AuthController extends Controller
         ]);
 
         $isReseller = $request->role === 'reseller';
+        $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+
+        // Jika pendaftaran reseller gratis, akun langsung aktif
+        $isActive = $isReseller ? ($isFree || $fee <= 0) : true;
 
         $user = User::create([
             'name' => $request->name,
@@ -75,26 +102,46 @@ class AuthController extends Controller
             'whatsapp' => $request->whatsapp ?? '',
             'password' => Hash::make($request->password),
             'role' => $isReseller ? 'reseller' : 'user',
-            'is_active' => $isReseller ? false : true, // Reseller wajib bayar dulu
+            'is_active' => $isActive,
             'balance' => 0,
         ]);
 
         if ($isReseller) {
+            if ($isFree || $fee <= 0) {
+                // Catat log histori aktivasi promo
+                TransactionLog::create([
+                    'user_id'     => $user->id,
+                    'type'        => 'reseller_promo',
+                    'amount'      => 0,
+                    'description' => 'Aktivasi Kemitraan VIP Reseller (Promo Gratis)',
+                ]);
+
+                Auth::login($user);
+
+                return response()->json([
+                    'status'   => 'success',
+                    'is_free'  => true,
+                    'redirect' => route('home'),
+                    'message'  => 'Selamat! Akun Reseller VIP Anda berhasil terdaftar dan langsung aktif (Promo Gratis).',
+                ]);
+            }
+
+            // Mode Berbayar (QRIS Nominal Sesuai Pengaturan Admin)
             $invoiceNumber = 'RES-' . strtoupper(Str::random(8)) . '-' . time();
             $callbackUrl = url('/api/webhook/reseller-qris');
             $qrisUrl = null;
             $orderIdGateway = $invoiceNumber;
-            $totalNominal = 20000;
+            $totalNominal = $fee;
 
             try {
                 $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
-                    'nominal'      => 20000,
+                    'nominal'      => $fee,
                     'callback_url' => $callbackUrl,
                 ]);
                 $data = $response->json();
                 if (isset($data['data']['orderId'])) {
                     $orderIdGateway = $data['data']['orderId'];
-                    $totalNominal = $data['data']['total_nominal'] ?? 20000;
+                    $totalNominal = $data['data']['total_nominal'] ?? $fee;
                     $qrisUrl = $data['data']['url_qris'] ?? null;
                 }
             } catch (\Exception $e) {}
@@ -103,7 +150,7 @@ class AuthController extends Controller
                 'user_id'          => $user->id,
                 'invoice_number'   => $invoiceNumber,
                 'order_id_gateway' => $orderIdGateway,
-                'amount'           => 20000,
+                'amount'           => $fee,
                 'status'           => 'pending',
                 'qris_url'         => $qrisUrl,
                 'payment_method'   => 'qris',
@@ -114,7 +161,7 @@ class AuthController extends Controller
                 'user_id'       => $user->id,
                 'order_id'      => $orderIdGateway,
                 'invoice'       => $invoiceNumber,
-                'amount'        => 20000,
+                'amount'        => $fee,
                 'total_nominal' => $totalNominal,
                 'url_qris'      => $qrisUrl,
                 'message'       => 'Pendaftaran reseller berhasil disimpan. Silakan lakukan pembayaran Rp ' . number_format($totalNominal, 0, ',', '.') . ' untuk aktivasi akun.',

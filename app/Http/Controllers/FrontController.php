@@ -412,7 +412,17 @@ class FrontController extends Controller
         }
 
         $paymentChannels = [['code' => 'QRIS_CUSTOM', 'name' => 'QRIS Otomatis (All E-Wallet)', 'fee' => 0, 'type' => 'qris', 'icon' => 'https://tripay.co.id/images/payment-channel/H3zP71b7sU1631525949.png']];
-        return Inertia::render('Checkout', ['product' => $product, 'paymentChannels' => $paymentChannels, 'auth' => ['user' => Auth::user()]]);
+        $initialQty = max(1, (int) request()->query('qty', 1));
+        if ($product->stock > 0 && $initialQty > $product->stock) {
+            $initialQty = $product->stock;
+        }
+
+        return Inertia::render('Checkout', [
+            'product'         => $product, 
+            'paymentChannels' => $paymentChannels, 
+            'initialQty'      => $initialQty,
+            'auth'            => ['user' => Auth::user()]
+        ]);
     }
 
     // CEK VOUCHER API
@@ -425,8 +435,13 @@ class FrontController extends Controller
         if ($voucher->max_uses !== null && $voucher->used_count >= $voucher->max_uses) return response()->json(['status' => 'error', 'message' => 'Kuota voucher telah habis.']);
 
         $product = Product::findOrFail($request->product_id);
-        $discountAmount = ($voucher->type == 'nominal') ? $voucher->value : ($product->price * $voucher->value) / 100;
-        if ($discountAmount >= $product->price) $discountAmount = $product->price - 1; 
+        $qty = max(1, (int) $request->input('quantity', 1));
+        $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($product->reseller_price);
+        $unitPrice = (int) ($isReseller ? $product->reseller_price : $product->price);
+        $subtotal = $unitPrice * $qty;
+
+        $discountAmount = ($voucher->type == 'nominal') ? $voucher->value : ($subtotal * $voucher->value) / 100;
+        if ($discountAmount >= $subtotal) $discountAmount = $subtotal - 1; 
 
         return response()->json(['status' => 'success', 'discount_amount' => round($discountAmount), 'code' => $voucher->code]);
     }
@@ -442,11 +457,24 @@ class FrontController extends Controller
 
         $request->validate([
             'product_id' => 'required',
+            'quantity'   => 'nullable|integer|min:1|max:100',
             'email'      => 'nullable|email',
             'whatsapp'   => 'nullable|string',
             'buyer_name' => 'nullable|string|max:100',
         ]);
         $product = Product::findOrFail($request->product_id);
+        $qty = max(1, (int) $request->input('quantity', 1));
+
+        // Cek stok lokal sebelum memproses transaksi
+        if ($product->type === 'local' && ($product->process_type ?? 'auto') !== 'manual') {
+            $availableStock = \App\Models\LocalAccount::where('product_id', $product->id)->where('is_sold', false)->count();
+            if ($availableStock < $qty) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => "Jumlah pembelian ({$qty} pcs) melebihi sisa stok yang tersedia ({$availableStock} pcs)."
+                ], 400);
+            }
+        }
 
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
@@ -459,14 +487,17 @@ class FrontController extends Controller
         
         // Cek dan Potong Voucher jika ada
         $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($product->reseller_price);
-        $nominal = (int) ($isReseller ? $product->reseller_price : $product->price);
+        $unitPrice = (int) ($isReseller ? $product->reseller_price : $product->price);
+        $subtotal = $unitPrice * $qty;
+
+        $nominal = $subtotal;
         $discount = 0;
         if ($request->voucher_code) {
             $voucher = Voucher::where('code', $request->voucher_code)->where('is_active', true)->first();
             if ($voucher) {
-                $discount = ($voucher->type == 'nominal') ? $voucher->value : ($nominal * $voucher->value) / 100;
-                if ($discount >= $nominal) $discount = $nominal - 1;
-                $nominal = $nominal - $discount;
+                $discount = ($voucher->type == 'nominal') ? $voucher->value : ($subtotal * $voucher->value) / 100;
+                if ($discount >= $subtotal) $discount = $subtotal - 1;
+                $nominal = $subtotal - $discount;
                 $voucher->increment('used_count'); // Tambah data pemakaian voucher
             }
         }
@@ -529,9 +560,10 @@ class FrontController extends Controller
                 'invoice_number'  => $data['data']['orderId'], 
                 'product_id'      => $product->id, 
                 'product_name'    => $product->name, 
+                'quantity'        => $qty,
                 'product_type'    => $product->type ?? 'local',
                 'provider'        => $provider,
-                'price'           => $product->price,
+                'price'           => $unitPrice,
                 'discount'        => round($discount),
                 'total_amount'    => $data['data']['total_nominal'] ?? $nominal,
                 'payment_status'  => 'pending',
@@ -579,6 +611,7 @@ class FrontController extends Controller
             'status'         => $retStatus,
             'order_id'       => $order->invoice_number,
             'product_name'   => $order->product_name,
+            'quantity'       => (int) ($order->quantity ?? 1),
             'product_type'   => $order->product_type,
             'provider'       => $order->provider,
             'price'          => (int) $order->price,
@@ -730,6 +763,13 @@ class FrontController extends Controller
             'orders'    => $orders,
             'topups'    => $mutations,
             'mutations' => $mutations,
+            'resellerSettings' => [
+                'is_free'       => Setting::where('key', 'reseller_registration_free')->value('value') == '1',
+                'fee'           => (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000),
+                'promo_title'   => Setting::where('key', 'reseller_promo_title')->value('value') ?: 'PROMO SPESIAL: DAFTAR RESELLER VIP GRATIS!',
+                'promo_message' => Setting::where('key', 'reseller_promo_message')->value('value') ?: 'Nikmati harga modal termurah khusus mitra Reseller VIP langsung aktif tanpa biaya aktivasi!',
+                'promo_badge'   => Setting::where('key', 'reseller_promo_badge')->value('value') ?: 'PROMO TERBATAS',
+            ],
             'stats'     => [
                 'total_income'  => $totalIncome,
                 'total_expense' => $totalExpense,
@@ -774,10 +814,12 @@ class FrontController extends Controller
     public function buyWithBalance(Request $request) {
         $request->validate([
             'product_id' => 'required',
+            'quantity'   => 'nullable|integer|min:1|max:100',
             'whatsapp'   => 'nullable|string',
             'email'      => 'nullable|email',
             'buyer_name' => 'nullable|string|max:100',
         ]);
+        $qty = max(1, (int) $request->input('quantity', 1));
 
         $user = Auth::user();
         if ($user && $user->role === 'admin') {
@@ -798,36 +840,39 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Produk ini sedang dinonaktifkan untuk sementara waktu.']);
         }
 
+        // Cek stok lokal sebelum memotong saldo untuk mencegah race condition
+        if ($product->type === 'local' && $product->process_type !== 'manual') {
+            $availableStock = \App\Models\LocalAccount::where('product_id', $product->id)
+                ->where('is_sold', false)
+                ->count();
+
+            if ($availableStock < $qty) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => "Maaf, jumlah pembelian ({$qty} pcs) melebihi sisa stok yang tersedia ({$availableStock} pcs). Saldo Anda aman dan tidak terpotong."
+                ], 400);
+            }
+        }
+
         // Hitung harga setelah voucher & diskon reseller
         $isReseller = $user->role === 'reseller' && !empty($product->reseller_price);
-        $nominal = (int) ($isReseller ? $product->reseller_price : $product->price);
+        $unitPrice = (int) ($isReseller ? $product->reseller_price : $product->price);
+        $subtotal = $unitPrice * $qty;
+
+        $nominal = $subtotal;
         $discount = 0;
         if ($request->voucher_code) {
             $voucher = \App\Models\Voucher::where('code', $request->voucher_code)->where('is_active', true)->first();
             if ($voucher) {
-                $discount = ($voucher->type == 'nominal') ? $voucher->value : ($nominal * $voucher->value) / 100;
-                if ($discount >= $nominal) $discount = $nominal - 1;
-                $nominal = $nominal - $discount;
+                $discount = ($voucher->type == 'nominal') ? $voucher->value : ($subtotal * $voucher->value) / 100;
+                if ($discount >= $subtotal) $discount = $subtotal - 1;
+                $nominal = $subtotal - $discount;
                 $voucher->increment('used_count');
             }
         }
 
         if ($user->balance < $nominal) {
             return response()->json(['status' => 'error', 'message' => 'Saldo tidak mencukupi. Silakan top up terlebih dahulu.']);
-        }
-
-        // Cek stok lokal sebelum memotong saldo untuk mencegah race condition
-        if ($product->type === 'local' && $product->process_type !== 'manual') {
-            $hasStock = \App\Models\LocalAccount::where('product_id', $product->id)
-                ->where('is_sold', false)
-                ->exists();
-
-            if (!$hasStock) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Maaf, stok produk ini baru saja habis terbeli oleh pembeli lain. Saldo Anda aman dan tidak terpotong.'
-                ], 400);
-            }
         }
 
         // Kurangi saldo
@@ -838,7 +883,7 @@ class FrontController extends Controller
             'user_id'     => $user->id,
             'type'        => 'debit',
             'amount'      => $nominal,
-            'description' => 'Pembelian: ' . $product->name,
+            'description' => 'Pembelian (' . $qty . ' pcs): ' . $product->name,
         ]);
 
         // Buat invoice
@@ -879,9 +924,10 @@ class FrontController extends Controller
             'invoice_number' => $invoiceNumber,
             'product_id'     => $product->id,
             'product_name'   => $product->name,
+            'quantity'       => $qty,
             'product_type'   => $product->type ?? 'local',
             'provider'       => $provider,
-            'price'          => $product->price,
+            'price'          => $unitPrice,
             'discount'       => $discount,
             'total_amount'   => $nominal,
             'payment_status' => 'paid',
@@ -926,6 +972,7 @@ class FrontController extends Controller
             'sn_or_account' => $snAkun,
             'is_ready'      => $isReady,
             'created_at'    => now()->format('d M Y, H:i'),
+            'quantity'      => $qty,
             'wa_sent'       => !empty($order->whatsapp_notified_at),
             'wa_target'     => $targetWhatsapp,
             'message'       => $isReady ? 'Pembelian berhasil! Akun telah siap.' : 'Pembelian berhasil! Akun Anda sedang disiapkan secara otomatis.',
@@ -1030,7 +1077,7 @@ class FrontController extends Controller
         ]);
     }
 
-    // Upgrade ke Reseller VIP via Saldo
+    // Upgrade ke Reseller VIP via Saldo atau Klaim Promo Gratis
     public function upgradeResellerWithBalance() {
         $user = Auth::user();
         if ($user && $user->role === 'admin') {
@@ -1040,17 +1087,41 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Anda sudah menjadi Reseller VIP!']);
         }
 
-        if ($user->balance < 20000) {
-            return response()->json(['status' => 'error', 'message' => 'Saldo tidak mencukupi (Rp 20.000). Silakan top up saldo terlebih dahulu.']);
+        $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+
+        if ($isFree || $fee <= 0) {
+            // PROMO GRATIS: Langsung upgrade tanpa potong saldo!
+            $user->update(['role' => 'reseller', 'is_active' => true]);
+
+            \App\Models\TransactionLog::create([
+                'user_id'     => $user->id,
+                'type'        => 'reseller_promo',
+                'amount'      => 0,
+                'description' => 'Aktivasi Upgrade Akun VIP Reseller (Promo Gratis)',
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'is_free' => true,
+                'message' => 'Selamat! Akun Anda berhasil di-upgrade ke VIP Reseller secara Gratis (Promo Aktif).',
+            ]);
         }
 
-        $user->decrement('balance', 20000);
+        if ($user->balance < $fee) {
+            return response()->json([
+                'status'  => 'error', 
+                'message' => 'Saldo tidak mencukupi (Rp ' . number_format($fee, 0, ',', '.') . '). Silakan top up saldo terlebih dahulu.'
+            ]);
+        }
+
+        $user->decrement('balance', $fee);
         $user->update(['role' => 'reseller', 'is_active' => true]);
 
         \App\Models\TransactionLog::create([
             'user_id'     => $user->id,
             'type'        => 'reseller_fee',
-            'amount'      => 20000,
+            'amount'      => $fee,
             'description' => 'Aktivasi Upgrade Akun VIP Reseller (Potong Saldo)',
         ]);
 
@@ -1060,18 +1131,40 @@ class FrontController extends Controller
         ]);
     }
 
-    // Upgrade ke Reseller VIP via QRIS Rp 20.000
+    // Upgrade ke Reseller VIP via QRIS
     public function upgradeResellerWithQris() {
         $user = Auth::user();
         if ($user && $user->role === 'admin') {
             return response()->json(['status' => 'error', 'message' => 'Akun Admin dalam mode pantau dan tidak dapat melakukan upgrade reseller.'], 403);
         }
+        if ($user->role === 'reseller') {
+            return response()->json(['status' => 'error', 'message' => 'Anda sudah menjadi Reseller VIP!']);
+        }
+
+        $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+
+        if ($isFree || $fee <= 0) {
+            $user->update(['role' => 'reseller', 'is_active' => true]);
+            \App\Models\TransactionLog::create([
+                'user_id'     => $user->id,
+                'type'        => 'reseller_promo',
+                'amount'      => 0,
+                'description' => 'Aktivasi Upgrade Akun VIP Reseller (Promo Gratis)',
+            ]);
+            return response()->json([
+                'status'  => 'success',
+                'is_free' => true,
+                'message' => 'Selamat! Akun Anda berhasil di-upgrade ke VIP Reseller secara Gratis.',
+            ]);
+        }
+
         $invoiceNumber = 'RES-' . strtoupper(Str::random(8)) . '-' . time();
         $callbackUrl = url('/api/webhook/reseller-qris');
 
         try {
             $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
-                'nominal'      => 20000,
+                'nominal'      => $fee,
                 'callback_url' => $callbackUrl,
             ]);
             $data = $response->json();
@@ -1080,7 +1173,7 @@ class FrontController extends Controller
                 \App\Models\ResellerRegistration::create([
                     'user_id'          => $user->id,
                     'invoice_number'   => $invoiceNumber,
-                    'amount'           => 20000,
+                    'amount'           => $fee,
                     'payment_method'   => 'qris',
                     'status'           => 'pending',
                     'qris_url'         => $data['data']['url_qris'] ?? null,
@@ -1091,7 +1184,7 @@ class FrontController extends Controller
                     'status'        => 'success',
                     'order_id'      => $data['data']['orderId'],
                     'invoice'       => $invoiceNumber,
-                    'total_nominal' => $data['data']['total_nominal'] ?? 20000,
+                    'total_nominal' => $data['data']['total_nominal'] ?? $fee,
                     'url_qris'      => $data['data']['url_qris'],
                 ]);
             }

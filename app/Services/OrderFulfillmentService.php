@@ -122,16 +122,25 @@ class OrderFulfillmentService
             $order->provider = 'Otomatis';
 
             return DB::transaction(function () use ($order, $product) {
-                // Lock 1 akun yang belum terjual dengan lockForUpdate untuk mencegah race condition
-                $account = LocalAccount::where('product_id', $product->id)
+                $qty = max(1, (int) ($order->quantity ?? 1));
+
+                // Lock $qty akun yang belum terjual dengan lockForUpdate untuk mencegah race condition
+                $accounts = LocalAccount::where('product_id', $product->id)
                     ->where('is_sold', false)
                     ->lockForUpdate()
-                    ->first();
+                    ->limit($qty)
+                    ->get();
 
-                if ($account) {
+                if ($accounts->count() === $qty) {
                     // Pemenang rebutan stok: tandai terjual & alokasikan akun
-                    $account->update(['is_sold' => true]);
-                    $snAkun = "Email: " . $account->email . "\nPassword: " . $account->password;
+                    $snParts = [];
+                    foreach ($accounts as $index => $acc) {
+                        $acc->update(['is_sold' => true]);
+                        $prefix = ($qty > 1) ? ("=== AKUN #" . ($index + 1) . " ===\n") : "";
+                        $snParts[] = $prefix . "Email: " . $acc->email . "\nPassword: " . $acc->password;
+                    }
+
+                    $snAkun = implode("\n\n", $snParts);
                     $product->update(['stock' => $product->accounts()->where('is_sold', false)->count()]);
 
                     $order->sn_or_account   = $snAkun;
@@ -147,10 +156,10 @@ class OrderFulfillmentService
                         'status'        => 'completed',
                         'is_ready'      => true,
                         'sn_or_account' => $snAkun,
-                        'message'       => 'Akun lokal berhasil dialokasikan.',
+                        'message'       => 'Akun lokal (' . $qty . ' pcs) berhasil dialokasikan.',
                     ];
                 } else {
-                    // KALAH REBUTAN STOK (Stok sisa 1 sudah diambil pembeli lain!)
+                    // KALAH REBUTAN STOK (Stok sisa tidak cukup untuk memenuhi pesanan!)
                     // Jalankan Logika Auto-Refund ke Saldo Akun Pembeli
                     return self::handleOutOfStockAutoRefund($order, $product);
                 }

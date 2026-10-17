@@ -14,10 +14,13 @@ export default function ProfileSidebar({
   handleMenuClick,
   setShowTopup,
   setShowUpgradeModal,
+  resellerSettings,
   setShowWaModal,
   setWaModalPhone,
   setShowChangeWaModal,
 }) {
+  const isFree = Boolean(resellerSettings?.is_free);
+  const fee = Number(resellerSettings?.fee ?? 20000);
   return (
     <div className="flex flex-col h-fit">
       {/* Avatar & Info */}
@@ -154,15 +157,26 @@ export default function ProfileSidebar({
 
         {/* Promo Upgrade untuk Pelanggan Biasa */}
         {!isReseller && (
-          <div className="mt-3 bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-amber-500/15 border border-amber-500/30 rounded-2xl p-3.5 text-center">
-            <span className="text-base">👑</span>
-            <p className="text-xs font-black text-amber-500 dark:text-amber-400 mt-1">Mau Harga Lebih Murah?</p>
-            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium mt-0.5">Daftar Reseller hanya Rp 20.000 seumur hidup</p>
+          <div className={`mt-3 border rounded-2xl p-3.5 text-center transition-all ${isFree ? 'bg-gradient-to-r from-emerald-500/15 via-amber-500/15 to-yellow-500/15 border-emerald-500/40 shadow-sm' : 'bg-gradient-to-r from-amber-500/15 via-yellow-500/15 to-amber-500/15 border-amber-500/30'}`}>
+            <div className="flex items-center justify-center gap-1.5">
+              <span className="text-base">👑</span>
+              {isFree && (
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500 text-white animate-pulse">
+                  PROMO
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-black text-amber-500 dark:text-amber-400 mt-1">
+              {isFree ? 'Promo VIP Reseller Gratis!' : 'Mau Harga Lebih Murah?'}
+            </p>
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+              {isFree ? 'Aktivasi seumur hidup Rp 0 (Promo Terbatas)' : `Daftar Reseller hanya Rp ${fee.toLocaleString('id-ID')} seumur hidup`}
+            </p>
             <button
               onClick={() => setShowUpgradeModal(true)}
-              className="mt-2.5 w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 text-xs font-black py-2 rounded-xl hover:brightness-110 transition shadow cursor-pointer"
+              className={`mt-2.5 w-full text-xs font-black py-2.5 rounded-xl transition shadow cursor-pointer ${isFree ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 text-white hover:brightness-110 shadow-emerald-500/20' : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 hover:brightness-110'}`}
             >
-              Upgrade Sekarang 👑
+              {isFree ? 'Klaim VIP Gratis Sekarang ⚡' : 'Upgrade Sekarang 👑'}
             </button>
           </div>
         )}

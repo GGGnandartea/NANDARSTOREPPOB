@@ -877,6 +877,75 @@ class AdminController extends Controller
     }
     public function toggleResellerStatus($id) { $user = User::findOrFail($id); $user->update(['is_active' => !$user->is_active]); return back()->with('success', 'Status diubah!'); }
     public function deleteReseller($id) { User::findOrFail($id)->delete(); return back()->with('success', 'Reseller dihapus!'); }
+
+    /**
+     * Halaman Pengaturan Reseller VIP & Promo Pendaftaran
+     */
+    public function resellerSettings() {
+        $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
+        $promoTitle = Setting::where('key', 'reseller_promo_title')->value('value') ?: 'PROMO SPESIAL: DAFTAR RESELLER VIP GRATIS!';
+        $promoMessage = Setting::where('key', 'reseller_promo_message')->value('value') ?: 'Nikmati harga modal termurah khusus mitra Reseller VIP langsung aktif tanpa biaya aktivasi!';
+        $promoBadge = Setting::where('key', 'reseller_promo_badge')->value('value') ?: 'PROMO TERBATAS';
+
+        $totalResellers = User::where('role', 'reseller')->count();
+        $activeResellers = User::where('role', 'reseller')->where('is_active', true)->count();
+        $pendingResellers = User::where('role', 'reseller')->where('is_active', false)->count();
+        $totalPaidRevenue = \App\Models\ResellerRegistration::where('status', 'paid')->sum('amount');
+
+        return view('admin.reseller_settings', compact(
+            'isFree',
+            'fee',
+            'promoTitle',
+            'promoMessage',
+            'promoBadge',
+            'totalResellers',
+            'activeResellers',
+            'pendingResellers',
+            'totalPaidRevenue'
+        ));
+    }
+
+    /**
+     * Simpan Pengaturan Reseller VIP & Promo
+     */
+    public function saveResellerSettings(Request $request) {
+        $request->validate([
+            'reseller_registration_fee' => 'nullable|integer|min:0|max:5000000',
+            'reseller_promo_title'      => 'nullable|string|max:150',
+            'reseller_promo_message'    => 'nullable|string|max:500',
+            'reseller_promo_badge'      => 'nullable|string|max:50',
+        ]);
+
+        $isFree = $request->has('reseller_registration_free') ? '1' : '0';
+        $fee = max(0, (int) $request->input('reseller_registration_fee', 20000));
+        $promoTitle = $request->input('reseller_promo_title') ?: 'PROMO SPESIAL: DAFTAR RESELLER VIP GRATIS!';
+        $promoMessage = $request->input('reseller_promo_message') ?: 'Nikmati harga modal termurah khusus mitra Reseller VIP langsung aktif tanpa biaya aktivasi!';
+        $promoBadge = $request->input('reseller_promo_badge') ?: 'PROMO TERBATAS';
+
+        Setting::updateOrCreate(['key' => 'reseller_registration_free'], ['value' => $isFree]);
+        Setting::updateOrCreate(['key' => 'reseller_registration_fee'], ['value' => (string) $fee]);
+        Setting::updateOrCreate(['key' => 'reseller_promo_title'], ['value' => $promoTitle]);
+        Setting::updateOrCreate(['key' => 'reseller_promo_message'], ['value' => $promoMessage]);
+        Setting::updateOrCreate(['key' => 'reseller_promo_badge'], ['value' => $promoBadge]);
+
+        Cache::forget('reseller_settings');
+
+        return back()->with('success', 'Pengaturan Reseller VIP & Promo berhasil disimpan!');
+    }
+
+    /**
+     * Quick Toggle Mode Pendaftaran Gratis/Berbayar
+     */
+    public function toggleResellerFreePromo() {
+        $current = Setting::where('key', 'reseller_registration_free')->value('value') == '1';
+        $new = $current ? '0' : '1';
+        Setting::updateOrCreate(['key' => 'reseller_registration_free'], ['value' => $new]);
+        Cache::forget('reseller_settings');
+
+        $statusText = $new === '1' ? 'GRATIS (Promo Aktif)' : 'BERBAYAR (Normal)';
+        return back()->with('success', "Status pendaftaran Reseller VIP berhasil diubah menjadi: {$statusText}!");
+    }
     public function orders(Request $request) {
         $query = Order::with(['user', 'product'])->orderBy('id', 'desc');
         if ($request->search) { $query->where('invoice_number', 'like', '%' . $request->search . '%')->orWhere('product_name', 'like', '%' . $request->search . '%'); }

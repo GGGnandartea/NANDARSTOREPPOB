@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
 export default function ProductDetail({ product, auth }) {
@@ -9,6 +9,27 @@ export default function ProductDetail({ product, auth }) {
     }, []);
 
     const isOutOfStock = product.stock <= 0;
+    const maxStock = product.stock > 0 ? product.stock : 1;
+    const [quantity, setQuantity] = useState(1);
+
+    const isReseller = auth?.user?.role === 'reseller' && Boolean(product.reseller_price);
+    const unitPrice = isReseller ? Number(product.reseller_price) : Number(product.price);
+    const subtotal = unitPrice * quantity;
+
+    const handleDecrement = () => {
+        setQuantity((prev) => Math.max(1, prev - 1));
+    };
+
+    const handleIncrement = () => {
+        setQuantity((prev) => Math.min(maxStock, prev + 1));
+    };
+
+    const handleQtyInput = (e) => {
+        let val = parseInt(e.target.value) || 1;
+        if (val < 1) val = 1;
+        if (val > maxStock) val = maxStock;
+        setQuantity(val);
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300">
@@ -108,6 +129,54 @@ export default function ProductDetail({ product, auth }) {
                             </div>
                         </div>
 
+                        {/* Selector Kuantitas Pembelian */}
+                        {!isOutOfStock && auth?.user?.role !== 'admin' && (
+                            <div className="mb-6 p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-100 dark:border-gray-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div>
+                                    <span className="block text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                                        Jumlah Pembelian
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-gray-400">
+                                        Maksimal sesuai sisa stok ({product.stock} pcs)
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                                    <div className="flex items-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1 shadow-sm">
+                                        <button
+                                            type="button"
+                                            onClick={handleDecrement}
+                                            disabled={quantity <= 1}
+                                            className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-lg"
+                                        >
+                                            -
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max={maxStock}
+                                            value={quantity}
+                                            onChange={handleQtyInput}
+                                            className="w-14 text-center font-black text-base bg-transparent text-gray-900 dark:text-white outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleIncrement}
+                                            disabled={quantity >= maxStock}
+                                            className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition text-lg"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Subtotal</span>
+                                        <span className="text-base sm:text-lg font-black text-orange-500">
+                                            Rp {subtotal.toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Tombol Aksi Fokus (Kembali & Beli) */}
                         <div className="mt-auto flex flex-col sm:flex-row gap-3">
                             <Link href="/" className="flex items-center justify-center gap-2 px-6 py-3.5 sm:py-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-extrabold rounded-2xl transition-colors cursor-pointer w-full sm:w-auto shrink-0 shadow-sm">
@@ -136,8 +205,11 @@ export default function ProductDetail({ product, auth }) {
                                     Stok Habis Sementara
                                 </button>
                             ) : (
-                                <Link href={`/checkout/${product.id}`} className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-extrabold py-3.5 sm:py-4 rounded-2xl shadow-lg shadow-orange-500/30 transition-all hover:-translate-y-1 cursor-pointer text-sm sm:text-base">
-                                    Gas Beli Langsung
+                                <Link 
+                                    href={`/checkout/${product.id}?qty=${quantity}`} 
+                                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-extrabold py-3.5 sm:py-4 rounded-2xl shadow-lg shadow-orange-500/30 transition-all hover:-translate-y-1 cursor-pointer text-sm sm:text-base"
+                                >
+                                    Gas Beli Langsung ({quantity} pcs)
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
                                 </Link>
                             )}

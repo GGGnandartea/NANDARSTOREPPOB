@@ -1,8 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Icon, fmt } from './ProfileIcons';
 
-export default function UpgradeResellerModal({ onClose, userBalance }) {
-  const [method, setMethod] = useState(userBalance >= 20000 ? 'balance' : 'qris');
+export default function UpgradeResellerModal({ onClose, userBalance, resellerSettings }) {
+  const isFree = Boolean(resellerSettings?.is_free);
+  const fee = Number(resellerSettings?.fee ?? 20000);
+  const promoTitle = resellerSettings?.promo_title || 'PROMO RESELLER VIP GRATIS!';
+  const promoMessage = resellerSettings?.promo_message || 'Buka harga modal reseller termurah untuk semua produk tanpa biaya pendaftaran!';
+  const promoBadge = resellerSettings?.promo_badge || 'PROMO VIP';
+
+  const [method, setMethod] = useState(isFree || userBalance >= fee ? 'balance' : 'qris');
   const [step, setStep] = useState('choose'); // choose | qris | done
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,9 +49,14 @@ export default function UpgradeResellerModal({ onClose, userBalance }) {
       });
       const data = await res.json();
       if (data.status === 'success') {
-        setQrisData(data);
-        setStep('qris');
-        startPolling(data.order_id);
+        if (data.is_free) {
+          setStep('done');
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          setQrisData(data);
+          setStep('qris');
+          startPolling(data.order_id);
+        }
       } else {
         setError(data.message || 'Gagal membuat QRIS.');
       }
@@ -88,63 +99,105 @@ export default function UpgradeResellerModal({ onClose, userBalance }) {
           {step === 'choose' && (
             <div className="space-y-4">
               <div className="text-center pb-2">
-                <p className="text-xs text-gray-400 font-bold uppercase">Biaya Upgrade</p>
-                <p className="text-3xl font-black text-amber-400 mt-0.5">Rp 20.000</p>
-                <p className="text-[11px] text-gray-400 mt-1 font-medium">Buka harga modal reseller termurah untuk semua produk!</p>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <p className="text-xs text-gray-400 font-bold uppercase">Biaya Upgrade</p>
+                  {isFree && (
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-white uppercase animate-pulse">
+                      {promoBadge}
+                    </span>
+                  )}
+                </div>
+                <p className={`text-3xl font-black mt-0.5 ${isFree ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {isFree ? 'GRATIS (Rp 0)' : fmt.rp(fee)}
+                </p>
+                <p className="text-[11px] text-gray-300 mt-1 font-medium leading-relaxed">
+                  {isFree ? promoMessage : 'Buka harga modal reseller termurah untuk semua produk!'}
+                </p>
               </div>
 
               {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold p-3 rounded-xl">{error}</div>}
 
-              {/* Pilihan Metode */}
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setMethod('balance')}
-                  disabled={userBalance < 20000}
-                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition cursor-pointer ${method === 'balance' ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-800/40 hover:border-gray-700'} ${userBalance < 20000 ? 'opacity-40 cursor-not-allowed' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-green-500/20 text-green-400 flex items-center justify-center">
-                      <Icon.Wallet className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-black text-white">Potong Saldo</p>
-                      <p className="text-[10px] text-gray-400">Saldo kamu: {fmt.rp(userBalance)}</p>
-                    </div>
+              {isFree ? (
+                /* ─── TAMPILAN PROMO GRATIS: 1-KLIK AKTIVASI ─── */
+                <div className="space-y-3 pt-1">
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-2xl text-left space-y-1">
+                    <p className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
+                      <span>🎉</span> Promo Spesial Aktif!
+                    </p>
+                    <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
+                      Anda berhak mendapatkan upgrade VIP Reseller secara gratis tanpa potong saldo atau pembayaran QRIS.
+                    </p>
                   </div>
-                  {userBalance >= 20000 ? (
-                    <span className="text-[9px] font-black bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Tersedia</span>
-                  ) : (
-                    <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Kurang</span>
-                  )}
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => setMethod('qris')}
-                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition cursor-pointer ${method === 'qris' ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-800/40 hover:border-gray-700'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                      <Icon.Scan className="w-4 h-4" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-black text-white">Bayar QRIS Instan</p>
-                      <p className="text-[10px] text-gray-400">Semua e-wallet & mobile banking</p>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={handleUpgradeBalance}
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 hover:brightness-110 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {loading ? (
+                      'Memproses Aktivasi...'
+                    ) : (
+                      <>
+                        <span>⚡</span> Klaim Upgrade VIP Gratis Sekarang
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                /* ─── TAMPILAN BERBAYAR (STANDAR) ─── */
+                <>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setMethod('balance')}
+                      disabled={userBalance < fee}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition cursor-pointer ${method === 'balance' ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-800/40 hover:border-gray-700'} ${userBalance < fee ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-green-500/20 text-green-400 flex items-center justify-center">
+                          <Icon.Wallet className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-black text-white">Potong Saldo</p>
+                          <p className="text-[10px] text-gray-400">Saldo kamu: {fmt.rp(userBalance)}</p>
+                        </div>
+                      </div>
+                      {userBalance >= fee ? (
+                        <span className="text-[9px] font-black bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Tersedia</span>
+                      ) : (
+                        <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Kurang</span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMethod('qris')}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-2xl border-2 transition cursor-pointer ${method === 'qris' ? 'border-amber-500 bg-amber-500/10' : 'border-gray-800 bg-gray-800/40 hover:border-gray-700'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                          <Icon.Scan className="w-4 h-4" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-black text-white">Bayar QRIS Instan</p>
+                          <p className="text-[10px] text-gray-400">Semua e-wallet &amp; mobile banking</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Otomatis</span>
+                    </button>
                   </div>
-                  <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Otomatis</span>
-                </button>
-              </div>
 
-              <button
-                type="button"
-                onClick={method === 'balance' ? handleUpgradeBalance : handleUpgradeQris}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:brightness-110 text-gray-950 font-black py-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-3"
-              >
-                {loading ? 'Memproses...' : method === 'balance' ? 'Bayar Rp 20.000 dari Saldo' : 'Tampilkan QRIS Pembayaran →'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={method === 'balance' ? handleUpgradeBalance : handleUpgradeQris}
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:brightness-110 text-gray-950 font-black py-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-3"
+                  >
+                    {loading ? 'Memproses...' : method === 'balance' ? `Bayar ${fmt.rp(fee)} dari Saldo` : 'Tampilkan QRIS Pembayaran →'}
+                  </button>
+                </>
+              )}
             </div>
           )}
 

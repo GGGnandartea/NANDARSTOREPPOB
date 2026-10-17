@@ -2,7 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
 export default function Register() {
-    const { store } = usePage().props;
+    const { store, resellerSettings } = usePage().props;
+    const isFreeReseller = Boolean(resellerSettings?.is_free);
+    const resellerFee = Number(resellerSettings?.fee ?? 20000);
+    const promoTitle = resellerSettings?.promo_title || 'PROMO RESELLER VIP GRATIS!';
+    const promoMessage = resellerSettings?.promo_message || 'Daftar Reseller VIP sekarang dan nikmati harga modal termurah seumur hidup tanpa biaya aktivasi!';
+    const promoBadge = resellerSettings?.promo_badge || 'PROMO VIP';
+
     const [role, setRole] = useState('user');
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -163,6 +169,11 @@ export default function Register() {
                             className={`flex-1 py-3 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${role === 'reseller' ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'text-amber-400 hover:text-amber-300'}`}
                         >
                             <span>👑</span> Reseller VIP
+                            {isFreeReseller && (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500 text-white animate-pulse">
+                                    GRATIS
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -170,17 +181,28 @@ export default function Register() {
                         
                         {/* Notifikasi Khusus Reseller */}
                         {role === 'reseller' && (
-                            <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border border-amber-500/30 p-4 rounded-2xl mb-5 animate-[fadeIn_0.3s_ease-out]">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                    <span className="text-base">👑</span>
-                                    <h4 className="text-amber-400 text-xs font-black uppercase tracking-wider">Aktivasi Reseller VIP (Rp 20.000)</h4>
+                            <div className={`p-4 rounded-2xl mb-5 animate-[fadeIn_0.3s_ease-out] border ${isFreeReseller ? 'bg-gradient-to-br from-emerald-500/15 via-amber-500/10 to-yellow-500/15 border-emerald-500/40 shadow-lg shadow-emerald-500/10' : 'bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border-amber-500/30'}`}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-base">👑</span>
+                                        <h4 className="text-amber-400 text-xs font-black uppercase tracking-wider">
+                                            {isFreeReseller ? promoTitle : `Aktivasi Reseller VIP (Rp ${resellerFee.toLocaleString('id-ID')})`}
+                                        </h4>
+                                    </div>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${isFreeReseller ? 'bg-emerald-500 text-white animate-pulse' : 'bg-amber-500/20 text-amber-300'}`}>
+                                        {isFreeReseller ? promoBadge : `Rp ${resellerFee.toLocaleString('id-ID')}`}
+                                    </span>
                                 </div>
                                 <p className="text-gray-300 text-[11px] leading-relaxed mb-2 font-medium">
-                                    Nikmati <strong>Harga Modal Termurah</strong> untuk semua produk aplikasi premium &amp; digital, margin cuan maksimal seumur hidup.
+                                    {isFreeReseller ? promoMessage : 'Nikmati Harga Modal Termurah untuk semua produk aplikasi premium & digital, margin cuan maksimal seumur hidup.'}
                                 </p>
-                                <div className="bg-black/30 px-3 py-2 rounded-xl text-[10px] text-amber-200/90 font-bold flex items-center gap-2">
-                                    <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    Biaya aktivasi Rp 20.000 via QRIS otomatis muncul setelah klik daftar.
+                                <div className={`px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 ${isFreeReseller ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-black/30 text-amber-200/90'}`}>
+                                    <span className="text-sm">⚡</span>
+                                    {isFreeReseller ? (
+                                        <span><strong>Promo Aktif:</strong> Akun Reseller VIP Anda akan <strong>langsung aktif otomatis</strong> saat tombol daftar diklik!</span>
+                                    ) : (
+                                        <span>Biaya aktivasi Rp {resellerFee.toLocaleString('id-ID')} via QRIS otomatis muncul setelah klik daftar.</span>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -311,7 +333,11 @@ export default function Register() {
                                 {processing ? (
                                     <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memproses...</>
                                 ) : role === 'reseller' ? (
-                                    <>Daftar & Bayar Biaya Reseller (Rp 20.000) <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                    isFreeReseller ? (
+                                        <>🎉 Daftar Reseller VIP Gratis (Rp 0) <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                    ) : (
+                                        <>Daftar &amp; Bayar Biaya Reseller (Rp {resellerFee.toLocaleString('id-ID')}) <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                    )
                                 ) : (
                                     <>Daftar Sebagai Pelanggan <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
                                 )}

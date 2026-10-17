@@ -13,10 +13,19 @@ const fmt = {
   rp: (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0),
 };
 
-export default function CheckoutIndex({ product, paymentChannels }) {
+export default function CheckoutIndex({ product, paymentChannels, initialQty = 1 }) {
   const { auth, store } = usePage().props;
   const user = auth?.user;
   const userBalance = user?.balance ?? 0;
+
+  const maxStock = (product.type === 'local' && product.stock > 0) ? product.stock : 999;
+
+  const [quantity, setQuantity] = useState(() => {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const qParam = urlParams ? parseInt(urlParams.get('qty'), 10) : null;
+    const initial = Number.isInteger(qParam) && qParam > 0 ? qParam : (initialQty || 1);
+    return Math.max(1, Math.min(initial, maxStock));
+  });
 
   const [buyerName, setBuyerName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -72,8 +81,9 @@ export default function CheckoutIndex({ product, paymentChannels }) {
   };
 
   const isReseller = user?.role === 'reseller' && Boolean(product.reseller_price);
-  const basePrice = isReseller ? Number(product.reseller_price) : Number(product.price);
-  const finalPrice = Math.max(0, basePrice - discountAmount);
+  const unitPrice = isReseller ? Number(product.reseller_price) : Number(product.price);
+  const subtotal = unitPrice * quantity;
+  const finalPrice = Math.max(0, subtotal - discountAmount);
   const canPayBalance = user && userBalance >= finalPrice;
 
   const handleCopyAccount = (text) => {
@@ -254,41 +264,55 @@ export default function CheckoutIndex({ product, paymentChannels }) {
     return cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
   };
 
-  const checkVoucher = async () => {
+  const handleQuantityChange = (newQty) => {
+    const validQty = Math.max(1, Math.min(newQty, maxStock));
+    setQuantity(validQty);
+    if (voucher && discountName) {
+      checkVoucher(validQty, false);
+    }
+  };
+
+  const checkVoucher = async (qtyToUse = quantity, showToast = true) => {
     if (!voucher) return;
     setVoucherLoading(true);
     try {
       const res = await fetch('/api/check-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
-        body: JSON.stringify({ code: voucher, product_id: product.id }),
+        body: JSON.stringify({ code: voucher, product_id: product.id, quantity: qtyToUse }),
       });
       const data = await res.json();
       if (res.ok && data.status === 'success') {
         setDiscountAmount(data.discount_amount);
         setDiscountName(data.code);
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'success',
-          title: `Diskon Rp ${data.discount_amount.toLocaleString('id-ID')} diterapkan!`,
-          showConfirmButton: false,
-          timer: 3000,
-        });
+        if (showToast) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `Diskon Rp ${data.discount_amount.toLocaleString('id-ID')} diterapkan!`,
+            showConfirmButton: false,
+            timer: 3000,
+          });
+        }
       } else {
         setDiscountAmount(0);
         setDiscountName('');
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'error',
-          title: data.message || 'Voucher tidak valid.',
-          showConfirmButton: false,
-          timer: 3000,
-        });
+        if (showToast) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            title: data.message || 'Voucher tidak valid.',
+            showConfirmButton: false,
+            timer: 3000,
+          });
+        }
       }
     } catch {
-      Swal.fire('Error', 'Gagal mengecek voucher', 'error');
+      if (showToast) {
+        Swal.fire('Error', 'Gagal mengecek voucher', 'error');
+      }
     }
     setVoucherLoading(false);
   };
@@ -334,6 +358,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
         body: JSON.stringify({
           product_id: product.id,
+          quantity,
           buyer_name: buyerName,
           email: email || null,
           whatsapp: targetWa,
@@ -369,7 +394,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
     }
     const result = await Swal.fire({
       title: 'Konfirmasi Pembelian',
-      html: `<p class="text-sm text-gray-600">Bayar <strong>${fmt.rp(finalPrice)}</strong> menggunakan saldo?<br>Sisa saldo: <strong>${fmt.rp(userBalance - finalPrice)}</strong></p>`,
+      html: `<p class="text-sm text-gray-600">Bayar <strong>${fmt.rp(finalPrice)}</strong> untuk <strong>${quantity} pcs</strong> menggunakan saldo?<br>Sisa saldo: <strong>${fmt.rp(userBalance - finalPrice)}</strong></p>`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#f97316',
@@ -387,6 +412,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
         body: JSON.stringify({
           product_id: product.id,
+          quantity,
           buyer_name: buyerName,
           email: email || null,
           whatsapp: targetWa,
@@ -405,6 +431,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
           payment_method: 'Saldo Akun',
           payment_status: 'paid',
           status: 'LUNAS',
+          quantity: data.quantity || quantity,
           created_at: data.created_at,
           wa_sent: data.wa_sent,
           wa_target: data.wa_target,
@@ -464,7 +491,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
           {!orderId && !balanceSuccess && (
             <div>
               {/* Ringkasan Produk */}
-              <CheckoutProductSummary product={product} />
+              <CheckoutProductSummary product={product} quantity={quantity} />
 
               {user?.role === 'admin' ? (
                 <CheckoutAdminAlert />
@@ -473,6 +500,11 @@ export default function CheckoutIndex({ product, paymentChannels }) {
                   user={user}
                   userBalance={userBalance}
                   product={product}
+                  quantity={quantity}
+                  setQuantity={handleQuantityChange}
+                  maxStock={maxStock}
+                  unitPrice={unitPrice}
+                  subtotal={subtotal}
                   buyerName={buyerName}
                   setBuyerName={setBuyerName}
                   email={email}
@@ -529,6 +561,7 @@ export default function CheckoutIndex({ product, paymentChannels }) {
               handleCopyAccount={handleCopyAccount}
               copied={copied}
               product={product}
+              quantity={completedOrder?.quantity || balanceSuccess?.quantity || quantity}
               finalPrice={finalPrice}
               user={user}
               waSentSuccess={waSentSuccess}

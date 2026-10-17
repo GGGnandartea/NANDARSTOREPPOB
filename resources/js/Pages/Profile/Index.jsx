@@ -15,7 +15,7 @@ import UpgradeResellerModal from './Partials/UpgradeResellerModal';
 import ChangeWaModal from './Partials/ChangeWaModal';
 import WaVerificationModal from './Partials/WaVerificationModal';
 
-export default function Profile({ orders = [], topups = [], mutations = [], stats = null }) {
+export default function Profile({ orders = [], topups = [], mutations = [], stats = null, resellerSettings = null }) {
   const { auth, flash, url } = usePage().props;
   const user = auth?.user;
   const isReseller = user?.role === 'reseller';
@@ -287,6 +287,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
               handleMenuClick={handleMenuClick}
               setShowTopup={setShowTopup}
               setShowUpgradeModal={setShowUpgradeModal}
+              resellerSettings={resellerSettings}
               setShowWaModal={setShowWaModal}
               setWaModalPhone={setWaModalPhone}
               setShowChangeWaModal={setShowChangeWaModal}
@@ -313,6 +314,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
                 handleMenuClick={handleMenuClick}
                 setShowTopup={setShowTopup}
                 setShowUpgradeModal={setShowUpgradeModal}
+                resellerSettings={resellerSettings}
                 setShowWaModal={setShowWaModal}
                 setWaModalPhone={setWaModalPhone}
                 setShowChangeWaModal={setShowChangeWaModal}
@@ -419,7 +421,11 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
 
       {/* UPGRADE RESELLER MODAL */}
       {showUpgradeModal && (
-        <UpgradeResellerModal onClose={() => setShowUpgradeModal(false)} userBalance={user?.balance || 0} />
+        <UpgradeResellerModal
+          onClose={() => setShowUpgradeModal(false)}
+          userBalance={user?.balance || 0}
+          resellerSettings={resellerSettings}
+        />
       )}
 
       {/* GANTI NOMOR WHATSAPP MODAL */}

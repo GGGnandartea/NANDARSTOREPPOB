@@ -9,6 +9,7 @@ export default function CheckoutSuccessSection({
   handleCopyAccount,
   copied,
   product,
+  quantity = 1,
   finalPrice,
   user,
   waSentSuccess,
@@ -20,6 +21,7 @@ export default function CheckoutSuccessSection({
   const currentOrderId = completedOrder?.order_id || balanceSuccess?.order_id || orderId;
   const productName = completedOrder?.product_name || product?.name;
   const totalAmount = completedOrder?.total_amount || balanceSuccess?.total_nominal || finalPrice;
+  const displayQty = completedOrder?.quantity || balanceSuccess?.quantity || quantity;
 
   return (
     <div className="text-center py-2 space-y-4">
@@ -118,6 +120,12 @@ export default function CheckoutSuccessSection({
           <span className="text-gray-400 font-bold">Layanan</span>
           <span className="font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{productName}</span>
         </div>
+        {displayQty > 1 && (
+          <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
+            <span className="text-gray-400 font-bold">Jumlah Pembelian</span>
+            <span className="font-black text-orange-500 px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/20">{displayQty} pcs</span>
+          </div>
+        )}
         <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
           <span className="text-gray-400 font-bold">Metode Bayar</span>
           <span className="font-bold text-gray-900 dark:text-white">{balanceSuccess ? 'Saldo Akun' : 'QRIS Otomatis'}</span>
