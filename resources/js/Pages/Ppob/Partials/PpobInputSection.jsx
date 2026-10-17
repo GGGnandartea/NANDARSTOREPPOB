@@ -40,7 +40,7 @@ export default function PpobInputSection({
   setStreamingSearch,
 }) {
   return (
-    <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+    <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
       {/* TAB 1: PULSA & DATA */}
       {activeTab === 'pulsa' && (
         <>

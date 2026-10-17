@@ -474,16 +474,16 @@ export default function PpobIndex({ store, initialPulsa }) {
       />
 
       {/* HERO SECTION */}
-      <section className="relative overflow-hidden pt-8 pb-10 sm:pb-12 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden pt-5 pb-6 sm:pt-8 sm:pb-12 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8">
           <PpobPromoBanner />
           <PpobTabNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
         </div>
       </section>
 
       {/* WORKSPACE AREA */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
           {/* KOLOM KIRI: INPUT DATA & OPERATOR SELECTOR (5 COLS) */}
           <div className="lg:col-span-5 space-y-6">
             <PpobInputSection

@@ -39,9 +39,9 @@ export default function Navbar({
 
             {/* NAVBAR */}
             <nav className={`glass-nav sticky ${auth?.user?.role === 'admin' ? 'top-8' : 'top-0'} z-40 transition-all duration-300 ${isScrolled ? 'border-b border-gray-200 dark:border-gray-800 shadow-sm' : 'border-b border-transparent dark:border-transparent'}`}>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+                <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-3">
                     
-                    <div className="flex-1 h-full relative overflow-hidden flex items-center">
+                    <div className="flex-1 min-w-0 h-full relative overflow-hidden flex items-center">
                         <Link href="/" className={`absolute left-0 flex items-center gap-2 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? '-translate-y-16 opacity-0 sm:translate-y-0 sm:opacity-100 sm:relative sm:mr-6' : 'translate-y-0 opacity-100 relative sm:mr-6'}`}>
                             {store?.logo ? (
                                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 p-0.5 flex items-center justify-center shadow-md shrink-0 overflow-hidden">
@@ -53,34 +53,47 @@ export default function Navbar({
                             <span className="text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0">{store?.name || 'NandarStore'}</span>
                         </Link>
 
-                        <div className={`absolute left-0 w-full max-w-xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative' : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'}`}>
+                        <div className={`absolute left-0 w-full max-w-xl transition-all duration-300 ease-out ${isScrolled ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative' : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'}`}>
                             <form onSubmit={handleSearch} className="relative w-full">
-                                <input type="text" value={searchTerm} onChange={handleInputChange} placeholder="Cari layanan..." className="w-full pl-4 pr-12 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-full text-[13px] sm:text-sm font-bold dark:text-white outline-none transition-colors shadow-inner" />
-                                <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Cari Produk">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={handleInputChange}
+                                    placeholder="Cari layanan..."
+                                    className="w-full pl-3.5 pr-9 sm:pl-4 sm:pr-12 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-full text-xs sm:text-sm font-semibold dark:text-white outline-none transition-colors shadow-inner"
+                                />
+                                <button
+                                    type="submit"
+                                    className="absolute right-1 sm:right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-7 sm:h-7 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                                    title="Cari Produk"
+                                >
+                                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                                 </button>
                             </form>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-1 sm:gap-3 shrink-0 relative z-10 bg-white/50 dark:bg-gray-900/50 sm:bg-transparent backdrop-blur-md rounded-full p-1 sm:p-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 relative z-10">
                         {/* PPOB DASHBOARD LINK BUTTON */}
                         <Link
                             href="/ppob"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs shadow-md shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Buka Layanan PPOB &amp; Pulsa"
+                            className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-[11px] sm:text-xs shadow-sm shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer shrink-0"
+                            title="Buka Layanan PPOB & Pulsa"
                         >
-                            <span className="text-xs">⚡</span>
-                            <span className="hidden sm:inline">PPOB &amp; Pulsa</span>
-                            <span className="sm:hidden">PPOB</span>
-                            <span className="text-[9px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider">HOT</span>
+                            <span>PPOB</span>
+                            <span className="hidden sm:inline">&amp; Pulsa</span>
+                            <span className="hidden sm:inline-block text-[9px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
                         </Link>
 
-                        <button onClick={toggleDarkMode} className="p-2 rounded-full text-gray-500 hover:text-black dark:text-gray-400 dark:hover:bg-gray-800 transition-colors cursor-pointer" title="Ganti Mode Gelap / Terang">
+                        <button
+                            onClick={toggleDarkMode}
+                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-black dark:text-gray-400 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
+                            title="Ganti Mode Gelap / Terang"
+                        >
                             {isDark ? (
-                                <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd"></path></svg>
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd"></path></svg>
                             ) : (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
                             )}
                         </button>
 
@@ -238,13 +251,14 @@ export default function Navbar({
                                 )}
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-1.5 sm:gap-3">
                                 <button onClick={() => setShowTrackModal(true)} className="hidden sm:flex text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-2.5 rounded-full transition shadow-sm cursor-pointer items-center gap-2">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Lacak Pesanan
                                 </button>
-                                <Link href="/login" className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-4 py-2 sm:px-5 sm:py-2.5 rounded-full transition shadow-md cursor-pointer mr-1 sm:mr-0">
-                                    Masuk/Daftar
+                                <Link href="/login" className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-full transition shadow-sm cursor-pointer">
+                                    <span className="sm:hidden">Masuk</span>
+                                    <span className="hidden sm:inline">Masuk/Daftar</span>
                                 </Link>
                             </div>
                         )}

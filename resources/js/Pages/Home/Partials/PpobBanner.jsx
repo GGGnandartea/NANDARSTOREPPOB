@@ -7,36 +7,29 @@ export default function PpobBanner({ filters }) {
     }
 
     return (
-        <div className="mb-6 md:mb-8 animate-fade-in-up">
+        <div className="mb-4 sm:mb-6 animate-fade-in-up">
             <Link
                 href="/ppob"
-                className="block p-5 sm:p-7 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-100/50 dark:from-gray-900 dark:via-[#0e221d] dark:to-[#123129] border border-emerald-200 dark:border-emerald-500/30 text-gray-900 dark:text-white shadow-lg shadow-emerald-900/5 dark:shadow-xl dark:shadow-emerald-950/20 hover:border-emerald-400 dark:hover:border-emerald-400 hover:shadow-xl transition-all group overflow-hidden relative cursor-pointer"
+                className="block p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-100/50 dark:from-gray-900 dark:via-[#0e221d] dark:to-[#123129] border border-emerald-200 dark:border-emerald-500/30 text-gray-900 dark:text-white shadow-md shadow-emerald-900/5 dark:shadow-xl dark:shadow-emerald-950/20 hover:border-emerald-400 dark:hover:border-emerald-400 hover:shadow-lg transition-all group overflow-hidden relative cursor-pointer"
             >
                 <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/10 dark:bg-emerald-500/15 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
-                    <div className="flex items-center gap-4">
-                        <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 group-hover:scale-105 transition-transform p-3">
-                            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z" />
-                            </svg>
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 relative z-10">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <h3 className="text-sm sm:text-base font-black text-gray-900 dark:text-white tracking-tight">
+                                Pusat Layanan PPOB, Pulsa &amp; Tagihan
+                            </h3>
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                                Transaksi Otomatis &amp; Instan
+                            </span>
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white tracking-wide">
-                                    Pusat Layanan PPOB, Pulsa &amp; Tagihan
-                                </h3>
-                                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                                    TRANSAKSI OTOMATIS &amp; INSTAN
-                                </span>
-                            </div>
-                            <p className="text-xs text-gray-600 dark:text-gray-300 font-medium max-w-2xl leading-relaxed">
-                                Beli pulsa semua operator, paket data, token listrik PLN, top up e-wallet (DANA, GoPay, OVO), voucher game (MLBB, FF, Genshin) &amp; bayar tagihan PDAM otomatis detik ini juga.
-                            </p>
-                        </div>
+                        <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 font-medium max-w-2xl leading-relaxed line-clamp-2 sm:line-clamp-none">
+                            Beli pulsa semua operator, paket data, token listrik PLN, top up e-wallet (DANA, GoPay, OVO), voucher game (MLBB, FF, Genshin) &amp; bayar tagihan PDAM otomatis detik ini juga.
+                        </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5 self-end md:self-center shrink-0">
-                        <div className="hidden xl:flex items-center gap-3 text-xs font-bold text-emerald-800 dark:text-emerald-300/90 bg-white/80 dark:bg-white/5 px-4 py-2.5 rounded-2xl border border-emerald-200/80 dark:border-white/10 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-2.5 self-end md:self-center shrink-0 w-full md:w-auto justify-between md:justify-end pt-1 md:pt-0">
+                        <div className="hidden xl:flex items-center gap-2.5 text-xs font-bold text-emerald-800 dark:text-emerald-300/90 bg-white/80 dark:bg-white/5 px-3.5 py-2 rounded-xl border border-emerald-200/80 dark:border-white/10 shadow-xs">
                             <span className="flex items-center gap-1.5">
                                 <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg>
                                 Pulsa &amp; Data
@@ -57,9 +50,9 @@ export default function PpobBanner({ filters }) {
                                 E-Wallet
                             </span>
                         </div>
-                        <span className="py-3 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-950/20 border border-emerald-400/40 group-hover:scale-105 transition-all flex items-center gap-2 shrink-0">
+                        <span className="py-2 px-3.5 sm:py-2.5 sm:px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md shadow-emerald-950/20 border border-emerald-400/40 group-hover:scale-105 transition-all flex items-center gap-1.5 shrink-0 ml-auto md:ml-0">
                             <span>Buka Dashboard PPOB</span>
-                            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            <svg className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                         </span>
                     </div>
                 </div>

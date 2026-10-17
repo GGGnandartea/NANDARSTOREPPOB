@@ -50,7 +50,7 @@ export default function PpobProductGrid({
               <div
                 key={item.code}
                 onClick={() => onOpenCheckout(item)}
-                className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
+                className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
                   isMaintenance
                     ? 'bg-amber-500/5 border-amber-500/30 opacity-75'
                     : isInactive
@@ -66,31 +66,31 @@ export default function PpobProductGrid({
                       {item.name}
                     </h4>
                     {isMaintenance ? (
-                      <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40 shrink-0">
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40 shrink-0">
                         GANGGUAN
                       </span>
                     ) : isInactive ? (
-                      <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 shrink-0">
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 shrink-0">
                         NONAKTIF
                       </span>
                     ) : (
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                         INSTAN
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-white/5 mt-2 gap-2">
+                <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-white/5 mt-2 gap-2">
                   <div>
-                    <p className="text-[10px] font-black uppercase text-gray-400">Harga Layanan</p>
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase text-gray-400">Harga Layanan</p>
                     <span className="text-sm sm:text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
                       {fmt.rp(item.price)}
                     </span>
                   </div>
                   <button
                     type="button"
-                    className={`px-4 py-2.5 rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 shrink-0 ${
+                    className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black shadow-md transition-all flex items-center gap-1.5 shrink-0 ${
                       isMaintenance
                         ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-not-allowed'
                         : isInactive
@@ -104,7 +104,8 @@ export default function PpobProductGrid({
                       <span>Tutup</span>
                     ) : (
                       <>
-                        <span>Beli Sekarang</span>
+                        <span className="sm:hidden">Beli</span>
+                        <span className="hidden sm:inline">Beli Sekarang</span>
                         <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                         </svg>
