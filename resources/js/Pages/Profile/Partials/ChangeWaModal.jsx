@@ -132,3 +132,4 @@ export default function ChangeWaModal({ onClose, currentWhatsapp, onNumberChange
     </div>
   );
 }
+

@@ -21,3 +21,4 @@ export default function RecentPurchaseToast({ showNotif, activeNotif }) {
         </div>
     );
 }
+

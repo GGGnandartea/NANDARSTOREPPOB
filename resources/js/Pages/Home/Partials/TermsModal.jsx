@@ -19,3 +19,4 @@ export default function TermsModal({ showTerms, setShowTerms, terms }) {
         </div>
     );
 }
+

@@ -149,3 +149,4 @@ export const PPOB_TABS = [
 export const fmt = {
   rp: (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0),
 };
+

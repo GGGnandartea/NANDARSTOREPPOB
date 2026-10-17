@@ -542,3 +542,4 @@ export default function CheckoutIndex({ product, paymentChannels }) {
     </div>
   );
 }
+

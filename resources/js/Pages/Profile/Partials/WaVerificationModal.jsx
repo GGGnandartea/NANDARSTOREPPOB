@@ -281,3 +281,4 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
     </div>
   );
 }
+

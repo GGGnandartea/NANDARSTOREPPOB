@@ -183,7 +183,19 @@ export default function ProfileSidebar({
               onClick={() => handleMenuClick(m.key)}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-sm font-bold transition cursor-pointer ${isActive ? activeClass : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
             >
-              <m.icon className="w-4 h-4 shrink-0" />
+              <m.icon
+                className={`w-4 h-4 shrink-0 ${
+                  !isActive
+                    ? m.key === 'orders_ppob'
+                      ? 'text-emerald-500'
+                      : m.key === 'orders_app'
+                      ? 'text-blue-500'
+                      : m.key === 'topup'
+                      ? 'text-amber-500'
+                      : ''
+                    : ''
+                }`}
+              />
               <span className="flex-1 text-left">{m.label}</span>
               {m.badge && (
                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black text-amber-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}`}>
@@ -191,7 +203,19 @@ export default function ProfileSidebar({
                 </span>
               )}
               {m.count !== undefined && m.count > 0 && (
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${isActive ? 'bg-black/20 text-current' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>{m.count}</span>
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
+                    isActive
+                      ? 'bg-black/20 text-current'
+                      : m.key === 'orders_ppob'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300'
+                      : m.key === 'orders_app'
+                      ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300'
+                      : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  {m.count}
+                </span>
               )}
               <Icon.ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'opacity-80' : 'text-gray-300 dark:text-gray-600'}`} />
             </button>
@@ -211,3 +235,4 @@ export default function ProfileSidebar({
     </div>
   );
 }
+

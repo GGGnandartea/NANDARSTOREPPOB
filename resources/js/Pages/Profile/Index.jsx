@@ -22,34 +22,45 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
 
   const allMutations = mutations && mutations.length > 0 ? mutations : topups;
 
+  // Pisahkan pesanan Aplikasi Premium vs PPOB 24 Jam
+  const appOrders = useMemo(() => orders.filter((o) => o.product_type !== 'ppob'), [orders]);
+  const ppobOrders = useMemo(() => orders.filter((o) => o.product_type === 'ppob'), [orders]);
+
   // Akumulasi Total Pemasukan & Pengeluaran Sejak Pertama Kali Daftar
   const totalIncomeCalc = useMemo(() => {
     if (stats?.total_income !== undefined && stats?.total_income !== null) return Number(stats.total_income);
     return allMutations
-      .filter(m => m.type === 'income' && m.status === 'success')
+      .filter((m) => m.type === 'income' && m.status === 'success')
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [allMutations, stats]);
 
   const totalExpenseCalc = useMemo(() => {
     if (stats?.total_expense !== undefined && stats?.total_expense !== null) return Number(stats.total_expense);
     return allMutations
-      .filter(m => m.type === 'expense' && m.status === 'success')
+      .filter((m) => m.type === 'expense' && m.status === 'success')
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [allMutations, stats]);
 
-  const totalIncomeCount = stats?.income_count ?? allMutations.filter(m => m.type === 'income' && m.status === 'success').length;
-  const totalExpenseCount = stats?.expense_count ?? allMutations.filter(m => m.type === 'expense' && m.status === 'success').length;
+  const totalIncomeCount =
+    stats?.income_count ?? allMutations.filter((m) => m.type === 'income' && m.status === 'success').length;
+  const totalExpenseCount =
+    stats?.expense_count ?? allMutations.filter((m) => m.type === 'expense' && m.status === 'success').length;
 
   const [activeMenu, setActiveMenu] = useState(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
-      if (tabParam && ['dashboard', 'orders', 'topup', 'security', 'settings', 'profile'].includes(tabParam)) {
-        return tabParam === 'settings' ? 'profile' : tabParam;
+      if (tabParam) {
+        if (tabParam === 'ppob' || tabParam === 'orders_ppob') return 'orders_ppob';
+        if (tabParam === 'orders' || tabParam === 'orders_app' || tabParam === 'history') return 'orders_app';
+        if (tabParam === 'orders_all') return 'orders_all';
+        if (tabParam === 'settings') return 'profile';
+        if (['dashboard', 'topup', 'security', 'profile'].includes(tabParam)) return tabParam;
       }
     }
     return 'dashboard';
   });
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showTopup, setShowTopup] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -75,35 +86,50 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
 
   useEffect(() => {
     setOrderPage(1);
-  }, [orderSearchQuery]);
+  }, [orderSearchQuery, activeMenu]);
 
   useEffect(() => {
     setMutationPage(1);
   }, [mutationFilter]);
 
-  const filteredOrders = orders.filter((o) => {
-    if (!orderSearchQuery.trim()) return true;
-    const q = orderSearchQuery.toLowerCase().trim();
-    const inv = String(o.invoice_number || o.id || '').toLowerCase();
-    const prod = String(o.product_name || '').toLowerCase();
-    const wa = String(o.whatsapp || '').toLowerCase();
-    const email = String(o.email || '').toLowerCase();
-    const sn = String(o.sn_or_account || '').toLowerCase();
-    const notes = String(o.notes || '').toLowerCase();
-    const status = String(o.order_status || o.payment_status || '').toLowerCase();
-    const total = String(o.total_amount || o.price || '').toLowerCase();
+  // Tentukan daftar order aktif berdasarkan menu tab
+  const currentOrderCategory = useMemo(() => {
+    if (activeMenu === 'orders_ppob') return 'ppob';
+    if (activeMenu === 'orders_all') return 'all';
+    return 'app';
+  }, [activeMenu]);
 
-    return (
-      inv.includes(q) ||
-      prod.includes(q) ||
-      wa.includes(q) ||
-      email.includes(q) ||
-      sn.includes(q) ||
-      notes.includes(q) ||
-      status.includes(q) ||
-      total.includes(q)
-    );
-  });
+  const currentOrderList = useMemo(() => {
+    if (currentOrderCategory === 'ppob') return ppobOrders;
+    if (currentOrderCategory === 'all') return orders;
+    return appOrders;
+  }, [currentOrderCategory, ppobOrders, orders, appOrders]);
+
+  const filteredOrders = useMemo(() => {
+    return currentOrderList.filter((o) => {
+      if (!orderSearchQuery.trim()) return true;
+      const q = orderSearchQuery.toLowerCase().trim();
+      const inv = String(o.invoice_number || o.id || '').toLowerCase();
+      const prod = String(o.product_name || '').toLowerCase();
+      const wa = String(o.whatsapp || '').toLowerCase();
+      const email = String(o.email || '').toLowerCase();
+      const sn = String(o.sn_or_account || '').toLowerCase();
+      const notes = String(o.notes || '').toLowerCase();
+      const status = String(o.order_status || o.payment_status || '').toLowerCase();
+      const total = String(o.total_amount || o.price || '').toLowerCase();
+
+      return (
+        inv.includes(q) ||
+        prod.includes(q) ||
+        wa.includes(q) ||
+        email.includes(q) ||
+        sn.includes(q) ||
+        notes.includes(q) ||
+        status.includes(q) ||
+        total.includes(q)
+      );
+    });
+  }, [currentOrderList, orderSearchQuery]);
 
   const orderTotalPages = Math.ceil(filteredOrders.length / 10);
   const paginatedOrders = filteredOrders.slice((orderPage - 1) * 10, orderPage * 10);
@@ -128,7 +154,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
         },
       });
@@ -156,9 +182,12 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
       if (tab) {
-        if (tab === 'history') setActiveMenu('orders');
-        else if (['dashboard', 'profile', 'orders', 'topup', 'security', 'settings'].includes(tab)) {
-          setActiveMenu(tab === 'settings' ? 'profile' : tab);
+        if (tab === 'history' || tab === 'orders' || tab === 'orders_app') setActiveMenu('orders_app');
+        else if (tab === 'ppob' || tab === 'orders_ppob') setActiveMenu('orders_ppob');
+        else if (tab === 'orders_all') setActiveMenu('orders_all');
+        else if (tab === 'settings') setActiveMenu('profile');
+        else if (['dashboard', 'profile', 'topup', 'security'].includes(tab)) {
+          setActiveMenu(tab);
         }
       } else {
         setActiveMenu('dashboard');
@@ -169,44 +198,67 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
   useEffect(() => {
     const theme = localStorage.getItem('theme');
     if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark'); setIsDark(true);
+      document.documentElement.classList.add('dark');
+      setIsDark(true);
     }
   }, []);
 
   const toggleDark = () => {
-    if (isDark) { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); setIsDark(false); }
-    else { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); setIsDark(true); }
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDark(true);
+    }
   };
 
   const menus = [
-    { key: 'dashboard', label: 'Dashboard',             icon: Icon.Dashboard },
-    { key: 'orders',   label: 'Riwayat Pembelian',      icon: Icon.History, count: orders.length },
-    { key: 'topup',    label: 'Riwayat Saldo & Top Up',  icon: Icon.Wallet,  count: allMutations.length },
-    { key: 'profile',  label: 'Edit Profil',            icon: Icon.User     },
-    { key: 'security', label: 'Ubah Password',          icon: Icon.Lock     },
+    { key: 'dashboard',   label: 'Dashboard',             icon: Icon.Dashboard },
+    { key: 'orders_app',  label: 'Pesanan Aplikasi',      icon: Icon.App,     count: appOrders.length },
+    { key: 'orders_ppob', label: 'Pesanan PPOB 24H',      icon: Icon.Ppob,    count: ppobOrders.length },
+    { key: 'topup',       label: 'Riwayat Saldo & Top Up', icon: Icon.Wallet,  count: allMutations.length },
+    { key: 'profile',     label: 'Edit Profil',           icon: Icon.User },
+    { key: 'security',    label: 'Ubah Password',         icon: Icon.Lock },
   ];
 
-  const handleMenuClick = (key) => { 
-    setActiveMenu(key); 
-    setSidebarOpen(false); 
-    const targetUrl = key === 'dashboard' ? '/profile' : `/profile?tab=${key}`;
+  const handleMenuClick = (key) => {
+    let normalizedKey = key;
+    if (key === 'orders') normalizedKey = 'orders_app';
+    else if (key === 'ppob') normalizedKey = 'orders_ppob';
+    setActiveMenu(normalizedKey);
+    setSidebarOpen(false);
+    setOrderPage(1);
+    setOrderSearchQuery('');
+    let targetParam = normalizedKey;
+    if (normalizedKey === 'orders_app') targetParam = 'orders';
+    else if (normalizedKey === 'orders_ppob') targetParam = 'ppob';
+
+    const targetUrl = normalizedKey === 'dashboard' ? '/profile' : `/profile?tab=${targetParam}`;
     router.visit(targetUrl, { preserveState: true, preserveScroll: true, replace: true });
   };
+
+  const isOrdersTabActive =
+    activeMenu === 'orders_app' ||
+    activeMenu === 'orders_ppob' ||
+    activeMenu === 'orders_all' ||
+    activeMenu === 'orders';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors">
       <Head>
         <title>{isReseller ? 'Profil VIP Reseller - NandarStore' : 'Profil Saya - NandarStore'}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
         <style>{`.font-jakarta{font-family:'Plus Jakarta Sans',sans-serif}.glass-nav{background:rgba(255,255,255,0.95);backdrop-filter:blur(10px)}.dark .glass-nav{background:rgba(15,23,42,0.9)}`}</style>
       </Head>
 
       {/* NAVBAR */}
-      <ProfileNavbar
-        setSidebarOpen={setSidebarOpen}
-        toggleDark={toggleDark}
-        isDark={isDark}
-      />
+      <ProfileNavbar setSidebarOpen={setSidebarOpen} toggleDark={toggleDark} isDark={isDark} />
 
       {/* MOBILE SIDEBAR OVERLAY */}
       {sidebarOpen && (
@@ -215,7 +267,13 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
           <div className="relative w-72 bg-white dark:bg-gray-900 h-full shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
               <span className="font-black text-gray-900 dark:text-white">Menu</span>
-              <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer" aria-label="Tutup Sidebar"><Icon.X className="w-5 h-5" /></button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                aria-label="Tutup Sidebar"
+              >
+                <Icon.X className="w-5 h-5" />
+              </button>
             </div>
             <ProfileSidebar
               user={user}
@@ -240,7 +298,6 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
       {/* MAIN LAYOUT */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-6 items-start">
-
           {/* DESKTOP SIDEBAR */}
           <aside className="hidden md:flex flex-col w-72 shrink-0 h-fit self-start">
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm overflow-hidden h-fit">
@@ -265,7 +322,6 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
 
           {/* MAIN CONTENT */}
           <main className="flex-1 min-w-0">
-
             {/* Dashboard Profil */}
             {activeMenu === 'dashboard' && (
               <DashboardTab
@@ -288,15 +344,25 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
             {activeMenu === 'profile' && (
               <EditProfileTab
                 user={user}
-                onOpenWaModal={(phone) => { setWaModalPhone(phone || user?.whatsapp || ''); setShowWaModal(true); }}
+                onOpenWaModal={(phone) => {
+                  setWaModalPhone(phone || user?.whatsapp || '');
+                  setShowWaModal(true);
+                }}
                 onOpenChangeWaModal={() => setShowChangeWaModal(true)}
               />
             )}
 
-            {/* Riwayat Pembelian */}
-            {activeMenu === 'orders' && (
+            {/* Riwayat Pembelian (Aplikasi vs PPOB vs Semua) */}
+            {isOrdersTabActive && (
               <OrdersTab
-                orders={orders}
+                orders={currentOrderList}
+                allOrders={orders}
+                activeCategory={currentOrderCategory}
+                onSelectCategory={(cat) => {
+                  if (cat === 'ppob') handleMenuClick('orders_ppob');
+                  else if (cat === 'all') handleMenuClick('orders_all');
+                  else handleMenuClick('orders_app');
+                }}
                 filteredOrders={filteredOrders}
                 paginatedOrders={paginatedOrders}
                 orderSearchQuery={orderSearchQuery}
@@ -335,19 +401,26 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
             )}
 
             {/* Ubah Password */}
-            {activeMenu === 'security' && (
-              <SecurityTab flash={flash} />
-            )}
-
+            {activeMenu === 'security' && <SecurityTab flash={flash} />}
           </main>
         </div>
       </div>
 
       {/* TOP UP MODAL */}
-      {showTopup && <TopupModal onClose={() => setShowTopup(false)} onSuccess={() => { setShowTopup(false); router.reload({ only: [] }); }} />}
+      {showTopup && (
+        <TopupModal
+          onClose={() => setShowTopup(false)}
+          onSuccess={() => {
+            setShowTopup(false);
+            router.reload({ only: [] });
+          }}
+        />
+      )}
 
       {/* UPGRADE RESELLER MODAL */}
-      {showUpgradeModal && <UpgradeResellerModal onClose={() => setShowUpgradeModal(false)} userBalance={user?.balance || 0} />}
+      {showUpgradeModal && (
+        <UpgradeResellerModal onClose={() => setShowUpgradeModal(false)} userBalance={user?.balance || 0} />
+      )}
 
       {/* GANTI NOMOR WHATSAPP MODAL */}
       {showChangeWaModal && (

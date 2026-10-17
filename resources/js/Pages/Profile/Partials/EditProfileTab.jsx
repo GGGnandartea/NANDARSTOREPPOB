@@ -107,3 +107,4 @@ export default function EditProfileTab({ user, onOpenWaModal, onOpenChangeWaModa
     </div>
   );
 }
+

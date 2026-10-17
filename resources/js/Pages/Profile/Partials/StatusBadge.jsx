@@ -24,3 +24,4 @@ export default function StatusBadge({ status }) {
   const s = (status || '').toUpperCase();
   return <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${map[s] || 'bg-gray-100 text-gray-500'}`}>{labels[s] || s || '-'}</span>;
 }
+

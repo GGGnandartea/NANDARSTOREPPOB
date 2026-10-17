@@ -81,3 +81,4 @@ export default function PpobHeader({ store, user, userBalance, isDark, toggleDar
     </header>
   );
 }
+
