@@ -5,27 +5,23 @@ use App\Http\Controllers\FrontController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PpobController;
-
-Route::get('/', [FrontController::class, 'index'])->name('home');
-Route::get('/product/{type}/{id}', [FrontController::class, 'show'])->name('product.detail');
-
 // --- RUTE HALAMAN DEPAN & CHECKOUT ---
 Route::get('/', [FrontController::class, 'index'])->name('home');
-Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.detail');
+Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.detail')->whereNumber('id');
 
-Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout');
+Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
 Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process');
-Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status');
-Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice');
-Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct');
-Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa');
+Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+');
+Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+');
 
 // --- RUTE LAYANAN PPOB KIOSBANK ---
 Route::get('/ppob', [PpobController::class, 'index'])->name('ppob.index');
 Route::get('/ppob/products', [PpobController::class, 'getProducts'])->name('ppob.products');
 Route::post('/ppob/inquiry', [PpobController::class, 'inquiry'])->name('ppob.inquiry');
 Route::post('/ppob/checkout', [PpobController::class, 'checkout'])->name('ppob.checkout');
-Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status');
+Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+');
 // ----------------------------------
 
 

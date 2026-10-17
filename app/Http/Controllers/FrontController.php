@@ -48,9 +48,24 @@ class FrontController extends Controller
             if(!empty($p->category) && !in_array($p->category, $manualCategories)) { $manualCategories[] = $p->category; }
         }
 
-        if ($request->search) { $query->where('name', 'like', '%' . $request->search . '%'); }
-        if ($request->category) { $query->where('name', 'like', $request->category . '%'); }
-        if ($request->tipe) { $query->where('category', $request->tipe); }
+        if ($request->filled('search')) {
+            $cleanSearch = trim(strip_tags((string) $request->search));
+            $cleanSearch = substr($cleanSearch, 0, 80);
+            $escapedSearch = str_replace(['%', '_', '\\'], ['\%', '\_', '\\\\'], $cleanSearch);
+            if (!empty($cleanSearch)) {
+                $query->where('name', 'like', '%' . $escapedSearch . '%');
+            }
+        }
+        if ($request->filled('category')) {
+            $cleanCategory = trim(strip_tags((string) $request->category));
+            $cleanCategory = substr($cleanCategory, 0, 50);
+            $query->where('name', 'like', str_replace(['%', '_', '\\'], ['\%', '\_', '\\\\'], $cleanCategory) . '%');
+        }
+        if ($request->filled('tipe')) {
+            $cleanTipe = trim(strip_tags((string) $request->tipe));
+            $cleanTipe = substr($cleanTipe, 0, 50);
+            $query->where('category', $cleanTipe);
+        }
 
         $products = $query->get();
 
@@ -346,7 +361,13 @@ class FrontController extends Controller
     }
 
     public function show($id) {
-        $product = Product::findOrFail($id);
+        if (!is_numeric($id) || (int) $id <= 0) {
+            abort(404);
+        }
+        $product = Product::find((int) $id);
+        if (!$product) {
+            abort(404);
+        }
 
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
@@ -373,7 +394,13 @@ class FrontController extends Controller
     }
 
     public function checkout($id) {
-        $product = Product::findOrFail($id);
+        if (!is_numeric($id) || (int) $id <= 0) {
+            abort(404);
+        }
+        $product = Product::find((int) $id);
+        if (!$product) {
+            abort(404);
+        }
 
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';

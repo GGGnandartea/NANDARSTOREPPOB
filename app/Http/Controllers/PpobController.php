@@ -141,6 +141,19 @@ class PpobController extends Controller
         $whatsapp      = $request->input('whatsapp') ?: (Auth::user()?->whatsapp ?: $customerId);
         $email         = $request->input('email') ?: (Auth::user()?->email ?: 'user@nandarstore.com');
 
+        // Validasi integritas harga dari database PpobProduct jika produk terdaftar
+        $officialProduct = \App\Models\PpobProduct::where('code', $productCode)->first();
+        if ($officialProduct && $officialProduct->price > 0) {
+            $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($officialProduct->reseller_price);
+            $baseExpectedPrice = (int) ($isReseller ? $officialProduct->reseller_price : $officialProduct->price);
+            if ($nominal < $baseExpectedPrice) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Validasi keamanan gagal: Nominal transaksi tidak valid atau tidak sesuai katalog resmi.'
+                ], 400);
+            }
+        }
+
         // Diskon voucher jika ada
         $discount = 0;
         $voucherCode = $request->input('voucher_code');

@@ -515,6 +515,14 @@ class AdminController extends Controller
     }
 
     public function saveBranding(Request $request) {
+        $request->validate([
+            'store_name'    => 'nullable|string|max:100',
+            'store_tagline' => 'nullable|string|max:200',
+            'store_logo'    => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:3072',
+            'store_favicon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,webp,ico|max:1024',
+            'loading_logo'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:3072',
+        ]);
+
         // Nama Brand & Slogan
         if ($request->filled('store_name')) {
             Setting::updateOrCreate(['key' => 'store_name'], ['value' => trim($request->store_name)]);
@@ -779,6 +787,13 @@ class AdminController extends Controller
         $localProducts = $query->get(); return view('admin.local_products', compact('localProducts'));
     }
     public function storeLocalProduct(Request $request) {
+        $request->validate([
+            'name'           => 'required|string|max:150',
+            'category'       => 'nullable|string|max:100',
+            'price'          => 'required|numeric|min:0',
+            'reseller_price' => 'nullable|numeric|min:0',
+            'image'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+        ]);
         $imagePath = $request->hasFile('image') ? $request->file('image')->store('products', 'public') : null;
         Product::create([
             'name' => $request->name,
@@ -795,6 +810,13 @@ class AdminController extends Controller
         return back()->with('success', 'Produk berhasil ditambahkan.');
     }
     public function updateLocalProduct(Request $request, $id) {
+        $request->validate([
+            'name'           => 'required|string|max:150',
+            'category'       => 'nullable|string|max:100',
+            'price'          => 'required|numeric|min:0',
+            'reseller_price' => 'nullable|numeric|min:0',
+            'image'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+        ]);
         $product = Product::findOrFail($id);
         $product->name = $request->name;
         $product->category = $request->category;
@@ -820,6 +842,11 @@ class AdminController extends Controller
         $accounts = $query->get(); return view('admin.local_accounts', compact('product', 'accounts'));
     }
     public function storeLocalAccount(Request $request, $id) {
+        $request->validate([
+            'txt_file' => 'nullable|file|mimes:txt|max:5120',
+            'email'    => 'nullable|string|max:150',
+            'password' => 'nullable|string|max:255',
+        ]);
         $product = Product::findOrFail($id); $count = 0;
         if ($request->hasFile('txt_file')) {
             $content = file_get_contents($request->file('txt_file')->getRealPath()); $lines = explode("\n", $content);
