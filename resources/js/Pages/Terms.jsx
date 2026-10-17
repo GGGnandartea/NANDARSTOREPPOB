@@ -193,7 +193,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
                                     <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">Ketentuan Umum</h2>
                                 </div>
                                 <p className="text-xs sm:text-sm pl-8 text-gray-600 dark:text-gray-400">
-                                    {storeName} adalah penyedia layanan pembelian produk digital, aplikasi akun premium legal, serta layanan PPOB (Pulsa, Paket Data, Token Listrik PLN, Top Up Game & E-Wallet) 24 jam otomatis. Dengan melakukan pemesanan di situs kami, Anda menyatakan telah berusia cakap hukum dan menyetujui seluruh ketentuan ini.
+                                    {storeName} adalah penyedia layanan pembelian produk digital, aplikasi akun premium legal, serta layanan PPOB (Pulsa, Paket Data, Token Listrik PLN, Top Up Game & E-Wallet) otomatis. Dengan melakukan pemesanan di situs kami, Anda menyatakan telah berusia cakap hukum dan menyetujui seluruh ketentuan ini.
                                 </p>
                             </section>
 
@@ -231,7 +231,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
                                     <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">Ketentuan Layanan PPOB & Pulsa</h2>
                                 </div>
                                 <ul className="list-disc pl-12 space-y-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                                    <li>Server PPOB terhubung langsung ke operator switching multi-biller 24 jam non-stop.</li>
+                                    <li>Server PPOB terhubung langsung ke operator switching multi-biller secara otomatis dan real-time.</li>
                                     <li>Pembeli bertanggung jawab penuh atas kebenaran Nomor HP, No. Meter PLN, atau User ID Game yang diinput. Transaksi sukses ke nomor yang salah tidak dapat dibatalkan atau ditarik kembali.</li>
                                     <li>Jika terjadi gangguan jaringan dari operator pusat sehingga transaksi berstatus gagal, dana pembayaran akan dikembalikan 100% ke Saldo Akun Member.</li>
                                 </ul>

@@ -68,7 +68,7 @@ export default function Navbar({
                         <Link
                             href="/ppob"
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xs shadow-md shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Buka Layanan PPOB & Pulsa 24 Jam"
+                            title="Buka Layanan PPOB &amp; Pulsa"
                         >
                             <span className="text-xs">⚡</span>
                             <span className="hidden sm:inline">PPOB &amp; Pulsa</span>

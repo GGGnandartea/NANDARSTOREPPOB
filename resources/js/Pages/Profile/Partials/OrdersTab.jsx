@@ -30,7 +30,7 @@ export default function OrdersTab({
   const getHeaderInfo = () => {
     if (activeCategory === 'ppob') {
       return {
-        title: 'Riwayat Transaksi PPOB 24 Jam',
+        title: 'Riwayat Transaksi PPOB',
         desc: 'Daftar pembelian pulsa, paket data, token PLN, voucher game & e-wallet',
         emptyTitle: 'Belum Ada Transaksi PPOB',
         emptyDesc: 'Transaksi PPOB Anda akan tercatat secara otomatis di sini.',
@@ -50,7 +50,7 @@ export default function OrdersTab({
     }
     return {
       title: 'Semua Riwayat Pembelian',
-      desc: 'Daftar seluruh transaksi produk aplikasi premium dan PPOB 24 Jam',
+      desc: 'Daftar seluruh transaksi produk aplikasi premium dan PPOB',
       emptyTitle: 'Belum Ada Pembelian',
       emptyDesc: 'Riwayat transaksi Anda akan muncul di sini.',
       emptyCta: 'Mulai Belanja Sekarang →',
@@ -69,7 +69,7 @@ export default function OrdersTab({
             <span>{header.title}</span>
             {activeCategory === 'ppob' && (
               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                ⚡ PPOB 24H
+                ⚡ PPOB
               </span>
             )}
             {activeCategory === 'app' && (
@@ -123,7 +123,7 @@ export default function OrdersTab({
           }`}
         >
           <Icon.Ppob className="w-3.5 h-3.5 text-emerald-500" />
-          <span>PPOB 24 Jam</span>
+          <span>PPOB</span>
           <span
             className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
               activeCategory === 'ppob'

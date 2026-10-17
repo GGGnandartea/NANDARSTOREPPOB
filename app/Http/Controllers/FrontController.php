@@ -1272,7 +1272,7 @@ class FrontController extends Controller
     public function faq() {
         $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
-        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya 24 Jam';
+        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
         $whatsappGroup = Setting::where('key', 'whatsapp_group_link')->value('value') ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H';
 
@@ -1292,7 +1292,7 @@ class FrontController extends Controller
     public function terms() {
         $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
-        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya 24 Jam';
+        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
         $termsContent  = Setting::where('key', 'terms_and_conditions')->value('value') ?: '';
 

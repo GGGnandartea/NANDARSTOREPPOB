@@ -24,7 +24,7 @@ export default function PpobMobileNav({ user }) {
           <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Aplikasi</span>
         </Link>
 
-        {/* 3. PPOB 24 Jam (ACTIVE) */}
+        {/* 3. PPOB (ACTIVE) */}
         <div className="flex flex-col items-center justify-center py-1 text-emerald-600 dark:text-emerald-400 relative">
           <div className="relative">
             <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor">
@@ -34,7 +34,7 @@ export default function PpobMobileNav({ user }) {
               HOT
             </span>
           </div>
-          <span className="text-[8.5px] font-black mt-0.5 tracking-tight">PPOB 24H</span>
+          <span className="text-[8.5px] font-black mt-0.5 tracking-tight">PPOB</span>
         </div>
 
         {/* 4. Riwayat / Lacak */}

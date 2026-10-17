@@ -26,7 +26,7 @@ export default function PpobBanner({ filters }) {
                                     Pusat Layanan PPOB, Pulsa &amp; Tagihan
                                 </h3>
                                 <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                                    TRANSAKSI OTOMATIS 24 JAM
+                                    TRANSAKSI OTOMATIS &amp; INSTAN
                                 </span>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-300 font-medium max-w-2xl leading-relaxed">

@@ -7,7 +7,7 @@ export default function PpobPromoBanner() {
       <div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-black uppercase tracking-wider mb-3 shadow-xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-          <span>Layanan Transaksi Otomatis Aktif 24 Jam Nonstop</span>
+          <span>Layanan Transaksi Otomatis &amp; Instan</span>
         </div>
         <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
           Dashboard Pembelian <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600">PPOB &amp; Pulsa</span>

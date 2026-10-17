@@ -49,13 +49,13 @@ export default function MobileBottomNav({
                     <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Aplikasi</span>
                 </button>
 
-                {/* 3. PPOB 24 Jam */}
+                {/* 3. PPOB */}
                 <Link href="/ppob" className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-emerald-500 dark:hover:text-emerald-400 relative transition-colors">
                     <div className="relative">
                         <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
                         <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-emerald-500 text-[6.5px] font-black text-white leading-none">HOT</span>
                     </div>
-                    <span className="text-[8.5px] font-black mt-0.5 tracking-tight text-emerald-600 dark:text-emerald-400">PPOB 24H</span>
+                    <span className="text-[8.5px] font-black mt-0.5 tracking-tight text-emerald-600 dark:text-emerald-400">PPOB</span>
                 </Link>
 
                 {/* 4. Lacak Pesanan */}

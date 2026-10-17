@@ -65,7 +65,7 @@ export default function Home({
 
     const defaultBanners = [
         { id: 1, title: 'Beli App Premium Lebih Hemat', subtitle: 'Netflix, Spotify, Canva Premium dengan harga termurah & garansi penuh.', badge: 'FLASH SALE', bg_gradient: 'from-orange-600 to-red-600', image: null, image_mobile: null },
-        { id: 2, title: 'Aplikasi Premium Bergaransi', subtitle: 'YouTube Premium, CapCut Pro, ChatGPT Plus proses instan otomatis 24 jam.', badge: 'PREMIUM', bg_gradient: 'from-blue-600 to-indigo-700', image: null, image_mobile: null },
+        { id: 2, title: 'Aplikasi Premium Bergaransi', subtitle: 'YouTube Premium, CapCut Pro, ChatGPT Plus proses instan otomatis bergaransi.', badge: 'PREMIUM', bg_gradient: 'from-blue-600 to-indigo-700', image: null, image_mobile: null },
         { id: 3, title: 'Promo Pembayaran QRIS', subtitle: 'Bisa bayar pakai GoPay, OVO, Dana, ShopeePay & Semua Mobile Banking.', badge: 'PROMO', bg_gradient: 'from-emerald-500 to-teal-600', image: null, image_mobile: null }
     ];
 

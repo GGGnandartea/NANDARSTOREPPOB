@@ -218,7 +218,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
   const menus = [
     { key: 'dashboard',   label: 'Dashboard',             icon: Icon.Dashboard },
     { key: 'orders_app',  label: 'Pesanan Aplikasi',      icon: Icon.App,     count: appOrders.length },
-    { key: 'orders_ppob', label: 'Pesanan PPOB 24H',      icon: Icon.Ppob,    count: ppobOrders.length },
+    { key: 'orders_ppob', label: 'Pesanan PPOB',          icon: Icon.Ppob,    count: ppobOrders.length },
     { key: 'topup',       label: 'Riwayat Saldo & Top Up', icon: Icon.Wallet,  count: allMutations.length },
     { key: 'profile',     label: 'Edit Profil',           icon: Icon.User },
     { key: 'security',    label: 'Ubah Password',         icon: Icon.Lock },

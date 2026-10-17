@@ -24,7 +24,7 @@ export default function QuickServicesGrid({
                 </div>
                 <span className="text-[10px] sm:text-xs font-bold text-gray-400 dark:text-gray-500 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Siap 24 Jam
+                    Online Otomatis
                 </span>
             </div>
 

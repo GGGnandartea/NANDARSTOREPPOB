@@ -31,7 +31,7 @@ class PpobController extends Controller
     {
         $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
-        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Layanan PPOB & Produk Digital Otomatis 24 Jam';
+        $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Layanan PPOB & Produk Digital Otomatis';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
 
         $user = Auth::user();

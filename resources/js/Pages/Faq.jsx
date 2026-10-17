@@ -63,32 +63,32 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             a: 'Ya, 100% legal dan aman! Kami menggunakan metode subscription dan pembayaran legal resmi. Akun terbebas dari tindakan ilegal atau hacking, serta dilengkapi garansi perlindungan penuh.'
         },
 
-        // KATEGORI: PPOB & PULSA 24 JAM
+        // KATEGORI: PPOB & PULSA
         {
             id: 5,
             category: 'ppob',
-            categoryLabel: 'PPOB & Pulsa 24 Jam',
+            categoryLabel: 'PPOB & Pulsa',
             q: 'Apakah layanan PPOB, pulsa, dan token PLN aktif 24 jam non-stop?',
             a: 'Tentu saja! Server PPOB kami terhubung secara direct host-to-host ke switching multi-biller 24/7. Anda bisa membeli pulsa Telkomsel, Indosat, XL, Tri, Smartfren, hingga isi token listrik PLN kapan saja bahkan pada tengah malam tanpa gangguan.'
         },
         {
             id: 6,
             category: 'ppob',
-            categoryLabel: 'PPOB & Pulsa 24 Jam',
+            categoryLabel: 'PPOB & Pulsa',
             q: 'Beli Token Listrik PLN, bagaimana cara melihat 20 digit nomor tokennya?',
             a: 'Setelah status transaksi PPOB dinyatakan Sukses/Selesai, 20 digit kode Token PLN langsung tertera di kolom SN (Serial Number) pada halaman invoice atau notifikasi WhatsApp Anda. Cukup ketikkan 20 angka tersebut ke meteran PLN rumah Anda.'
         },
         {
             id: 7,
             category: 'ppob',
-            categoryLabel: 'PPOB & Pulsa 24 Jam',
+            categoryLabel: 'PPOB & Pulsa',
             q: 'Saya salah memasukkan nomor HP / No. Meter tujuan, bisakah dibatalkan?',
             a: 'Sistem server PPOB memproses transaksi secara otomatis ke provider seketika setelah pembayaran diterima. Transaksi yang sudah terkirim ke provider tidak dapat dibatalkan atau ditarik kembali. Mohon selalu teliti memeriksa nomor tujuan sebelum mengonfirmasi pembayaran.'
         },
         {
             id: 8,
             category: 'ppob',
-            categoryLabel: 'PPOB & Pulsa 24 Jam',
+            categoryLabel: 'PPOB & Pulsa',
             q: 'Top-up E-Wallet (DANA, OVO, GoPay, ShopeePay) apakah ada biaya admin?',
             a: 'Harga yang tertera pada produk e-wallet di NandarStore sudah merupakan harga final yang sangat kompetitif dan hemat dibanding transfer antar bank reguler.'
         },
@@ -163,7 +163,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
     const categories = [
         { id: 'all', label: 'Semua Pertanyaan', icon: '✨' },
         { id: 'order', label: 'Akun & Order', icon: '🛒' },
-        { id: 'ppob', label: 'PPOB & Pulsa 24 Jam', icon: '⚡' },
+        { id: 'ppob', label: 'PPOB & Pulsa', icon: '⚡' },
         { id: 'payment', label: 'Pembayaran & Saldo', icon: '💳' },
         { id: 'warranty', label: 'Garansi & Kendala', icon: '🛡️' },
         { id: 'reseller', label: 'Reseller VIP', icon: '👑' },
@@ -199,7 +199,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
         <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
             <Head>
                 <title>{`Pusat Bantuan & FAQ - ${storeName}`}</title>
-                <meta name="description" content="Temukan jawaban cepat seputar cara pembelian akun premium, transaksi PPOB pulsa 24 jam, metode pembayaran QRIS/saldo, dan klaim garansi di NandarStore." />
+                <meta name="description" content="Temukan jawaban cepat seputar cara pembelian akun premium, transaksi PPOB & pulsa, metode pembayaran QRIS/saldo, dan klaim garansi di NandarStore." />
             </Head>
 
             {/* TOP NAVIGATION BAR */}
@@ -283,7 +283,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
                     </h1>
 
                     <p className="mt-3.5 text-sm sm:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto font-medium leading-relaxed">
-                        Temukan solusi cepat dan jawaban atas pertanyaan umum seputar pembelian akun premium, PPOB 24 jam, cara bayar QRIS, hingga panduan klaim garansi di {storeName}.
+                        Temukan solusi cepat dan jawaban atas pertanyaan umum seputar pembelian akun premium, PPOB, cara bayar QRIS, hingga panduan klaim garansi di {storeName}.
                     </p>
 
                     {/* SEARCH INPUT BAR */}

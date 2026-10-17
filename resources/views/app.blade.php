@@ -148,7 +148,7 @@
         $appLoadingLogo = \App\Models\Setting::where('key', 'loading_logo')->value('value') ?: ($appStoreLogo ?: null);
         $appStoreTagline = \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis';
         $appStoreDesc = \App\Models\Setting::where('key', 'store_description')->value('value') 
-            ?: 'Pusat belanja akun premium murah, pulsa, token listrik PLN, top-up e-wallet DANA/OVO/GoPay, voucher game, dan tagihan PPOB 24 jam otomatis dan terpercaya.';
+            ?: 'Pusat belanja akun premium murah, pulsa, token listrik PLN, top-up e-wallet DANA/OVO/GoPay, voucher game, dan tagihan PPOB otomatis dan terpercaya.';
 
         // Logika Dynamic SEO & Open Graph Preview
         $currentUrl = url()->current();
@@ -162,13 +162,13 @@
             if ($productModel) {
                 $ogTitle = $productModel->name . ' - ' . $appStoreName;
                 $formattedPrice = 'Rp ' . number_format($productModel->price, 0, ',', '.');
-                $ogDescription = 'Beli ' . $productModel->name . ' harga spesial ' . $formattedPrice . '. Proses otomatis 24 jam instan dan bergaransi hanya di ' . $appStoreName . '.';
+                $ogDescription = 'Beli ' . $productModel->name . ' harga spesial ' . $formattedPrice . '. Proses otomatis instan dan bergaransi hanya di ' . $appStoreName . '.';
                 if ($productModel->image) {
                     $ogImage = str_starts_with($productModel->image, 'http') ? $productModel->image : url($productModel->image);
                 }
             }
         } elseif (request()->is('ppob*')) {
-            $ogTitle = 'Pusat Layanan PPOB, Pulsa & Tagihan 24 Jam - ' . $appStoreName;
+            $ogTitle = 'Pusat Layanan PPOB, Pulsa & Tagihan - ' . $appStoreName;
             $ogDescription = 'Beli pulsa semua operator, paket data, token PLN, e-wallet DANA/OVO/GoPay, voucher game MLBB/FF, dan tagihan PDAM otomatis detik ini juga.';
         } elseif (request()->is('faq*')) {
             $ogTitle = 'Pusat Bantuan & Pertanyaan Umum (FAQ) - ' . $appStoreName;
