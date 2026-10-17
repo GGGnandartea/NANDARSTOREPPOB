@@ -337,7 +337,13 @@
             <div class="invoice-title-block">
                 <div class="invoice-label">Official Invoice</div>
                 <div class="invoice-number">{{ $order->invoice_number }}</div>
-                <div class="badge-paid">✓ {{ strtoupper($order->payment_status ?? 'LUNAS') }}</div>
+                @if(strtolower($order->order_status ?? '') === 'refunded')
+                    <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
+                        ↩ DANA TELAH DI-REFUND
+                    </div>
+                @else
+                    <div class="badge-paid">✓ {{ strtoupper($order->payment_status ?? 'LUNAS') }}</div>
+                @endif
             </div>
         </div>
 
@@ -462,6 +468,26 @@
                 • Transaksi PPOB diproses secara instan dan otomatis langsung ke nomor / ID tujuan.<br>
                 • Simpan nomor invoice ini sebagai bukti sah transaksi Anda.<br>
                 • Layanan bantuan: Hubungi CS {{ $storeName }} di WhatsApp <a href="https://wa.me/{{ $adminWaClean }}" target="_blank" style="color: #15803d; font-weight: 800; text-decoration: underline;">+62 823-1745-8496</a> atau gabung <a href="{{ $waGroup }}" target="_blank" style="color: #15803d; font-weight: 800; text-decoration: underline;">Grup Komunitas WhatsApp</a>.
+            </div>
+        @elseif(strtolower($order->order_status ?? '') === 'refunded')
+            <!-- CARD PEMBERITAHUAN KHUSUS ORDER DI-REFUND -->
+            <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.05) 100%); border: 2px solid rgba(239, 68, 68, 0.35); border-radius: 20px; padding: 32px 24px; text-align: center; margin-bottom: 26px; box-shadow: 0 10px 30px -10px rgba(239, 68, 68, 0.15);">
+                <div style="width: 64px; height: 64px; margin: 0 auto 16px auto; border-radius: 50%; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; font-size: 28px; color: #ef4444;">
+                    ↩
+                </div>
+                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 999px; color: #ef4444; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px;">
+                    Dana Telah Di-refund 100%
+                </div>
+                <h3 style="font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 8px; line-height: 1.35;">
+                    Stok Produk Habis Terbeli Bersamaan
+                </h3>
+                <p style="font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 20px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                    Mohon maaf, saat Anda menyelesaikan pembayaran, sisa stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain. Dana Anda sebesar <strong>Rp {{ number_format($order->total_amount ?: ($order->price ?: 0), 0, ',', '.') }}</strong> telah otomatis kami kembalikan <strong>100% ke Saldo Akun NandarStore</strong> Anda.
+                </p>
+                <a href="/profile" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 14px; background: #ea580c; color: #ffffff; font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
+                    <span>Cek Saldo di Menu Profil &amp; Beli Produk Lain</span>
+                    <span>→</span>
+                </a>
             </div>
         @else
             <!-- PROMINENT BIG LOADING CARD JIKA AKUN MASIH MENUNGGU -->

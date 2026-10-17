@@ -789,6 +789,20 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Saldo tidak mencukupi. Silakan top up terlebih dahulu.']);
         }
 
+        // Cek stok lokal sebelum memotong saldo untuk mencegah race condition
+        if ($product->type === 'local' && $product->process_type !== 'manual') {
+            $hasStock = \App\Models\LocalAccount::where('product_id', $product->id)
+                ->where('is_sold', false)
+                ->exists();
+
+            if (!$hasStock) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Maaf, stok produk ini baru saja habis terbeli oleh pembeli lain. Saldo Anda aman dan tidak terpotong.'
+                ], 400);
+            }
+        }
+
         // Kurangi saldo
         $user->decrement('balance', $nominal);
 
@@ -858,6 +872,23 @@ class FrontController extends Controller
 
         $snAkun = $order->sn_or_account ?: $order->account_details;
         $isReady = !empty($fulfillResult['is_ready']) || !\App\Services\OrderFulfillmentService::isWaitingText($snAkun);
+
+        if ($order->order_status === 'refunded' || !empty($fulfillResult['is_refunded'])) {
+            return response()->json([
+                'status'        => 'refunded',
+                'order_id'      => $invoiceNumber,
+                'product_name'  => $product->name,
+                'product_type'  => $order->product_type,
+                'total_nominal' => $nominal,
+                'sn_or_account' => $snAkun,
+                'is_ready'      => false,
+                'is_refunded'   => true,
+                'created_at'    => now()->format('d M Y, H:i'),
+                'wa_sent'       => true,
+                'wa_target'     => $targetWhatsapp,
+                'message'       => 'Stok produk baru saja habis terbeli bersamaan oleh pembeli lain. Dana sebesar Rp ' . number_format($nominal, 0, ',', '.') . ' telah otomatis kami kembalikan 100% ke saldo akun Anda.',
+            ]);
+        }
 
         return response()->json([
             'status'        => 'success',

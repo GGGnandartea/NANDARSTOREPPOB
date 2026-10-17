@@ -6,10 +6,13 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\LocalAccount;
 use App\Models\Setting;
+use App\Models\User;
+use App\Models\TransactionLog;
 use App\Services\KiosbankService;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class OrderFulfillmentService
 {
@@ -115,47 +118,43 @@ class OrderFulfillmentService
                 ];
             }
 
-            // PRODUK OTOMATIS: Ambil dari stok akun otomatis
+            // PRODUK OTOMATIS: Ambil dari stok akun otomatis dengan Pessimistic Locking (Atomic)
             $order->provider = 'Otomatis';
-            $account = LocalAccount::where('product_id', $product->id)
-                ->where('is_sold', false)
-                ->first();
 
-            if ($account) {
-                $account->update(['is_sold' => true]);
-                $snAkun = "Email: " . $account->email . "\nPassword: " . $account->password;
-                $product->update(['stock' => $product->accounts()->where('is_sold', false)->count()]);
+            return DB::transaction(function () use ($order, $product) {
+                // Lock 1 akun yang belum terjual dengan lockForUpdate untuk mencegah race condition
+                $account = LocalAccount::where('product_id', $product->id)
+                    ->where('is_sold', false)
+                    ->lockForUpdate()
+                    ->first();
 
-                $order->sn_or_account  = $snAkun;
-                $order->account_details = $snAkun;
-                $order->order_status   = 'completed';
-                $order->payment_status = 'paid';
-                $order->save();
+                if ($account) {
+                    // Pemenang rebutan stok: tandai terjual & alokasikan akun
+                    $account->update(['is_sold' => true]);
+                    $snAkun = "Email: " . $account->email . "\nPassword: " . $account->password;
+                    $product->update(['stock' => $product->accounts()->where('is_sold', false)->count()]);
 
-                // Kirim notifikasi WA
-                WebhookController::sendOrderNotification($order);
+                    $order->sn_or_account   = $snAkun;
+                    $order->account_details = $snAkun;
+                    $order->order_status    = 'completed';
+                    $order->payment_status  = 'paid';
+                    $order->save();
 
-                return [
-                    'status'        => 'completed',
-                    'is_ready'      => true,
-                    'sn_or_account' => $snAkun,
-                    'message'       => 'Akun lokal berhasil dialokasikan.',
-                ];
-            } else {
-                $snAkun = "Stok akun otomatis saat ini sedang kosong. Admin akan segera mengirimkan akun pengganti via WhatsApp/Email.";
-                $order->sn_or_account  = $snAkun;
-                $order->account_details = $snAkun;
-                $order->order_status   = 'processing';
-                $order->payment_status = 'paid';
-                $order->save();
+                    // Kirim notifikasi WA
+                    WebhookController::sendOrderNotification($order);
 
-                return [
-                    'status'        => 'processing',
-                    'is_ready'      => false,
-                    'sn_or_account' => $snAkun,
-                    'message'       => 'Stok lokal habis, pesanan dialihkan ke admin.',
-                ];
-            }
+                    return [
+                        'status'        => 'completed',
+                        'is_ready'      => true,
+                        'sn_or_account' => $snAkun,
+                        'message'       => 'Akun lokal berhasil dialokasikan.',
+                    ];
+                } else {
+                    // KALAH REBUTAN STOK (Stok sisa 1 sudah diambil pembeli lain!)
+                    // Jalankan Logika Auto-Refund ke Saldo Akun Pembeli
+                    return self::handleOutOfStockAutoRefund($order, $product);
+                }
+            });
         }
 
         // ─── 2. FULFILLMENT PRODUK API (PREFLIX & PREMKU) ──────────────────────
@@ -596,5 +595,138 @@ class OrderFulfillmentService
         }
 
         return false;
+    }
+
+    /**
+     * Menangani kondisi saat stok produk habis karena kalah rebutan dengan pembeli lain.
+     * Mengembalikan dana 100% secara otomatis ke saldo akun pembeli terdaftar (Auto-Refund).
+     */
+    public static function handleOutOfStockAutoRefund(Order $order, Product $product): array
+    {
+        $refundAmount = (int) ($order->total_amount ?: ($order->price ?: 0));
+        $buyer = $order->user_id ? User::find($order->user_id) : null;
+
+        if ($buyer) {
+            // A. PEMBELI MEMILIKI AKUN TERDAFTAR (AUTO-REFUND KE SALDO INSTAN)
+            $buyer->increment('balance', $refundAmount);
+
+            TransactionLog::create([
+                'user_id'     => $buyer->id,
+                'type'        => 'refund',
+                'amount'      => $refundAmount,
+                'description' => 'Auto-Refund Saldo: Stok ' . $product->name . ' habis terbeli bersamaan (Invoice #' . $order->invoice_number . ')',
+            ]);
+
+            $refundNotice = "⚠️ STOK HABIS SAAT PEMBAYARAN\n"
+                          . "Mohon maaf, stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain yang menyelesaikan pembayaran terlebih dahulu.\n\n"
+                          . "✅ DANA ANDA SEBESAR Rp " . number_format($refundAmount, 0, ',', '.') . " TELAH OTOMATIS KAMI REFUND 100% KE SALDO AKUN NANDARSTORE ANDA.\n"
+                          . "Saldo dapat Anda gunakan langsung untuk membeli produk lain atau melakukan penarikan.";
+
+            $order->sn_or_account   = $refundNotice;
+            $order->account_details = $refundNotice;
+            $order->order_status    = 'refunded';
+            $order->payment_status  = 'paid';
+            $order->notes           = ($order->notes ? $order->notes . ' | ' : '') . 'Auto-Refund 100% ke Saldo Akun (Stok habis rebutan).';
+            $order->save();
+
+            Log::info("[AUTO-REFUND-SUCCESS] Order {$order->invoice_number}: Saldo Rp {$refundAmount} telah dikembalikan ke user {$buyer->email}.");
+
+            // Kirim notifikasi WhatsApp ke pembeli bahwa dana telah di-refund
+            try {
+                self::sendRefundWaNotification($order, $buyer, $refundAmount);
+            } catch (\Exception $e) {
+                Log::error("[AUTO-REFUND-WA-ERROR] " . $e->getMessage());
+            }
+
+            return [
+                'status'        => 'refunded',
+                'is_ready'      => false,
+                'is_refunded'   => true,
+                'refund_amount' => $refundAmount,
+                'sn_or_account' => $refundNotice,
+                'message'       => 'Stok produk habis terbeli bersamaan. Dana telah otomatis di-refund ke Saldo Akun Anda.',
+            ];
+        } else {
+            // B. PEMBELI TAMU (GUEST) TANPA AKUN (MEMERLUKAN REFUND MANUAL VIA WA)
+            $guestNotice = "⚠️ STOK HABIS SAAT PEMBAYARAN\n"
+                         . "Mohon maaf, stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain.\n\n"
+                         . "Hubungi CS Admin NandarStore via WhatsApp untuk proses pengembalian dana (refund) langsung ke rekening Bank / E-Wallet Anda senilai Rp " . number_format($refundAmount, 0, ',', '.') . ".";
+
+            $order->sn_or_account   = $guestNotice;
+            $order->account_details = $guestNotice;
+            $order->order_status    = 'processing';
+            $order->payment_status  = 'paid';
+            $order->notes           = ($order->notes ? $order->notes . ' | ' : '') . '[PERLU REFUND MANUAL] Stok habis terbeli bersamaan. Pembeli Tamu (Guest).';
+            $order->save();
+
+            // Kirim notifikasi darurat ke WhatsApp Admin
+            try {
+                self::sendAdminRefundAlert($order, $refundAmount);
+            } catch (\Exception $e) {
+                Log::error("[ADMIN-REFUND-ALERT-ERROR] " . $e->getMessage());
+            }
+
+            return [
+                'status'        => 'processing',
+                'is_ready'      => false,
+                'is_refunded'   => false,
+                'sn_or_account' => $guestNotice,
+                'message'       => 'Stok produk habis. Hubungi Admin untuk pengembalian dana rekening/e-wallet.',
+            ];
+        }
+    }
+
+    /**
+     * Kirim pesan WhatsApp otomatis ke pembeli bahwa dana di-refund ke saldo akun
+     */
+    public static function sendRefundWaNotification(Order $order, User $buyer, $refundAmount)
+    {
+        $targetWa = $order->whatsapp ?: $buyer->whatsapp;
+        if (empty($targetWa)) return false;
+
+        $nominalFormatted = number_format($refundAmount, 0, ',', '.');
+        $adminWa = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
+
+        $msg = "⚠️ *PEMBERITAHUAN PENGEMBALIAN DANA (REFUND OTOMATIS)*\n\n"
+             . "Halo *{$buyer->name}*,\n"
+             . "Terima kasih telah bertransaksi di *NandarStore*.\n\n"
+             . "Kami menginformasikan bahwa pesanan Anda:\n"
+             . "• No. Invoice: *#{$order->invoice_number}*\n"
+             . "• Layanan: *{$order->product_name}*\n\n"
+             . "❌ *STATUS STOK:*\n"
+             . "Stok terakhir produk tersebut baru saja habis terbeli bersamaan oleh pembeli lain yang menyelesaikan pembayaran beberapa milidetik lebih awal.\n\n"
+             . "✅ *REFUND 100% TELAH BERHASIL:*\n"
+             . "Dana Anda sebesar *Rp {$nominalFormatted}* telah otomatis kami kembalikan 100% ke *Saldo Akun NandarStore* Anda saat ini juga!\n\n"
+             . "👉 Cek Saldo Anda di: " . url('/profile') . "\n"
+             . "Saldo tersebut dapat langsung Anda gunakan kembali untuk membeli produk lain tanpa biaya tambahan.\n\n"
+             . "Mohon maaf atas ketidaknyamanan ini. Jika ada pertanyaan, hubungi CS kami: https://wa.me/" . preg_replace('/[^0-9]/', '', $adminWa);
+
+        return WebhookController::sendWaMessage($targetWa, $msg);
+    }
+
+    /**
+     * Kirim notifikasi darurat ke admin jika pembeli tamu membutuhkan refund manual
+     */
+    public static function sendAdminRefundAlert(Order $order, $refundAmount)
+    {
+        $adminWa = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
+        if (empty($adminWa)) return false;
+
+        $targetWa = preg_replace('/[^0-9]/', '', $adminWa);
+        if (str_starts_with($targetWa, '0')) $targetWa = '62' . substr($targetWa, 1);
+
+        $nominalFormatted = number_format($refundAmount, 0, ',', '.');
+
+        $msg = "🚨 *ALERT ADMIN: KEBUTUHAN REFUND MANUAL (STOK HABIS)*\n\n"
+             . "Halo Admin, terjadi rebutan stok produk pada pesanan berikut:\n"
+             . "• No. Invoice: *#{$order->invoice_number}*\n"
+             . "• Produk: *{$order->product_name}*\n"
+             . "• Nominal Terbayar: *Rp {$nominalFormatted}*\n"
+             . "• Pembeli: *" . ($order->buyer_name ?: 'Tamu') . "*\n"
+             . "• WhatsApp Pembeli: *" . ($order->whatsapp ?: '-') . "*\n\n"
+             . "⚠️ *KETERANGAN:*\n"
+             . "Pembeli ini membayar saat stok tersisa 1, namun pembeli lain menyelesaikan pembayaran terlebih dahulu. Karena pembeli ini adalah Tamu (Guest) tanpa akun saldo, mohon segera hubungi pembeli dan transfer refund manual ke rekening/e-wallet mereka.";
+
+        return WebhookController::sendWaMessage($targetWa, $msg);
     }
 }
