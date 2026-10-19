@@ -15,12 +15,8 @@ export default function PpobInputSection({
   setPlnType,
   plnCustomerId,
   setPlnCustomerId,
-  plnInquiryResult,
-  setPlnInquiryResult,
-  isPlnInquiring,
-  handlePlnInquiry,
-  onOpenCheckout,
   setSelectedProduct,
+  onSwitchTab,
   // Game state
   selectedGame,
   setSelectedGame,
@@ -57,6 +53,7 @@ export default function PpobInputSection({
   setTagihanPdamSearch,
 }) {
   const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
+  const isBillTab = ['pdam', 'pln_postpaid', 'bpjs'].includes(activeTab);
   return (
     <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
       {/* TAB 1: PULSA & DATA */}
@@ -125,7 +122,7 @@ export default function PpobInputSection({
         </>
       )}
 
-      {/* TAB 2: TOKEN LISTRIK PLN */}
+      {/* TAB 2: TOKEN LISTRIK PLN (PRABAYAR SAJA — tagihan punya tab sendiri) */}
       {activeTab === 'pln' && (
         <>
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
@@ -134,42 +131,10 @@ export default function PpobInputSection({
                 <Icons.Pln className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-black text-sm text-gray-900 dark:text-white">Layanan Listrik PLN</h3>
-                <p className="text-[11px] text-gray-400 font-medium">Token Prabayar &amp; Tagihan Pasca</p>
+                <h3 className="font-black text-sm text-gray-900 dark:text-white">Token Listrik Prabayar</h3>
+                <p className="text-[11px] text-gray-400 font-medium">Token langsung masuk ke meter</p>
               </div>
             </div>
-          </div>
-
-          {/* Switch Token vs Pasca */}
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-gray-100 dark:bg-gray-900 border border-gray-200/60 dark:border-white/5">
-            <button
-              type="button"
-              onClick={() => {
-                setPlnType('prepaid');
-                setPlnInquiryResult(null);
-              }}
-              className={`py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-                plnType === 'prepaid'
-                  ? 'bg-white dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 dark:border dark:border-emerald-500/40 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Token Prabayar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPlnType('postpaid');
-                setSelectedProduct(null);
-              }}
-              className={`py-2.5 rounded-xl text-xs font-black transition cursor-pointer ${
-                plnType === 'postpaid'
-                  ? 'bg-white dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 dark:border dark:border-emerald-500/40 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              Tagihan Pasca
-            </button>
           </div>
 
           <div>
@@ -183,68 +148,17 @@ export default function PpobInputSection({
               placeholder="Contoh: 14012345678"
               className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
             />
-            <p className="text-[10px] text-gray-400 mt-1">Masukkan 11-12 digit nomor meteran atau ID PLN Anda.</p>
-          </div>
-
-          {/* TOMBOL CEK TAGIHAN ELEGAN & JELAS */}
-          {plnType === 'postpaid' && (
-            <button
-              type="button"
-              onClick={handlePlnInquiry}
-              disabled={isPlnInquiring || !plnCustomerId}
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPlnInquiring ? (
-                <>
-                  <svg className="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                  </svg>
-                  <span>Mengecek Tagihan PLN...</span>
-                </>
-              ) : (
-                <>
-                  <Icons.Search className="w-5 h-5" />
-                  <span>Cek Tagihan Listrik PLN</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {plnInquiryResult && (
-            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">Nama Pelanggan:</span>
-                <span className="font-black text-gray-900 dark:text-white">{plnInquiryResult.customer_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">Jumlah Tagihan:</span>
-                <span className="font-mono font-bold text-gray-900 dark:text-white">{fmt.rp(plnInquiryResult.amount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">Admin Bank:</span>
-                <span className="font-mono font-bold text-gray-900 dark:text-white">{fmt.rp(plnInquiryResult.admin_fee)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800/40">
-                <span className="font-black text-emerald-800 dark:text-emerald-300">Total Pembayaran:</span>
-                <span className="font-black font-mono text-base text-emerald-600 dark:text-emerald-400">{fmt.rp(plnInquiryResult.grand_total ?? plnInquiryResult.total)}</span>
-              </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Masukkan 11-12 digit nomor meteran. Tagihan listrik bulanan ada di menu
               <button
                 type="button"
-                onClick={() =>
-                  onOpenCheckout({
-                    code: '100301',
-                    name: `Tagihan Listrik PLN - ${plnInquiryResult.customer_name || ''}`.trim(),
-                    price: plnInquiryResult.grand_total ?? plnInquiryResult.total,
-                    inquiryKey: plnInquiryResult.inquiry_key,
-                  })
-                }
-                className="w-full mt-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition"
+                onClick={() => onSwitchTab && onSwitchTab('pln_postpaid')}
+                className="ml-1 font-bold text-emerald-600 hover:underline"
               >
-                <Icons.Lightning className="w-4 h-4" />
-                <span>Bayar Tagihan PLN</span>
-              </button>
-            </div>
-          )}
+                Tagihan PLN
+              </button>.
+            </p>
+          </div>
         </>
       )}
 
@@ -487,8 +401,8 @@ export default function PpobInputSection({
         </>
       )}
 
-      {/* TAB 6: TAGIHAN PDAM, PLN & BPJS */}
-      {activeTab === 'tagihan' && (
+      {/* TAB: TAGIHAN (PDAM, TAGIHAN PLN, BPJS — masing-masing menu terpisah) */}
+      {isBillTab && (
         <>
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
             <div className="flex items-center gap-2.5">
@@ -496,32 +410,43 @@ export default function PpobInputSection({
                 <Icons.Tagihan className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-black text-sm text-gray-900 dark:text-white">Cek &amp; Bayar Tagihan</h3>
-                <p className="text-[11px] text-gray-400 font-medium">PDAM, PLN Pascabayar, BPJS</p>
+                <h3 className="font-black text-sm text-gray-900 dark:text-white">
+                  {activeTab === 'pdam' && 'Cek & Bayar Tagihan PDAM'}
+                  {activeTab === 'pln_postpaid' && 'Cek & Bayar Tagihan PLN'}
+                  {activeTab === 'bpjs' && 'Cek & Bayar BPJS Kesehatan'}
+                </h3>
+                <p className="text-[11px] text-gray-400 font-medium">
+                  {activeTab === 'pdam' && 'Air bersih seluruh kota & kabupaten'}
+                  {activeTab === 'pln_postpaid' && 'Listrik pascabayar & non-taglis'}
+                  {activeTab === 'bpjs' && 'Iuran BPJS Kesehatan'}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                Jenis Layanan
-              </label>
-              <select
-                value={tagihanType}
-                onChange={(e) => {
-                  setTagihanType(e.target.value);
-                  setTagihanCustomerId('');
-                  setTagihanInquiryResult(null);
-                  setSelectedProduct(null);
-                }}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
-              >
-                {BILL_SERVICES.map((service) => (
-                  <option key={service.id} value={service.id}>{service.label}</option>
-                ))}
-              </select>
-            </div>
+            {/* PLN punya dua jenis transaksi: tagihan rutin dan penyambungan baru */}
+            {activeTab === 'pln_postpaid' && (
+              <div>
+                <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
+                  Jenis Tagihan PLN
+                </label>
+                <select
+                  value={tagihanType}
+                  onChange={(e) => {
+                    setTagihanType(e.target.value);
+                    setTagihanCustomerId('');
+                    setTagihanInquiryResult(null);
+                    setSelectedProduct(null);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
+                >
+                  {BILL_SERVICES.filter((s) => s.id === 'pln_postpaid' || s.id === 'pln_nontag').map((service) => (
+                    <option key={service.id} value={service.id}>{service.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Pilih wilayah PDAM karena setiap kota/kabupaten punya kode produk sendiri */}
             {tagihanType === 'pdam' && (

@@ -139,12 +139,24 @@ export const STREAMING_SERVICES = [
 
 export const PPOB_TABS = [
   { id: 'pulsa', label: 'Pulsa & Data', iconKey: 'Pulsa', desc: 'Semua Operator' },
-  { id: 'pln', label: 'Token PLN', iconKey: 'Pln', desc: 'Prabayar & Pasca' },
+  { id: 'pln', label: 'Token PLN', iconKey: 'Pln', desc: 'Token Prabayar' },
+  { id: 'pln_postpaid', label: 'Tagihan PLN', iconKey: 'Pln', desc: 'Pascabayar & Non-Taglis' },
+  { id: 'pdam', label: 'PDAM', iconKey: 'Tagihan', desc: 'Air Bersih' },
+  { id: 'bpjs', label: 'BPJS', iconKey: 'Tagihan', desc: 'Kesehatan' },
   { id: 'game', label: 'Voucher Game', iconKey: 'Game', desc: 'MLBB, FF, Genshin' },
   { id: 'ewallet', label: 'E-Wallet', iconKey: 'Ewallet', desc: 'DANA, GoPay, OVO' },
   { id: 'streaming', label: 'Aplikasi Streaming', iconKey: 'Streaming', desc: 'Spotify, Netflix, Vidio' },
-  { id: 'tagihan', label: 'Tagihan & PDAM', iconKey: 'Tagihan', desc: 'Cek & Bayar Rutin' },
 ];
+
+/** Tab yang memakai alur cek tagihan (inquiry) bukan katalog produk. */
+export const BILL_TABS = ['pdam', 'pln_postpaid', 'bpjs'];
+
+export const BILL_TAB_SERVICE = {
+  pdam: 'pdam',
+  pln_postpaid: 'pln_postpaid',
+  bpjs: 'bpjs',
+};
+
 
 export const fmt = {
   rp: (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0),

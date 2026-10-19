@@ -26,6 +26,19 @@ class KiosbankService
     protected ?string $privateKey;
     protected ?string $publicKey;
 
+    /**
+     * Pemetaan prefix pulsa internal ke prefixID resmi Kiosbank
+     * (dokumentasi Daftar Harga: AAE.* = PULSA).
+     */
+    public const PULSA_PREFIX_MAP = [
+        '21' => 'AAE.AAAD', // Telkomsel
+        '11' => 'AAE.AAAB', // Indosat
+        '31' => 'AAE.AAAG', // XL
+        '41' => 'AAE.AAAE', // Tri
+        '51' => 'AAE.AAAA', // Axis
+        '81' => 'AAE.AAAC', // Smartfren
+    ];
+
     public function __construct()
     {
         // Default mode: development (Sandbox)
@@ -627,6 +640,98 @@ class KiosbankService
     }
 
     /**
+     * Ambil daftar harga resmi dari API Kiosbank (/Services/getHargaByProductID).
+     * Response: { rc: "00", record: [{ code, name, price }] }.
+     * $prefixMap memetakan prefixID Kiosbank per prefix internal (misal 21 -> AAE.AAAD).
+     */
+    public function fetchOfficialPrices(string $prefixId): array
+    {
+        $sessionId = $this->getSessionId();
+        if (!$this->isConfigured() || !$sessionId || str_starts_with($sessionId, 'DEV-SESSION-')) {
+            return [];
+        }
+
+        $officialPrefix = self::PULSA_PREFIX_MAP[$prefixId] ?? $prefixId;
+        $res = $this->makeDigestRequest('/Services/getHargaByProductID', [
+            'sessionID'  => $sessionId,
+            'merchantID' => $this->merchantId,
+            'prefixID'   => $officialPrefix,
+        ], 'POST');
+
+        if (($res['rc'] ?? null) !== '00' || empty($res['record']) || !is_array($res['record'])) {
+            return [];
+        }
+
+        $prices = [];
+        foreach ($res['record'] as $row) {
+            $code = trim((string) ($row['code'] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+            $prices[$code] = [
+                'name'  => trim((string) ($row['name'] ?? $code)),
+                'price' => (int) ($row['price'] ?? 0),
+            ];
+        }
+
+        return $prices;
+    }
+
+    /**
+     * Terapkan harga resmi Kiosbank ke katalog lokal (base_price = harga resmi,
+     * price = harga resmi + margin toko yang sudah diatur admin).
+     */
+    public function syncPricesFromKiosbank(?string $prefixId = null): array
+    {
+        $this->ensureCatalogSeeded();
+
+        $targets = $prefixId
+            ? [$prefixId]
+            : PpobProduct::select('prefix_id')->distinct()->pluck('prefix_id')->filter()->values()->all();
+
+        $updated = 0;
+        $created = 0;
+        $failedPrefixes = [];
+
+        foreach ($targets as $targetPrefix) {
+            try {
+                $prices = $this->fetchOfficialPrices($targetPrefix);
+            } catch (\Exception $e) {
+                $failedPrefixes[] = $targetPrefix;
+                continue;
+            }
+
+            if (empty($prices)) {
+                continue;
+            }
+
+            foreach ($prices as $code => $info) {
+                if ($info['price'] <= 0) {
+                    continue;
+                }
+                $product = PpobProduct::where('code', $code)->first();
+                if ($product) {
+                    $margin = (int) ($product->margin ?? 0);
+                    $price = $info['price'] + $margin;
+                    $product->update([
+                        'base_price' => $info['price'],
+                        'price' => $price,
+                        'reseller_price' => $product->reseller_price ? max(0, $price - 300) : null,
+                    ]);
+                    $updated++;
+                }
+            }
+        }
+
+        return [
+            'status' => 'success',
+            'updated_count' => $updated,
+            'prefixes' => count($targets),
+            'failed_prefixes' => $failedPrefixes,
+        ];
+    }
+
+    /**
      * Ambil Daftar Pulsa Prabayar (Database First -> API / Catalog Fallback)
      */
     public function getPulsaPrabayar(string $prefixId): array
@@ -733,6 +838,24 @@ class KiosbankService
      */
     public function inquiry(string $productId, string $customerId, ?string $referenceId = null, ?string $additionalId = null, array $extraParams = []): array
     {
+        // Validasi productID: hanya angka/huruf, maksimal 6 karakter (kode Kiosbank).
+        // Mencegah penyalahgunaan productID arbitrer yang mengarah ke pembayaran salah.
+        if (!preg_match('/^[A-Za-z0-9]{2,10}$/', $productId)) {
+            return [
+                'status'  => 'error',
+                'rc'      => '99',
+                'message' => 'Kode produk tidak valid.',
+            ];
+        }
+
+        if (!preg_match('/^[0-9]{4,20}$/', $customerId)) {
+            return [
+                'status'  => 'error',
+                'rc'      => '99',
+                'message' => 'Nomor pelanggan harus berupa angka.',
+            ];
+        }
+
         $refId = $referenceId ?: $this->generate12DigitRef();
 
         if ($this->isConfigured()) {

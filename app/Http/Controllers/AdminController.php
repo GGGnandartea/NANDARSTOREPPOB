@@ -1836,7 +1836,14 @@ class AdminController extends Controller
     {
         try {
             $res = $kiosbankService->syncWithKiosbankApi();
-            return back()->with('success', "Sinkronisasi berhasil! {$res['total_products']} produk diperiksa. Status Active: {$res['active_count']}, Maintenance: {$res['maintenance_count']}.");
+            $priceRes = ['updated_count' => 0];
+            // Sinkronisasi harga resmi hanya saat API Kiosbank terjangkau.
+            try {
+                $priceRes = $kiosbankService->syncPricesFromKiosbank();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('[PPOB-SYNC-PRICE] ' . $e->getMessage());
+            }
+            return back()->with('success', "Sinkronisasi berhasil! {$res['total_products']} produk diperiksa. Status Active: {$res['active_count']}, Maintenance: {$res['maintenance_count']}, Harga diperbarui: {$priceRes['updated_count']}.");
         } catch (\Exception $e) {
             return back()->with('error', "Gagal sinkronisasi: " . $e->getMessage());
         }

@@ -13,7 +13,9 @@ return new class extends Migration
                 $table->string('api_trx_id')->nullable()->after('product_type');
             }
             if (!Schema::hasColumn('orders', 'notes')) {
-                $table->text('notes')->nullable()->after('whatsapp');
+                // Jangan memakai after('whatsapp'): kolom whatsapp pada instalasi
+                // lama dibuat oleh migration runtime di FrontController.
+                $table->text('notes')->nullable();
             }
         });
     }

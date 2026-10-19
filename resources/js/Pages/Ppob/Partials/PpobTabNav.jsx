@@ -3,7 +3,7 @@ import { Icons, PPOB_TABS } from './PpobConstants';
 
 export default function PpobTabNav({ activeTab, onSwitchTab }) {
   return (
-    <div className="mt-5 sm:mt-8 grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+    <div className="mt-5 sm:mt-8 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5">
       {PPOB_TABS.map((tab) => {
         const active = activeTab === tab.id;
         const TabIcon = Icons[tab.iconKey] || Icons.Pulsa;
