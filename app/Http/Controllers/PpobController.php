@@ -306,6 +306,14 @@ class PpobController extends Controller
             return response()->json(['status' => 'NOT_FOUND'], 404);
         }
 
+        // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
+        if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
+            $order->update([
+                'payment_status' => 'expired',
+                'order_status'   => 'expired',
+            ]);
+        }
+
         return response()->json([
             'status'         => $order->order_status,
             'payment_status' => $order->payment_status,

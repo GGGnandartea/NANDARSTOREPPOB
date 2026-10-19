@@ -250,6 +250,11 @@ export default function OrdersTab({
                   </div>
                   <p className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white leading-snug mb-1 break-words">
                     {o.product_name}
+                    {o.quantity > 1 && (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                        {o.quantity} pcs
+                      </span>
+                    )}
                   </p>
 
                   {o.notes && !/premku|preflix|provider|api|invalid|\[internal/i.test(o.notes) && (

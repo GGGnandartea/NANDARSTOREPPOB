@@ -523,10 +523,16 @@ class WebhookController extends Controller
         $productName = $order->product_name ?: ($product ? $product->name : 'Pesanan');
         $nominal = $order->total_amount ?: ($order->price ?: 0);
         $totalFormatted = number_format($nominal, 0, ',', '.');
-        $snAkun = $order->sn_or_account ?: ($order->account_details ?: 'Akun sedang diproses oleh admin.');
+        $snAkun = $order->sn_or_account ?: ($order->account_details ?: 'Pesanan sedang diproses.');
         $invoiceUrl = url('/order/invoice/' . $order->invoice_number);
         $metode = str_starts_with($order->invoice_number, 'BAL-') ? 'Saldo Akun' : 'QRIS Otomatis';
         $tanggal = $order->created_at ? $order->created_at->format('d M Y, H:i') : now()->format('d M Y, H:i');
+        $qty = (int) ($order->quantity ?? 1);
+        if ($qty < 1) $qty = 1;
+
+        $isPpob = ($order->product_type === 'ppob') 
+            || (isset($product) && $product->type === 'ppob') 
+            || str_starts_with($order->invoice_number, 'PPOB-');
 
         $adminWa = \App\Models\Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
         $adminWaClean = preg_replace('/[^0-9]/', '', $adminWa);
@@ -535,19 +541,28 @@ class WebhookController extends Controller
         }
         $waGroup = \App\Models\Setting::where('key', 'whatsapp_group_link')->value('value') ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H';
 
+        if ($isPpob) {
+            $sectionHeader = "⚡ *SERIAL NUMBER (SN) / TOKEN / STRUK:*";
+            $sectionWarning = "⚠️ _Simpan nomor SN / Token ini sebagai bukti sah pengisian._";
+        } else {
+            $sectionHeader = "🔑 *DETAIL AKUN / LISENSI ANDA:*";
+            $sectionWarning = "⚠️ _Simpan dan amankan email & password akun ini baik-baik._";
+        }
+
         $pesanWa = "✅ *PEMBAYARAN BERHASIL & PESANAN LUNAS*\n\n"
                  . "Halo *{$buyerUser->name}*, pesanan Anda telah berhasil diproses oleh sistem *NandarStore*.\n\n"
                  . "📋 *DETAIL PESANAN:*\n"
                  . "• No. Invoice: *{$order->invoice_number}*\n"
                  . "• Layanan: *{$productName}*\n"
+                 . ($qty > 1 ? "• Jumlah: *{$qty} Pcs*\n" : "")
                  . "• Total Bayar: *Rp {$totalFormatted}*\n"
                  . "• Metode Bayar: *{$metode}*\n"
                  . "• Tanggal: *{$tanggal} WIB*\n\n"
-                 . "🔑 *DETAIL AKUN / LISENSI ANDA:*\n"
+                 . "{$sectionHeader}\n"
                  . "------------------------------------\n"
                  . "{$snAkun}\n"
                  . "------------------------------------\n"
-                 . "⚠️ _Simpan dan amankan email & password akun ini baik-baik._\n\n"
+                 . "{$sectionWarning}\n\n"
                  . "📄 *LIHAT / DOWNLOAD INVOICE (PDF):*\n"
                  . "{$invoiceUrl}\n\n"
                  . "💬 *Bantuan CS Admin:* https://wa.me/{$adminWaClean}\n"
@@ -559,7 +574,7 @@ class WebhookController extends Controller
         return [
             'status'  => $sent ? 'success' : 'failed',
             'target'  => $targetPhone,
-            'message' => $sent ? 'Invoice dan detail akun berhasil dikirim ke WhatsApp!' : 'Gagal mengirim pesan WhatsApp.'
+            'message' => $sent ? 'Invoice dan detail pesanan berhasil dikirim ke WhatsApp!' : 'Gagal mengirim pesan WhatsApp.'
         ];
     }
 

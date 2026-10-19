@@ -592,6 +592,14 @@ class FrontController extends Controller
             return response()->json(['status' => 'NOT_FOUND']);
         }
 
+        // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
+        if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
+            $order->update([
+                'payment_status' => 'expired',
+                'order_status'   => 'expired',
+            ]);
+        }
+
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
         if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
@@ -682,6 +690,15 @@ class FrontController extends Controller
         }
 
         $user->refresh();
+
+        // Otomatis tandai pesanan QRIS yang pending lebih dari 15 menit sebagai expired
+        Order::where('user_id', $user->id)
+            ->where('payment_status', 'pending')
+            ->where('created_at', '<', now()->subMinutes(15))
+            ->update([
+                'payment_status' => 'expired',
+                'order_status'   => 'expired',
+            ]);
 
         $orders = Order::where('user_id', $user->id)
             ->with('product')

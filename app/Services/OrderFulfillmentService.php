@@ -181,84 +181,73 @@ class OrderFulfillmentService
                 $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
 
                 try {
+                    $qty = max(1, (int) ($order->quantity ?: 1));
+
                     // Hanya lakukan request pemesanan jika order belum pernah ditembak ke Preflix
                     if (empty($apiTrxId)) {
-                        $resOrder = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
-                            'koneksi'   => 'order',
-                            'id_produk' => $idProdukAsli,
-                            'id_user'   => $idUser,
-                            'key_user'  => $keyUser,
-                            'email'     => $order->email,
-                            'catatan'   => $order->invoice_number,
-                        ])->json();
+                        $snList = [];
+                        $apiTrxIds = [];
 
-                        Log::info("[PREFLIX-ORDER-INIT] Invoice: {$order->invoice_number} | Response: " . json_encode($resOrder));
-
-                        // Preflix mengembalikan:
-                        // {"status":"success","message":"Order berhasil","data":"{\"id_stok\":187414,\"id_produk\":\"894\",\"serial_number\":\"...\"}"}
-                        $preflixData = null;
-                        if (isset($resOrder['data'])) {
-                            if (is_array($resOrder['data'])) {
-                                $preflixData = $resOrder['data'];
-                            } elseif (is_string($resOrder['data'])) {
-                                $decoded = json_decode($resOrder['data'], true);
-                                if (is_array($decoded)) {
-                                    $preflixData = $decoded;
-                                }
-                            }
-                        }
-
-                        if (isset($resOrder['status']) && strtolower($resOrder['status']) === 'success') {
-                            $apiTrxId = $preflixData['id_stok'] 
-                                     ?? $preflixData['id_order'] 
-                                     ?? $preflixData['id_riwayat'] 
-                                     ?? ('PREFLIX-' . time());
-
-                            // Simpan api_trx_id secepatnya agar tidak pernah terulang
-                            $order->api_trx_id = (string) $apiTrxId;
-                            $order->save();
-
-                            // Ekstrak serial number instan dari Preflix
-                            $immediateSn = $preflixData['serial_number'] 
-                                        ?? $preflixData['sn'] 
-                                        ?? self::extractSnFromData($preflixData ?: $resOrder);
-
-                            if (!empty($immediateSn) && !self::isWaitingText($immediateSn)) {
-                                $snAkun = $immediateSn;
-                                $isReady = true;
-                            }
-                        } else {
-                            $failMsg = $resOrder['message'] ?? $resOrder['data']['status'] ?? 'Gagal dari provider';
-                            Log::warning("[PREFLIX-ORDER-FAILED] Invoice: {$order->invoice_number} | Message: {$failMsg}");
-
-                            // Cek apakah di riwayat Preflix sebenarnya sudah tercatat
-                            sleep(1);
-                            $riwayatRes = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
-                                'koneksi'  => 'get_riwayat',
-                                'id_user'  => $idUser,
-                                'key_user' => $keyUser,
+                        for ($i = 0; $i < $qty; $i++) {
+                            $itemCatatan = $order->invoice_number . ($qty > 1 ? "-ITEM" . ($i + 1) : "");
+                            $resOrder = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
+                                'koneksi'   => 'order',
+                                'id_produk' => $idProdukAsli,
+                                'id_user'   => $idUser,
+                                'key_user'  => $keyUser,
+                                'email'     => $order->email,
+                                'catatan'   => $itemCatatan,
                             ])->json();
 
-                            if (is_array($riwayatRes)) {
-                                foreach ($riwayatRes as $item) {
-                                    if (isset($item['id_produk']) && (string)$item['id_produk'] === (string)$idProdukAsli) {
-                                        if (!empty($item['sn']) && !self::isWaitingText($item['sn'])) {
-                                            $snAkun = $item['sn'];
-                                            $apiTrxId = $item['id_stok'] ?? $item['id_riwayat'] ?? ('PREFLIX-' . time());
-                                            $order->api_trx_id = (string) $apiTrxId;
-                                            $order->save();
-                                            $isReady = true;
-                                            break;
-                                        }
+                            Log::info("[PREFLIX-ORDER-INIT] Invoice: {$order->invoice_number} | Item: " . ($i + 1) . " | Response: " . json_encode($resOrder));
+
+                            $preflixData = null;
+                            if (isset($resOrder['data'])) {
+                                if (is_array($resOrder['data'])) {
+                                    $preflixData = $resOrder['data'];
+                                } elseif (is_string($resOrder['data'])) {
+                                    $decoded = json_decode($resOrder['data'], true);
+                                    if (is_array($decoded)) {
+                                        $preflixData = $decoded;
                                     }
                                 }
                             }
 
-                            if (!$isReady && (str_contains(strtolower($failMsg), 'saldo') || str_contains(strtolower($failMsg), 'forbidden'))) {
-                                $order->api_trx_id = 'ERR-BALANCE-' . time();
-                                $order->notes = 'Saldo akun Preflix provider sedang tidak mencukupi.';
-                                $order->save();
+                            if (isset($resOrder['status']) && strtolower($resOrder['status']) === 'success') {
+                                $itemTrxId = $preflixData['id_stok'] 
+                                          ?? $preflixData['id_order'] 
+                                          ?? $preflixData['id_riwayat'] 
+                                          ?? ('PREFLIX-' . time() . '-' . $i);
+                                $apiTrxIds[] = (string) $itemTrxId;
+
+                                $immediateSn = $preflixData['serial_number'] 
+                                            ?? $preflixData['sn'] 
+                                            ?? self::extractSnFromData($preflixData ?: $resOrder);
+
+                                if (!empty($immediateSn) && !self::isWaitingText($immediateSn)) {
+                                    $snList[] = ($qty > 1 ? "[Akun " . ($i + 1) . "]:\n" : "") . $immediateSn;
+                                }
+                            } else {
+                                $failMsg = $resOrder['message'] ?? $resOrder['data']['status'] ?? 'Gagal dari provider';
+                                Log::warning("[PREFLIX-ORDER-FAILED] Invoice: {$order->invoice_number} Item: " . ($i + 1) . " | Message: {$failMsg}");
+
+                                if (str_contains(strtolower($failMsg), 'saldo') || str_contains(strtolower($failMsg), 'forbidden')) {
+                                    $order->notes = 'Saldo akun Preflix provider sedang tidak mencukupi.';
+                                }
                             }
+                        }
+
+                        if (!empty($apiTrxIds)) {
+                            $apiTrxId = implode(',', $apiTrxIds);
+                            $order->api_trx_id = $apiTrxId;
+                            $order->save();
+                        }
+
+                        if (!empty($snList) && count($snList) === $qty) {
+                            $snAkun = implode("\n\n---\n\n", $snList);
+                            $isReady = true;
+                        } elseif (!empty($snList)) {
+                            $snAkun = implode("\n\n---\n\n", $snList);
                         }
                     } else {
                         // Jika sudah ada api_trx_id, ambil dari riwayat
@@ -294,8 +283,9 @@ class OrderFulfillmentService
                 $premkuService = new PremkuApiService();
 
                 try {
-                    $resOrder = $premkuService->createOrder($idProdukAsli, 1, $order->invoice_number);
-                    Log::info("[PREMKU-ORDER-INIT] Invoice: {$order->invoice_number} | Response: " . json_encode($resOrder));
+                    $qty = max(1, (int) ($order->quantity ?: 1));
+                    $resOrder = $premkuService->createOrder($idProdukAsli, $qty, $order->invoice_number);
+                    Log::info("[PREMKU-ORDER-INIT] Invoice: {$order->invoice_number} (Qty: {$qty}) | Response: " . json_encode($resOrder));
 
                     if (isset($resOrder['success']) && $resOrder['success'] === false) {
                         $errMsg = $resOrder['message'] ?? 'Gagal membuat pesanan';

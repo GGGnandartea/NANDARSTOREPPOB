@@ -120,9 +120,16 @@
 
                             <!-- Kolom 3: Layanan -->
                             <td>
-                                <p class="font-bold text-xs text-gray-900 dark:text-white max-w-[220px] truncate" title="{{ $order->product_name }}">
-                                    {{ $order->product_name }}
-                                </p>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <p class="font-bold text-xs text-gray-900 dark:text-white max-w-[220px] truncate" title="{{ $order->product_name }}">
+                                        {{ $order->product_name }}
+                                    </p>
+                                    @if(($order->quantity ?? 1) > 1)
+                                        <span class="inline-block text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                                            {{ $order->quantity }}x pcs
+                                        </span>
+                                    @endif
+                                </div>
                                 @php
                                     $prov = $order->provider;
                                 @endphp
@@ -158,6 +165,9 @@
                                 <span class="font-black text-xs text-gray-900 dark:text-white">
                                     Rp {{ number_format($order->total_amount ?? $order->price ?? 0, 0, ',', '.') }}
                                 </span>
+                                @if(($order->quantity ?? 1) > 1 && $order->price)
+                                    <span class="block text-[9px] text-gray-400 font-medium">@ Rp {{ number_format($order->price, 0, ',', '.') }}</span>
+                                @endif
                                 @if($order->voucher_code)
                                     <span class="block text-[9px] font-bold text-orange-500">Kupon: {{ $order->voucher_code }}</span>
                                 @endif

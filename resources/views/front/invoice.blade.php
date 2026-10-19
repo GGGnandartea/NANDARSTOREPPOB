@@ -386,13 +386,21 @@
         </div>
 
         <!-- ITEM TABLE -->
+        @php
+            $qty = (int) ($order->quantity ?? 1);
+            if ($qty < 1) $qty = 1;
+            $unitPrice = (int) ($order->price ?? ($order->total_amount / $qty));
+            $subtotalProduk = $unitPrice * $qty;
+        @endphp
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 50%;">Produk &amp; Layanan</th>
-                        <th style="width: 20%;">Kategori</th>
-                        <th class="td-right" style="width: 30%;">Nominal</th>
+                        <th style="width: 45%;">Produk &amp; Layanan</th>
+                        <th style="width: 15%;">Kategori</th>
+                        <th class="td-right" style="width: 15%;">Harga</th>
+                        <th style="width: 10%; text-align: center;">Qty</th>
+                        <th class="td-right" style="width: 15%;">Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -415,7 +423,9 @@
                             }
                         @endphp
                         <td>{{ $cat }}</td>
-                        <td class="td-right">Rp {{ number_format($order->price ?? $order->total_amount, 0, ',', '.') }}</td>
+                        <td class="td-right">Rp {{ number_format($unitPrice, 0, ',', '.') }}</td>
+                        <td style="text-align: center; font-weight: 700;">{{ $qty }}x</td>
+                        <td class="td-right">Rp {{ number_format($subtotalProduk, 0, ',', '.') }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -424,8 +434,8 @@
         <!-- TOTALS -->
         <div class="total-box">
             <div class="total-row">
-                <span class="info-label">Subtotal Produk</span>
-                <span class="info-value">Rp {{ number_format($order->price ?? $order->total_amount, 0, ',', '.') }}</span>
+                <span class="info-label">Subtotal Produk ({{ $qty }} item)</span>
+                <span class="info-value">Rp {{ number_format($subtotalProduk, 0, ',', '.') }}</span>
             </div>
             @if(!empty($order->discount_amount) && $order->discount_amount > 0)
             <div class="total-row">
@@ -435,7 +445,7 @@
             @endif
             <div class="total-row total-final">
                 <span>Total Lunas</span>
-                <span>Rp {{ number_format($order->total_amount ?? $order->price, 0, ',', '.') }}</span>
+                <span>Rp {{ number_format($order->total_amount ?? ($subtotalProduk - ($order->discount_amount ?? 0)), 0, ',', '.') }}</span>
             </div>
         </div>
 
