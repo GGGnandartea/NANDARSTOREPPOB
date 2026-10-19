@@ -3,11 +3,14 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 
 import { OPERATORS, GAMES, EWALLETS, STREAMING_SERVICES, fmt } from './Partials/PpobConstants';
+import { BILL_SERVICES, extractBillSummary } from './Partials/PpobBillUtils';
+import { PDAM_PRODUCTS } from './Partials/PdamProducts';
 import PpobHeader from './Partials/PpobHeader';
 import PpobPromoBanner from './Partials/PpobPromoBanner';
 import PpobTabNav from './Partials/PpobTabNav';
 import PpobInputSection from './Partials/PpobInputSection';
 import PpobProductGrid from './Partials/PpobProductGrid';
+import PpobTagihanPanel from './Partials/PpobTagihanPanel';
 import PpobCheckoutModal from './Partials/PpobCheckoutModal';
 import PpobQrisModal from './Partials/PpobQrisModal';
 import PpobSuccessModal from './Partials/PpobSuccessModal';
@@ -23,8 +26,8 @@ export default function PpobIndex({ store, initialPulsa }) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (['pulsa', 'pln', 'game', 'ewallet', 'streaming', 'tagihan'].includes(tabParam)) {
-        return tabParam;
+      if (['pulsa', 'pln', 'game', 'ewallet', 'streaming', 'tagihan', 'pdam'].includes(tabParam)) {
+        return tabParam === 'pdam' ? 'tagihan' : tabParam;
       }
     }
     return 'pulsa';
@@ -33,6 +36,9 @@ export default function PpobIndex({ store, initialPulsa }) {
   const handleSwitchTab = (tabId) => {
     setActiveTab(tabId);
     setSelectedProduct(null);
+    if (tabId === 'tagihan') {
+      setTagihanInquiryResult(null);
+    }
     if (typeof window !== 'undefined' && window.history) {
       const url = new URL(window.location);
       url.searchParams.set('tab', tabId);
@@ -44,8 +50,8 @@ export default function PpobIndex({ store, initialPulsa }) {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['pulsa', 'pln', 'game', 'ewallet', 'streaming', 'tagihan'].includes(tabParam)) {
-        setActiveTab(tabParam);
+      if (tabParam && ['pulsa', 'pln', 'game', 'ewallet', 'streaming', 'tagihan', 'pdam'].includes(tabParam)) {
+        setActiveTab(tabParam === 'pdam' ? 'tagihan' : tabParam);
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -75,6 +81,15 @@ export default function PpobIndex({ store, initialPulsa }) {
   const [selectedStreaming, setSelectedStreaming] = useState(STREAMING_SERVICES[0]);
   const [streamingAccount, setStreamingAccount] = useState('');
   const [streamingSearch, setStreamingSearch] = useState('');
+
+  // Tagihan state
+  const [tagihanType, setTagihanType] = useState('pdam'); // 'pdam' | 'pln_postpaid' | 'pln_nontag' | 'bpjs' | 'pln_prepaid'
+  const [tagihanCustomerId, setTagihanCustomerId] = useState('');
+  const [tagihanInquiryResult, setTagihanInquiryResult] = useState(null);
+  const [isTagihanInquiring, setIsTagihanInquiring] = useState(false);
+  const [tagihanPdamRegion, setTagihanPdamRegion] = useState('400191'); // Default PDAM productID
+  const [tagihanPeriod, setTagihanPeriod] = useState('01'); // BPJS: jumlah bulan yang dibayar
+  const [tagihanPdamSearch, setTagihanPdamSearch] = useState('');
 
   // Product Selection & Loading
   const [products, setProducts] = useState(initialPulsa || []);
@@ -127,8 +142,16 @@ export default function PpobIndex({ store, initialPulsa }) {
     }
   }, [phoneNumber]);
 
-  // Fetch products when category / operator / game / ewallet / streaming changes
+  // Fetch products when category / operator / game / ewallet / streaming changes.
+  // Tab tagihan tidak memakai katalog produk: nominalnya berasal dari hasil inquiry.
   useEffect(() => {
+    if (activeTab === 'tagihan') {
+      setProducts([]);
+      setSelectedProduct(null);
+      setIsLoadingProducts(false);
+      return;
+    }
+
     let category = 'pulsa';
     let prefix = '21';
 
@@ -199,8 +222,9 @@ export default function PpobIndex({ store, initialPulsa }) {
         setPlnInquiryResult(data);
         setSelectedProduct({
           code: '100301',
-          name: 'Tagihan Listrik PLN',
+          name: `Tagihan Listrik PLN - ${data.customer_name || ''}`.trim(),
           price: data.total,
+          inquiryKey: data.inquiry_key,
         });
       } else {
         Swal.fire({
@@ -222,6 +246,73 @@ export default function PpobIndex({ store, initialPulsa }) {
     }
   };
 
+  // Tagihan Inquiry (PDAM, PLN Pascabayar / Non-Taglis / Prabayar, BPJS)
+  const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
+  const activeBillProductId = activeBillService.id === 'pdam' ? tagihanPdamRegion : activeBillService.productId;
+
+  const handleTagihanInquiry = async () => {
+    const minLength = activeBillService.minLength || 4;
+    if (!tagihanCustomerId || tagihanCustomerId.length < minLength) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Periksa Nomor',
+        text: `Masukkan nomor pelanggan ${activeBillService.label} dengan benar.`,
+        confirmButtonColor: '#10b981',
+      });
+      return;
+    }
+
+    setIsTagihanInquiring(true);
+    setTagihanInquiryResult(null);
+    setSelectedProduct(null);
+    try {
+      const payload = {
+        product_id: activeBillProductId,
+        customer_id: tagihanCustomerId,
+      };
+      if (activeBillService.id === 'bpjs') {
+        payload.periode = tagihanPeriod;
+      }
+
+      const res = await fetch('/ppob/inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (data.status === 'success') {
+        const summary = extractBillSummary(data);
+        setTagihanInquiryResult({ ...data, summary });
+        setSelectedProduct({
+          code: activeBillProductId,
+          name: `${activeBillService.label} - ${summary.customerName}`,
+          price: summary.grandTotal,
+          inquiryKey: data.inquiry_key,
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Inquiry Gagal',
+          text: data.message || 'Nomor pelanggan tidak ditemukan atau tagihan sudah lunas.',
+          confirmButtonColor: '#10b981',
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Koneksi Error',
+        text: 'Gagal terhubung ke server inquiry.',
+        confirmButtonColor: '#10b981',
+      });
+    } finally {
+      setIsTagihanInquiring(false);
+    }
+  };
+
   // Target Customer ID based on current active tab
   const currentTargetNumber = useMemo(() => {
     if (activeTab === 'pulsa') return phoneNumber;
@@ -229,8 +320,9 @@ export default function PpobIndex({ store, initialPulsa }) {
     if (activeTab === 'game') return gameZoneId ? `${gameUserId} (${gameZoneId})` : gameUserId;
     if (activeTab === 'ewallet') return ewalletPhone;
     if (activeTab === 'streaming') return streamingAccount;
+    if (activeTab === 'tagihan') return tagihanCustomerId;
     return phoneNumber;
-  }, [activeTab, phoneNumber, plnCustomerId, gameUserId, gameZoneId, ewalletPhone, streamingAccount]);
+  }, [activeTab, phoneNumber, plnCustomerId, gameUserId, gameZoneId, ewalletPhone, streamingAccount, tagihanCustomerId]);
 
   // Validation before opening checkout
   const handleOpenCheckout = (product) => {
@@ -310,6 +402,18 @@ export default function PpobIndex({ store, initialPulsa }) {
       return;
     }
 
+    if (activeTab === 'tagihan') {
+      if (!tagihanInquiryResult || !product.inquiryKey) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Inquiry Belum Dilakukan',
+          text: 'Lakukan cek tagihan terlebih dahulu sebelum melanjutkan pembayaran.',
+          confirmButtonColor: '#10b981',
+        });
+        return;
+      }
+    }
+
     setCheckoutModal(true);
   };
 
@@ -371,6 +475,7 @@ export default function PpobIndex({ store, initialPulsa }) {
           customer_id: currentTargetNumber,
           amount: selectedProduct.price,
           payment_method: paymentMethod,
+          inquiry_key: selectedProduct.inquiryKey,
           whatsapp: user?.whatsapp || (activeTab === 'pulsa' ? phoneNumber : ''),
           email: user?.email || '',
         }),
@@ -500,6 +605,7 @@ export default function PpobIndex({ store, initialPulsa }) {
               setPlnInquiryResult={setPlnInquiryResult}
               isPlnInquiring={isPlnInquiring}
               handlePlnInquiry={handlePlnInquiry}
+              onOpenCheckout={handleOpenCheckout}
               setSelectedProduct={setSelectedProduct}
               selectedGame={selectedGame}
               setSelectedGame={setSelectedGame}
@@ -517,16 +623,39 @@ export default function PpobIndex({ store, initialPulsa }) {
               setStreamingAccount={setStreamingAccount}
               streamingSearch={streamingSearch}
               setStreamingSearch={setStreamingSearch}
+              tagihanType={tagihanType}
+              setTagihanType={setTagihanType}
+              tagihanCustomerId={tagihanCustomerId}
+              setTagihanCustomerId={setTagihanCustomerId}
+              tagihanInquiryResult={tagihanInquiryResult}
+              setTagihanInquiryResult={setTagihanInquiryResult}
+              isTagihanInquiring={isTagihanInquiring}
+              handleTagihanInquiry={handleTagihanInquiry}
+              tagihanPdamRegion={tagihanPdamRegion}
+              setTagihanPdamRegion={setTagihanPdamRegion}
+              tagihanPeriod={tagihanPeriod}
+              setTagihanPeriod={setTagihanPeriod}
+              tagihanPdamSearch={tagihanPdamSearch}
+              setTagihanPdamSearch={setTagihanPdamSearch}
             />
           </div>
 
-          {/* KOLOM KANAN: DENOMINASI / PRODUK GRID (7 COLS) */}
-          <PpobProductGrid
-            products={products}
-            isLoadingProducts={isLoadingProducts}
-            selectedProduct={selectedProduct}
-            onOpenCheckout={handleOpenCheckout}
-          />
+          {/* KOLOM KANAN: PANEL TAGIHAN ATAU GRID PRODUK (7 COLS) */}
+          {activeTab === 'tagihan' ? (
+            <PpobTagihanPanel
+              inquiryResult={tagihanInquiryResult}
+              isInquiring={isTagihanInquiring}
+              onOpenCheckout={handleOpenCheckout}
+              serviceLabel={activeBillService.label}
+            />
+          ) : (
+            <PpobProductGrid
+              products={products}
+              isLoadingProducts={isLoadingProducts}
+              selectedProduct={selectedProduct}
+              onOpenCheckout={handleOpenCheckout}
+            />
+          )}
         </div>
       </main>
 

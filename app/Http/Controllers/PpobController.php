@@ -10,6 +10,7 @@ use App\Services\KiosbankService;
 use App\Services\OrderFulfillmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -108,7 +109,29 @@ class PpobController extends Controller
         $referenceId = $request->input('reference_id');
 
         try {
-            $result = $this->kiosbank->inquiry($productId, $customerId, $referenceId, $zoneId);
+            $result = $this->kiosbank->inquiry($productId, $customerId, $referenceId, $zoneId, [
+                'periode' => $request->input('periode'),
+            ]);
+
+            // Simpan hasil inquiry sebagai sumber nominal otoritatif. Data Kiosbank
+            // hanya berlaku 10 menit, sehingga checkout wajib memakai data ini.
+            if (($result['status'] ?? '') === 'success' && (int) ($result['total'] ?? 0) > 0) {
+                $result['inquiry_key'] = hash('sha256', $productId . '|' . $customerId . '|' . ($result['reference_id'] ?? ''));
+                Cache::put('ppob_inquiry:' . $result['inquiry_key'], [
+                    'product_id'   => $productId,
+                    'customer_id'  => $customerId,
+                    'reference_id' => $result['reference_id'] ?? null,
+                    'amount'       => (int) ($result['amount'] ?? 0),
+                    'admin_fee'    => (int) ($result['admin_fee'] ?? 0),
+                    'penalty'      => (int) ($result['penalty'] ?? 0),
+                    'total'        => (int) $result['total'],
+                    'service_fee'  => (int) ($result['service_fee'] ?? 0),
+                    'grand_total'  => (int) ($result['grand_total'] ?? $result['total']),
+                    'customer_name'=> $result['customer_name'] ?? '',
+                    'expires_at'   => now()->addMinutes(10)->timestamp,
+                ], now()->addMinutes(10));
+            }
+
             return response()->json($result);
         } catch (\Exception $e) {
             Log::error('[PPOB-INQUIRY-ERROR] ' . $e->getMessage());
@@ -141,8 +164,44 @@ class PpobController extends Controller
         $whatsapp      = $request->input('whatsapp') ?: (Auth::user()?->whatsapp ?: $customerId);
         $email         = $request->input('email') ?: (Auth::user()?->email ?: 'user@nandarstore.com');
 
-        // Validasi integritas harga dari database PpobProduct jika produk terdaftar
-        $officialProduct = \App\Models\PpobProduct::where('code', $productCode)->first();
+        // Data tagihan hasil inquiry (PDAM / PLN pascabayar / BPJS). Nominalnya tidak
+        // diambil dari client, melainkan dari cache hasil inquiry di server.
+        $billAmount    = null;
+        $billAdminFee  = null;
+        $billPenalty   = null;
+        $billTotal     = null;
+        $billReference = null;
+        $inquiryKey    = $request->input('inquiry_key');
+        $isBillPayment = false;
+
+        // Jangan percaya nominal tagihan dari client. Ambil ulang hasil inquiry
+        // dari cache server dan tolak bila sudah melewati batas 10 menit.
+        if ($inquiryKey) {
+            $cachedInquiry = Cache::get('ppob_inquiry:' . $inquiryKey);
+            if (!$cachedInquiry
+                || $cachedInquiry['product_id'] !== $productCode
+                || $cachedInquiry['customer_id'] !== $customerId
+                || ($cachedInquiry['expires_at'] ?? 0) < now()->timestamp
+            ) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Data inquiry sudah kedaluwarsa. Silakan lakukan inquiry ulang sebelum membayar.',
+                ], 422);
+            }
+
+            $billAmount    = (int) $cachedInquiry['amount'];
+            $billAdminFee  = (int) $cachedInquiry['admin_fee'];
+            $billPenalty   = (int) ($cachedInquiry['penalty'] ?? 0);
+            $billTotal     = (int) $cachedInquiry['total'];
+            $billReference = $cachedInquiry['reference_id'];
+            // Harga jual ke pelanggan = total biller + markup toko.
+            $nominal       = (int) ($cachedInquiry['grand_total'] ?? $billTotal);
+            $isBillPayment = true;
+        }
+
+        // Validasi integritas harga dari database PpobProduct jika produk terdaftar.
+        // Produk tagihan tidak ada di katalog karena nominalnya dari inquiry biller.
+        $officialProduct = $isBillPayment ? null : \App\Models\PpobProduct::where('code', $productCode)->first();
         if ($officialProduct && $officialProduct->price > 0) {
             $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($officialProduct->reseller_price);
             $baseExpectedPrice = (int) ($isReseller ? $officialProduct->reseller_price : $officialProduct->price);
@@ -209,6 +268,11 @@ class PpobController extends Controller
                 'price'          => $nominal + $discount,
                 'discount'       => (int) round($discount),
                 'total_amount'   => $nominal,
+                'bill_amount'    => $isBillPayment ? $billAmount : null,
+                'bill_admin_fee' => $isBillPayment ? $billAdminFee : null,
+                'bill_penalty'   => $isBillPayment ? $billPenalty : null,
+                'bill_total'     => $isBillPayment ? $billTotal : null,
+                'bill_reference' => $isBillPayment ? $billReference : null,
                 'payment_status' => 'paid',
                 'order_status'   => 'processing',
                 'email'          => $email,
@@ -224,6 +288,10 @@ class PpobController extends Controller
                 $order->refresh();
             } catch (\Exception $e) {
                 Log::error('[PPOB-FULFILL-ERROR] ' . $e->getMessage());
+            }
+
+            if ($inquiryKey) {
+                Cache::forget('ppob_inquiry:' . $inquiryKey);
             }
 
             return response()->json([
@@ -276,6 +344,11 @@ class PpobController extends Controller
             'price'          => $nominal + $discount,
             'discount'       => (int) round($discount),
             'total_amount'   => $totalNominal,
+            'bill_amount'    => $isBillPayment ? $billAmount : null,
+            'bill_admin_fee' => $isBillPayment ? $billAdminFee : null,
+            'bill_penalty'   => $isBillPayment ? $billPenalty : null,
+            'bill_total'     => $isBillPayment ? $billTotal : null,
+            'bill_reference' => $isBillPayment ? $billReference : null,
             'payment_status' => 'pending',
             'order_status'   => 'pending',
             'email'          => $email,

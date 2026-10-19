@@ -8,7 +8,7 @@ class Order extends Model
 {
     protected $fillable = [
         'invoice_number', 'user_id', 'buyer_name', 'product_id', 'product_name', 'quantity', 'product_type', 'provider',
-        'price', 'discount', 'total_amount', 'payment_status', 'order_status', 'account_details',
+        'price', 'discount', 'total_amount', 'bill_amount', 'bill_admin_fee', 'bill_penalty', 'bill_total', 'bill_reference', 'payment_status', 'order_status', 'account_details',
         'email', 'whatsapp', 'voucher_code', 'discount_amount', 'sn_or_account',
         'api_trx_id', 'notes'
     ];

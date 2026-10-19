@@ -35,12 +35,64 @@ class OrderFulfillmentService
             $nominal = (int) ($order->total_amount ?: $order->price);
 
             $kiosbank = new KiosbankService();
-            // Kiosbank mengharuskan referenceID berupa 12 digit angka unik
-            $refId = $order->api_trx_id;
+            // Kiosbank mengharuskan referenceID berupa 12 digit angka unik.
+            // Untuk produk tagihan, pakai referenceID inquiry agar pembayaran
+            // merujuk pada data inquiry yang sama (berlaku maksimal 10 menit).
+            $refId = $order->bill_reference ?: $order->api_trx_id;
             if (empty($refId) || !ctype_digit((string)$refId) || strlen((string)$refId) !== 12) {
                 $refId = now()->format('ymd') . str_pad((string) mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
-                $order->api_trx_id = $refId;
+            }
+            $order->api_trx_id = $refId;
+            $order->save();
+
+            // Produk tagihan (PDAM / PLN pascabayar / BPJS) memakai endpoint Payment
+            // dengan nominal hasil inquiry, bukan SinglePayment seperti pulsa.
+            if ($order->bill_total) {
+                $res = $kiosbank->payBill(
+                    (string) $prodCode,
+                    (string) $targetNumber,
+                    (int) $order->bill_amount,
+                    (int) $order->bill_admin_fee,
+                    (int) $order->bill_total,
+                    $refId,
+                    $order->whatsapp
+                );
+
+                if (($res['status'] ?? '') === 'success') {
+                    $order->order_status   = 'completed';
+                    $order->payment_status = 'paid';
+                    $order->provider       = 'Kiosbank';
+                    $sn = $res['sn'] ?? ($res['reference_id'] ?? 'BERHASIL');
+                    $order->sn_or_account  = "No. Referensi: " . $sn;
+                    $order->account_details= "Pembayaran Tagihan: " . $order->product_name . "\nNo. Pelanggan: " . $targetNumber . "\nTotal: Rp " . number_format((int) $order->bill_total, 0, ',', '.') . "\nNo. Referensi: " . $sn;
+                    $order->notes          = ($order->notes ? $order->notes . ' | ' : '') . "Pembayaran tagihan Kiosbank sukses. Ref: " . ($res['reference_id'] ?? $refId);
+                    $order->save();
+
+                    try {
+                        WebhookController::sendOrderNotification($order);
+                    } catch (\Exception $e) {
+                        Log::error('[PPOB-WA-NOTIF-ERROR] ' . $e->getMessage());
+                    }
+
+                    return [
+                        'status'        => 'success',
+                        'is_ready'      => true,
+                        'sn_or_account' => $order->sn_or_account,
+                        'message'       => 'Tagihan berhasil dibayarkan melalui Kiosbank!',
+                    ];
+                }
+
+                $order->order_status   = 'processing';
+                $order->payment_status = 'paid';
+                $order->provider       = 'Kiosbank';
+                $order->notes          = 'Pembayaran tagihan sedang diproses Kiosbank: ' . ($res['message'] ?? 'Pending');
                 $order->save();
+
+                return [
+                    'status'   => 'processing',
+                    'is_ready' => false,
+                    'message'  => 'Pembayaran tagihan sedang diproses oleh provider Kiosbank.',
+                ];
             }
 
             $res = $kiosbank->singlePayment(

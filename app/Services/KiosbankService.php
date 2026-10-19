@@ -726,9 +726,12 @@ class KiosbankService
     }
 
     /**
-     * Inquiry Cek Tagihan / Cek ID Pelanggan
+     * Inquiry Cek Tagihan / Cek ID Pelanggan.
+     * Respons biller Kiosbank memiliki format berbeda (PDAM memakai tagihan,
+     * PLN memakai TG/TT, dan BPJS memakai total), sehingga nominal dinormalisasi
+     * di sini agar checkout tidak menampilkan Rp 0.
      */
-    public function inquiry(string $productId, string $customerId, ?string $referenceId = null, ?string $additionalId = null): array
+    public function inquiry(string $productId, string $customerId, ?string $referenceId = null, ?string $additionalId = null, array $extraParams = []): array
     {
         $refId = $referenceId ?: $this->generate12DigitRef();
 
@@ -745,46 +748,150 @@ class KiosbankService
                 if (!empty($additionalId)) {
                     $params['additionalID'] = $additionalId;
                 }
+                foreach ($extraParams as $key => $value) {
+                    if ($value !== null && $value !== '') {
+                        $params[$key] = $value;
+                    }
+                }
 
                 $res = $this->makeDigestRequest('/Services/Inquiry', $params, 'POST');
 
                 if (isset($res['rc']) && $res['rc'] === '00') {
                     $data = $res['data'] ?? [];
-                    $harga = (int) ($data['harga'] ?? 0);
+                    $amount = $this->parseKiosbankAmount(
+                        $data['tagihan'] ?? $data['TG'] ?? $data['harga'] ?? 0
+                    );
+                    $admin = $this->parseKiosbankAmount(
+                        $data['admin'] ?? $data['adminBank'] ?? $data['AB'] ?? 0
+                    );
+                    $denda = $this->parseKiosbankAmount($data['denda'] ?? $data['DD'] ?? 0);
+                    $total = $this->parseKiosbankAmount($data['total'] ?? $data['TT'] ?? 0);
+                    $total = $total > 0 ? $total : ($amount + $admin + $denda);
+                    $serviceFee = $this->resolveServiceFee($total);
+
                     return [
-                        'status'       => 'success',
-                        'rc'           => '00',
-                        'customer_id'  => $customerId,
-                        'customer_name'=> $data['nama'] ?? $data['customerName'] ?? 'Pelanggan Terverifikasi',
-                        'product_name' => $data['produk'] ?? 'Layanan PPOB',
-                        'amount'       => $harga,
-                        'admin_fee'    => (int) ($data['admin'] ?? 0),
-                        'total'        => $this->applyMarkup($harga),
-                        'reference_id' => $refId,
-                        'data'         => $data
+                        'status'        => 'success',
+                        'rc'            => '00',
+                        'product_id'    => $productId,
+                        'customer_id'   => $data['customerID'] ?? $data['ID'] ?? $data['NR'] ?? $customerId,
+                        'customer_name' => trim($data['nama'] ?? $data['NM'] ?? $data['customerName'] ?? 'Pelanggan Terverifikasi'),
+                        'product_name'  => $data['produk'] ?? 'Layanan PPOB',
+                        'amount'        => $amount,
+                        'admin_fee'     => $admin,
+                        'penalty'       => $denda,
+                        'total'         => $total,
+                        'service_fee'   => $serviceFee,
+                        'grand_total'   => $total + $serviceFee,
+                        'reference_id'  => $refId,
+                        'data'          => $data,
                     ];
                 }
 
                 return [
                     'status'  => 'error',
                     'rc'      => $res['rc'] ?? '99',
-                    'message' => $res['description'] ?? $this->getResponseCodeMessage($res['rc'] ?? '99')
+                    'message' => $res['description'] ?? $this->getResponseCodeMessage($res['rc'] ?? '99'),
                 ];
             }
         }
 
-        // Mock Inquiry Fallback untuk testing development tanpa blocking
+        return [
+            'status'        => 'success',
+            'rc'            => '00',
+            'product_id'    => $productId,
+            'customer_id'   => $customerId,
+            'customer_name' => 'PELANGGAN ' . strtoupper(substr($customerId, -4)),
+            'product_name'  => 'Inquiry ' . $productId,
+            'amount'        => 50000,
+            'admin_fee'     => 2500,
+            'penalty'       => 0,
+            'total'         => 52500,
+            'service_fee'   => $this->resolveServiceFee(52500),
+            'grand_total'   => $this->applyMarkup(52500),
+            'reference_id'  => $refId,
+            'data'          => ['status' => 'INQUIRY_OK'],
+        ];
+    }
+
+    /** Parse nominal Kiosbank yang dikirim sebagai zero-padded string. */
+    protected function parseKiosbankAmount($value): int
+    {
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '') {
+            return 0;
+        }
+
+        // Kiosbank memakai koma sebagai pemisah desimal: 000000091300 atau 000002440,00.
+        if (str_contains($value, ',')) {
+            $value = substr($value, 0, strpos($value, ','));
+        }
+
+        $normalized = preg_replace('/[^0-9-]/', '', $value);
+        return $normalized !== '' ? (int) $normalized : 0;
+    }
+
+    /**
+     * Potong markup admin menjadi biaya layanan terpisah agar total tagihan
+     * yang dibayarkan ke biller tetap utuh.
+     */
+    protected function resolveServiceFee(int $billerTotal): int
+    {
+        return max(0, $this->applyMarkup($billerTotal) - $billerTotal);
+    }
+
+    /**
+     * Payment biller (PDAM, PLN pascabayar/non-taglis, BPJS).
+     * Inquiry harus dilakukan terlebih dahulu dan data nominalnya dikirim ulang.
+     */
+    public function payBill(string $productId, string $customerId, int $amount, int $admin, int $total, ?string $referenceId = null, ?string $phoneNumber = null): array
+    {
+        $refId = $referenceId ?: $this->generate12DigitRef();
+        $sessionId = $this->getSessionId();
+        $params = [
+            'tglTransaksi' => now()->format('Y-m-d'),
+            'sessionID'    => $sessionId,
+            'merchantID'   => $this->merchantId,
+            'productID'    => $productId,
+            'customerID'   => $customerId,
+            'referenceID'  => $refId,
+            'tagihan'      => str_pad((string) $amount, 12, '0', STR_PAD_LEFT),
+            'admin'        => str_pad((string) $admin, 12, '0', STR_PAD_LEFT),
+            'total'        => str_pad((string) $total, 12, '0', STR_PAD_LEFT),
+        ];
+        if ($phoneNumber) {
+            $params['noHanphone'] = $phoneNumber;
+        }
+
+        if ($this->isConfigured() && $sessionId && !str_starts_with($sessionId, 'DEV-SESSION-')) {
+            $res = $this->makeDigestRequest('/Services/Payment', $params, 'POST');
+            if (($res['rc'] ?? null) === '00') {
+                $data = $res['data'] ?? [];
+                return [
+                    'status'       => 'success',
+                    'rc'           => '00',
+                    'reference_id' => trim($data['noReferensi'] ?? $data['RF'] ?? $refId),
+                    'sn'           => trim($data['token'] ?? $data['TK'] ?? $data['noReferensi'] ?? $data['RF'] ?? $refId),
+                    'data'         => $data,
+                ];
+            }
+            return [
+                'status'  => 'failed',
+                'rc'      => $res['rc'] ?? '99',
+                'message' => $res['description'] ?? $this->getResponseCodeMessage($res['rc'] ?? '99'),
+            ];
+        }
+
         return [
             'status'       => 'success',
             'rc'           => '00',
-            'customer_id'  => $customerId,
-            'customer_name'=> 'PELANGGAN ' . strtoupper(substr($customerId, -4)),
-            'product_name' => 'Inquiry ' . $productId,
-            'amount'       => 50000,
-            'admin_fee'    => 2500,
-            'total'        => 52500,
             'reference_id' => $refId,
-            'data'         => ['status' => 'INQUIRY_OK']
+            'sn'           => 'SANDBOX-' . strtoupper(bin2hex(random_bytes(6))),
+            'data'         => ['status' => 'BERHASIL'],
+            'is_sandbox'   => true,
         ];
     }
 

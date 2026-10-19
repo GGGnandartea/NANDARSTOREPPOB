@@ -1,6 +1,7 @@
 import React from 'react';
-import Swal from 'sweetalert2';
 import { Icons, OPERATORS, GAMES, EWALLETS, STREAMING_SERVICES, fmt } from './PpobConstants';
+import { BILL_SERVICES } from './PpobBillUtils';
+import { PDAM_PRODUCTS } from './PdamProducts';
 
 export default function PpobInputSection({
   activeTab,
@@ -18,6 +19,7 @@ export default function PpobInputSection({
   setPlnInquiryResult,
   isPlnInquiring,
   handlePlnInquiry,
+  onOpenCheckout,
   setSelectedProduct,
   // Game state
   selectedGame,
@@ -38,7 +40,23 @@ export default function PpobInputSection({
   setStreamingAccount,
   streamingSearch,
   setStreamingSearch,
+  // Tagihan state
+  tagihanType,
+  setTagihanType,
+  tagihanCustomerId,
+  setTagihanCustomerId,
+  tagihanInquiryResult,
+  setTagihanInquiryResult,
+  isTagihanInquiring,
+  handleTagihanInquiry,
+  tagihanPdamRegion,
+  setTagihanPdamRegion,
+  tagihanPeriod,
+  setTagihanPeriod,
+  tagihanPdamSearch,
+  setTagihanPdamSearch,
 }) {
+  const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
   return (
     <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
       {/* TAB 1: PULSA & DATA */}
@@ -208,8 +226,23 @@ export default function PpobInputSection({
               </div>
               <div className="flex justify-between pt-2 border-t border-emerald-200 dark:border-emerald-800/40">
                 <span className="font-black text-emerald-800 dark:text-emerald-300">Total Pembayaran:</span>
-                <span className="font-black font-mono text-base text-emerald-600 dark:text-emerald-400">{fmt.rp(plnInquiryResult.total)}</span>
+                <span className="font-black font-mono text-base text-emerald-600 dark:text-emerald-400">{fmt.rp(plnInquiryResult.grand_total ?? plnInquiryResult.total)}</span>
               </div>
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenCheckout({
+                    code: '100301',
+                    name: `Tagihan Listrik PLN - ${plnInquiryResult.customer_name || ''}`.trim(),
+                    price: plnInquiryResult.grand_total ?? plnInquiryResult.total,
+                    inquiryKey: plnInquiryResult.inquiry_key,
+                  })
+                }
+                className="w-full mt-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition"
+              >
+                <Icons.Lightning className="w-4 h-4" />
+                <span>Bayar Tagihan PLN</span>
+              </button>
             </div>
           )}
         </>
@@ -454,7 +487,7 @@ export default function PpobInputSection({
         </>
       )}
 
-      {/* TAB 6: TAGIHAN PDAM & BPJS */}
+      {/* TAB 6: TAGIHAN PDAM, PLN & BPJS */}
       {activeTab === 'tagihan' && (
         <>
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
@@ -463,8 +496,8 @@ export default function PpobInputSection({
                 <Icons.Tagihan className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-black text-sm text-gray-900 dark:text-white">Tagihan Rutin &amp; PDAM</h3>
-                <p className="text-[11px] text-gray-400 font-medium">Air PDAM, BPJS Kesehatan</p>
+                <h3 className="font-black text-sm text-gray-900 dark:text-white">Cek &amp; Bayar Tagihan</h3>
+                <p className="text-[11px] text-gray-400 font-medium">PDAM, PLN Pascabayar, BPJS</p>
               </div>
             </div>
           </div>
@@ -474,11 +507,88 @@ export default function PpobInputSection({
               <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
                 Jenis Layanan
               </label>
-              <select className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
-                <option value="pdam">PDAM Air Bersih (Kota / Kabupaten)</option>
-                <option value="bpjs">BPJS Kesehatan</option>
+              <select
+                value={tagihanType}
+                onChange={(e) => {
+                  setTagihanType(e.target.value);
+                  setTagihanCustomerId('');
+                  setTagihanInquiryResult(null);
+                  setSelectedProduct(null);
+                }}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
+              >
+                {BILL_SERVICES.map((service) => (
+                  <option key={service.id} value={service.id}>{service.label}</option>
+                ))}
               </select>
             </div>
+
+            {/* Pilih wilayah PDAM karena setiap kota/kabupaten punya kode produk sendiri */}
+            {tagihanType === 'pdam' && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                    Wilayah PDAM ({PDAM_PRODUCTS.length})
+                  </label>
+                  {tagihanPdamSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setTagihanPdamSearch('')}
+                      className="text-[10px] font-bold text-emerald-600 hover:underline"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={tagihanPdamSearch}
+                  onChange={(e) => setTagihanPdamSearch(e.target.value)}
+                  placeholder="Cari kota / kabupaten..."
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition mb-2"
+                />
+                <select
+                  value={tagihanPdamRegion}
+                  onChange={(e) => {
+                    setTagihanPdamRegion(e.target.value);
+                    setTagihanInquiryResult(null);
+                    setSelectedProduct(null);
+                  }}
+                  size={6}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-[11px] font-semibold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
+                >
+                  {PDAM_PRODUCTS
+                    .filter((p) => p.name.toLowerCase().includes(tagihanPdamSearch.toLowerCase()))
+                    .map((p) => (
+                      <option key={p.id} value={p.id} className="py-1">{p.name}</option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {/* BPJS memerlukan jumlah bulan tagihan yang akan dibayar */}
+            {tagihanType === 'bpjs' && (
+              <div>
+                <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
+                  Jumlah Bulan Tagihan
+                </label>
+                <select
+                  value={tagihanPeriod}
+                  onChange={(e) => {
+                    setTagihanPeriod(e.target.value);
+                    setTagihanInquiryResult(null);
+                    setSelectedProduct(null);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
+                >
+                  {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((code) => (
+                    <option key={code} value={code}>
+                      {parseInt(code, 10)} Bulan
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
@@ -486,26 +596,50 @@ export default function PpobInputSection({
               </label>
               <input
                 type="text"
-                placeholder="Contoh: 123456789"
+                value={tagihanCustomerId}
+                onChange={(e) => {
+                  setTagihanCustomerId(e.target.value.replace(/[^0-9]/g, ''));
+                  setTagihanInquiryResult(null);
+                  setSelectedProduct(null);
+                }}
+                placeholder={activeBillService.placeholder || 'Contoh: 123456789'}
                 className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
               />
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                Swal.fire({
-                  icon: 'info',
-                  title: 'Inquiry PDAM',
-                  text: 'Silakan masukkan nomor pelanggan PDAM Anda.',
-                  confirmButtonColor: '#10b981',
-                })
-              }
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              onClick={handleTagihanInquiry}
+              disabled={isTagihanInquiring || !tagihanCustomerId || tagihanCustomerId.length < (activeBillService.minLength || 4)}
+              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Icons.Search className="w-4 h-4" />
-              <span>Cek Tagihan Air PDAM</span>
+              {isTagihanInquiring ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  <span>Mengecek Tagihan...</span>
+                </>
+              ) : (
+                <>
+                  <Icons.Search className="w-5 h-5" />
+                  <span>Cek Tagihan</span>
+                </>
+              )}
             </button>
+
+            {tagihanInquiryResult?.summary && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">Nama:</span>
+                  <span className="font-black text-gray-900 dark:text-white text-right">{tagihanInquiryResult.summary.customerName}</span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-emerald-200 dark:border-emerald-800/40">
+                  <span className="font-black text-emerald-800 dark:text-emerald-300">Total Bayar:</span>
+                  <span className="font-black font-mono text-emerald-600 dark:text-emerald-400">{fmt.rp(tagihanInquiryResult.summary.grandTotal)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
