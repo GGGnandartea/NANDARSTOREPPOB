@@ -349,8 +349,6 @@ export default function Home({
                 {/* MENU LAYANAN UNGGULAN & SHORTCUT CEPAT */}
                 <QuickServicesGrid 
                     filters={filters}
-                    handleCategoryTipe={handleCategoryTipe}
-                    scrollToSection={scrollToSection}
                     setShowTrackModal={setShowTrackModal}
                     effectiveAdminWa={effectiveAdminWa}
                     store={store}

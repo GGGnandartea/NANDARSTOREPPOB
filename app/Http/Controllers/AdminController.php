@@ -148,19 +148,21 @@ class AdminController extends Controller
         }
 
         // Kiosbank PPOB Settings
-        $kiosbankHost         = Setting::where('key', 'kiosbank_host')->value('value') ?: 'development.kiosbank.com';
-        $kiosbankPort         = Setting::where('key', 'kiosbank_port')->value('value') ?: '4432';
-        $kiosbankProtocol     = Setting::where('key', 'kiosbank_protocol')->value('value') ?: 'https';
-        $kiosbankUsername     = Setting::where('key', 'kiosbank_username')->value('value') ?: '';
-        $kiosbankPassword     = Setting::where('key', 'kiosbank_password')->value('value') ?: '';
-        $kiosbankMitra        = Setting::where('key', 'kiosbank_mitra')->value('value') ?: 'DJI';
-        $kiosbankAccountId    = Setting::where('key', 'kiosbank_account_id')->value('value') ?: '';
-        $kiosbankMerchantId   = Setting::where('key', 'kiosbank_merchant_id')->value('value') ?: '';
-        $kiosbankMerchantName = Setting::where('key', 'kiosbank_merchant_name')->value('value') ?: 'NandarStore';
-        $kiosbankCounterId    = Setting::where('key', 'kiosbank_counter_id')->value('value') ?: '1';
-        $kiosbankMode         = Setting::where('key', 'kiosbank_mode')->value('value') ?: 'development';
+        $configuration = new \App\Services\KiosbankConfiguration();
+        $kiosbankMode = $configuration->mode();
+        $profile = $configuration->profile($kiosbankMode);
+        $kiosbankHost = $profile['host'];
+        $kiosbankPort = $profile['port'];
+        $kiosbankProtocol = $profile['protocol'];
+        $kiosbankUsername = $profile['username'];
+        $kiosbankPassword = $profile['password'];
+        $kiosbankMitra = $profile['mitra'];
+        $kiosbankAccountId = $profile['account_id'];
+        $kiosbankMerchantId = $profile['merchant_id'];
+        $kiosbankMerchantName = $profile['merchant_name'];
+        $kiosbankCounterId = $profile['counter_id'];
         $kiosbankMarkupType   = Setting::where('key', 'kiosbank_markup_type')->value('value') ?: 'fixed';
-        $kiosbankMarkupValue  = Setting::where('key', 'kiosbank_markup_value')->value('value') ?: '1000';
+        $kiosbankMarkupValue  = Setting::where('key', 'kiosbank_markup_value')->value('value') ?? '1000';
         $kiosbankEnabled      = Setting::where('key', 'kiosbank_enabled')->value('value') ?? '1';
         $kiosbankPrivateKey   = Setting::where('key', 'kiosbank_private_key')->value('value') ?: '';
         $kiosbankPublicKey    = Setting::where('key', 'kiosbank_public_key')->value('value') ?: '';
@@ -329,7 +331,9 @@ class AdminController extends Controller
 
     public function retryApiOrder($id) {
         $order = Order::findOrFail($id);
-        $result = \App\Services\OrderFulfillmentService::fulfillOrder($order);
+        $result = ($order->fulfillment_started_at && $order->product_type === 'api')
+            ? \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order)
+            : \App\Services\OrderFulfillmentService::fulfillOrder($order);
         $order->refresh();
 
         if ($order->order_status === 'completed') {
@@ -422,55 +426,18 @@ class AdminController extends Controller
         }
 
         // Kiosbank PPOB Settings
-        if ($request->has('kiosbank_host')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_host'], ['value' => trim($request->kiosbank_host)]);
+        $request->validate([
+            'kiosbank_markup_type' => 'sometimes|in:fixed,percent',
+            'kiosbank_markup_value' => 'sometimes|integer|min:0',
+        ]);
+        foreach (['kiosbank_markup_type', 'kiosbank_markup_value'] as $field) {
+            if ($request->has($field)) {
+                Setting::updateOrCreate(['key' => $field], ['value' => $request->input($field)]);
+            }
         }
-        if ($request->has('kiosbank_port')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_port'], ['value' => trim($request->kiosbank_port)]);
-        }
-        if ($request->has('kiosbank_protocol')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_protocol'], ['value' => trim($request->kiosbank_protocol)]);
-        }
-        if ($request->has('kiosbank_username')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_username'], ['value' => trim($request->kiosbank_username)]);
-        }
-        if ($request->has('kiosbank_password')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_password'], ['value' => trim($request->kiosbank_password)]);
-        }
-        if ($request->has('kiosbank_mitra')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_mitra'], ['value' => trim($request->kiosbank_mitra)]);
-        }
-        if ($request->has('kiosbank_account_id')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_account_id'], ['value' => trim($request->kiosbank_account_id)]);
-        }
-        if ($request->has('kiosbank_merchant_id')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_merchant_id'], ['value' => trim($request->kiosbank_merchant_id)]);
-        }
-        if ($request->has('kiosbank_merchant_name')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_merchant_name'], ['value' => trim($request->kiosbank_merchant_name)]);
-        }
-        if ($request->has('kiosbank_counter_id')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_counter_id'], ['value' => trim($request->kiosbank_counter_id)]);
-        }
-        if ($request->has('kiosbank_mode')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_mode'], ['value' => trim($request->kiosbank_mode)]);
-        }
-        if ($request->has('kiosbank_markup_type')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_markup_type'], ['value' => trim($request->kiosbank_markup_type)]);
-        }
-        if ($request->has('kiosbank_markup_value')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_markup_value'], ['value' => trim($request->kiosbank_markup_value)]);
-        }
-        if ($request->has('kiosbank_private_key')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_private_key'], ['value' => trim($request->kiosbank_private_key)]);
-        }
-        if ($request->has('kiosbank_public_key')) {
-            Setting::updateOrCreate(['key' => 'kiosbank_public_key'], ['value' => trim($request->kiosbank_public_key)]);
-        }
-        Setting::updateOrCreate(['key' => 'kiosbank_enabled'], ['value' => $request->has('kiosbank_enabled') ? '1' : '0']);
 
         Cache::forget('promo_settings');
-        return back()->with('success', 'Semua Pengaturan API Provider, Kiosbank PPOB & RSA Secret Key, Promo, dan WhatsApp berhasil disimpan!');
+        return back()->with('success', 'Pengaturan API provider, markup PPOB, promo, dan WhatsApp berhasil disimpan.');
     }
 
     /**
@@ -1321,9 +1288,14 @@ class AdminController extends Controller
 
             $cost = 0;
             if ($ord->product_type === 'ppob') {
-                $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
-                if ($prof > $rev) $prof = min(1000, $rev * 0.05);
-                $cost = max(0, $rev - $prof);
+                if ($ord->provider_amount !== null) {
+                    $cost = (float) $ord->provider_amount;
+                } else {
+                    // Legacy orders have no recorded provider cost.
+                    $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                    if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                    $cost = max(0, $rev - $prof);
+                }
             } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
                 $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
                 $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
@@ -1331,7 +1303,7 @@ class AdminController extends Controller
                 $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
             }
 
-            $prof = max(0, $rev - $cost);
+            $prof = $rev - $cost;
             $totalCost += $cost;
             $totalProfit += $prof;
         }
@@ -1388,16 +1360,21 @@ class AdminController extends Controller
 
                     $cost = 0;
                     if ($ord->product_type === 'ppob') {
-                        $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
-                        if ($prof > $rev) $prof = min(1000, $rev * 0.05);
-                        $cost = max(0, $rev - $prof);
+                        if ($ord->provider_amount !== null) {
+                            $cost = (float) $ord->provider_amount;
+                        } else {
+                            // Legacy orders have no recorded provider cost.
+                            $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                            if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                            $cost = max(0, $rev - $prof);
+                        }
                     } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
                         $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
                         $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
                     } else {
                         $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
                     }
-                    $dayProf += max(0, $rev - $cost);
+                    $dayProf += $rev - $cost;
                 }
 
                 $chartRevenue[] = (int) $dayRev;
@@ -1426,16 +1403,21 @@ class AdminController extends Controller
 
                     $cost = 0;
                     if ($ord->product_type === 'ppob') {
-                        $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
-                        if ($prof > $rev) $prof = min(1000, $rev * 0.05);
-                        $cost = max(0, $rev - $prof);
+                        if ($ord->provider_amount !== null) {
+                            $cost = (float) $ord->provider_amount;
+                        } else {
+                            // Legacy orders have no recorded provider cost.
+                            $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                            if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                            $cost = max(0, $rev - $prof);
+                        }
                     } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
                         $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
                         $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
                     } else {
                         $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
                     }
-                    $monthProf += max(0, $rev - $cost);
+                    $monthProf += $rev - $cost;
                 }
 
                 $chartRevenue[] = (int) $monthRev;
@@ -1475,9 +1457,14 @@ class AdminController extends Controller
 
                 $cost = 0;
                 if ($ord->product_type === 'ppob') {
-                    $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
-                    if ($prof > $rev) $prof = min(1000, $rev * 0.05);
-                    $cost = max(0, $rev - $prof);
+                    if ($ord->provider_amount !== null) {
+                        $cost = (float) $ord->provider_amount;
+                    } else {
+                        // Legacy orders have no recorded provider cost.
+                        $prof = ($kiosbankMarkupType === 'fixed') ? $kiosbankMarkupVal : ($rev * $kiosbankMarkupVal / 100);
+                        if ($prof > $rev) $prof = min(1000, $rev * 0.05);
+                        $cost = max(0, $rev - $prof);
+                    }
                 } elseif ($ord->product_type === 'api' || ($ord->product && $ord->product->type === 'api')) {
                     $apiCost = $ord->product ? (float) $ord->product->api_price : 0;
                     $cost = ($apiCost > 0) ? $apiCost : ($rev * 0.8);
@@ -1485,7 +1472,7 @@ class AdminController extends Controller
                     $cost = $ord->product && $ord->product->api_price ? (float) $ord->product->api_price : 0;
                 }
 
-                $mProf += max(0, $rev - $cost);
+                $mProf += $rev - $cost;
                 $mCost += $cost;
             }
 
@@ -1652,6 +1639,7 @@ class AdminController extends Controller
                 'Harga Asli (Rp)',
                 'Potongan Diskon (Rp)',
                 'Total Bayar (Rp)',
+                'Nominal Provider PPOB (Rp)',
                 'Status Pembayaran',
                 'Status Pesanan',
                 'Detail / Keterangan Akun'
@@ -1673,6 +1661,7 @@ class AdminController extends Controller
                     $o->price ?: 0,
                     $o->discount_amount ?: 0,
                     $o->total_amount ?: ($o->price ?: 0),
+                    $o->product_type === 'ppob' ? $o->provider_amount : '',
                     strtoupper($o->payment_status ?? 'PENDING'),
                     strtoupper($o->order_status ?? 'PENDING'),
                     preg_replace('/\s+/', ' ', trim($o->sn_or_account ?? $o->account_details ?? '-'))
@@ -1771,7 +1760,7 @@ class AdminController extends Controller
         $margin = (int) $request->margin;
         $basePrice = (int) $product->base_price;
         $price = $request->price ? (int)$request->price : ($basePrice + $margin);
-        $resellerPrice = $request->reseller_price ? (int)$request->reseller_price : ($price - 300);
+        $resellerPrice = $request->reseller_price ? (int)$request->reseller_price : max(0, $price - 300);
 
         $product->update([
             'margin'         => $margin,
@@ -1815,7 +1804,7 @@ class AdminController extends Controller
             }
 
             $price = $basePrice + $margin;
-            $resellerPrice = $price - 300;
+            $resellerPrice = max(0, $price - 300);
 
             $p->update([
                 'margin'         => $margin,
@@ -1842,8 +1831,15 @@ class AdminController extends Controller
                 $priceRes = $kiosbankService->syncPricesFromKiosbank();
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning('[PPOB-SYNC-PRICE] ' . $e->getMessage());
+                return back()->with('error', 'Status produk diperbarui, tetapi harga belum berhasil disinkronkan. Silakan coba lagi.');
             }
-            return back()->with('success', "Sinkronisasi berhasil! {$res['total_products']} produk diperiksa. Status Active: {$res['active_count']}, Maintenance: {$res['maintenance_count']}, Harga diperbarui: {$priceRes['updated_count']}.");
+            $failedCount = count($priceRes['failed_prefixes'] ?? []);
+            $created = $priceRes['created_count'] ?? 0;
+            $message = "Status produk diperiksa: {$res['total_products']}. Harga diperbarui: {$priceRes['updated_count']}. Produk baru: {$created}.";
+            if ($failedCount > 0) {
+                return back()->with('error', $message." Harga untuk {$failedCount} kelompok produk belum berhasil diambil. Coba sinkronkan kembali setelah koneksi tersedia.");
+            }
+            return back()->with('success', $message);
         } catch (\Exception $e) {
             return back()->with('error', "Gagal sinkronisasi: " . $e->getMessage());
         }
@@ -1868,39 +1864,27 @@ class AdminController extends Controller
      */
     public function kiosbankStoreDeposit(Request $request)
     {
+        if (!(new KiosbankService())->isDeveloperMode()) {
+            return back()->with('error', 'Deposit Production dilakukan melalui kanal resmi Kiosbank. Hubungi helpdesk untuk rekening tujuan yang valid.');
+        }
         $request->validate([
             'amount'         => 'required|numeric|min:10000',
-            'payment_method' => 'required|string',
+            'payment_method' => 'required|in:developer_mode',
         ]);
 
         $amount = (int) $request->amount;
-        $uniqueCode = rand(100, 999);
-        $totalPayment = $amount + $uniqueCode;
-        $invoiceNumber = 'DEP-KB-' . date('Ymd') . '-' . rand(1000, 9999);
-
-        $bankAccounts = [
-            'bca'     => ['name' => 'PT DESIGN JAYA INDONESIA', 'number' => '8410-888-999'],
-            'mandiri' => ['name' => 'PT DESIGN JAYA INDONESIA', 'number' => '137-00-1122334-5'],
-            'bri'     => ['name' => 'PT DESIGN JAYA INDONESIA', 'number' => '0341-01-000888-30-1'],
-            'bni'     => ['name' => 'PT DESIGN JAYA INDONESIA', 'number' => '089-7766-554'],
-            'qris'    => ['name' => 'KIOSBANK DJI QRIS', 'number' => 'NMID: ID102003882910'],
-        ];
-
-        $bankInfo = $bankAccounts[$request->payment_method] ?? ['name' => 'PT DESIGN JAYA INDONESIA', 'number' => '8410-888-999'];
-
+        $invoiceNumber = 'DEV-KB-'.now()->format('YmdHis').'-'.bin2hex(random_bytes(3));
         KiosbankDeposit::create([
-            'invoice_number'      => $invoiceNumber,
-            'amount'              => $amount,
-            'payment_method'      => $request->payment_method,
-            'status'              => 'pending',
-            'bank_account_name'   => $bankInfo['name'],
-            'bank_account_number' => $bankInfo['number'],
-            'unique_code'         => $uniqueCode,
-            'total_payment'       => $totalPayment,
-            'notes'               => $request->notes,
+            'invoice_number' => $invoiceNumber,
+            'amount' => $amount,
+            'payment_method' => 'developer_mode',
+            'status' => 'pending',
+            'unique_code' => 0,
+            'total_payment' => $amount,
+            'notes' => 'Simulasi Development. Tidak ada transfer uang nyata.',
         ]);
 
-        return back()->with('success', "Tiket deposit #{$invoiceNumber} berhasil dibuat! Silakan transfer sebesar Rp " . number_format($totalPayment, 0, ',', '.') . " ke rekening {$bankInfo['name']} ({$bankInfo['number']}).");
+        return back()->with('success', 'Tiket simulasi dibuat. Gunakan tombol Simulasikan Berhasil untuk menambah saldo virtual.');
     }
 
     /**
@@ -1908,20 +1892,19 @@ class AdminController extends Controller
      */
     public function kiosbankSimulateDeposit(Request $request, $id)
     {
-        $deposit = KiosbankDeposit::findOrFail($id);
+        abort_unless((new KiosbankService())->isDeveloperMode(), 403, 'Simulasi hanya tersedia di Development.');
+        return DB::transaction(function () use ($id) {
+            $deposit = KiosbankDeposit::lockForUpdate()->findOrFail($id);
+            if ($deposit->status === 'success') {
+                return back()->with('info', 'Tiket deposit ini sudah berhasil sebelumnya.');
+            }
+            $deposit->update(['status' => 'success']);
+            Setting::firstOrCreate(['key' => 'kiosbank_sandbox_deposit'], ['value' => '11251850']);
+            $balance = Setting::where('key', 'kiosbank_sandbox_deposit')->lockForUpdate()->firstOrFail();
+            $balance->update(['value' => (string) ((int) $balance->value + (int) $deposit->amount)]);
 
-        if ($deposit->status === 'success') {
-            return back()->with('info', 'Tiket deposit ini sudah berhasil sebelumnya.');
-        }
-
-        $deposit->update(['status' => 'success']);
-
-        // Tambahkan saldo sandbox di settings
-        $currentSandbox = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?: 11251850);
-        $newSandbox = $currentSandbox + (int) $deposit->amount;
-        Setting::updateOrCreate(['key' => 'kiosbank_sandbox_deposit'], ['value' => (string) $newSandbox]);
-
-        return back()->with('success', "⚡ [Developer Mode] Simulasi top up sukses! Saldo Kiosbank bertambah Rp " . number_format($deposit->amount, 0, ',', '.') . ". Saldo Sandbox sekarang: Rp " . number_format($newSandbox, 0, ',', '.'));
+            return back()->with('success', 'Simulasi berhasil. Saldo virtual bertambah Rp '.number_format($deposit->amount, 0, ',', '.').'.');
+        });
     }
 
     /**

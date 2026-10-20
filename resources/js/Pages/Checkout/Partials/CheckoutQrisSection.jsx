@@ -8,6 +8,7 @@ export default function CheckoutQrisSection({
   formatTimer,
   totalNominal,
   orderId,
+  invoiceUrl,
   qrisUrl,
   handleCancel,
   fmt,
@@ -51,6 +52,15 @@ export default function CheckoutQrisSection({
           )}
         </button>
       </div>
+
+      {invoiceUrl && (
+        <div className="mb-4 text-xs text-gray-500">
+          <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-500 underline">
+            Buka dan simpan tautan invoice
+          </a>
+          <p className="mt-1">Tautan ini diperlukan untuk membuka pesanan tamu. Simpan secara pribadi.</p>
+        </div>
+      )}
 
       {/* WARNING 5 MENIT */}
       <div className="mb-5 bg-gradient-to-r from-red-500/15 via-amber-500/15 to-red-500/15 border-2 border-red-500/30 dark:border-red-500/40 rounded-2xl p-4 text-left shadow-md">

@@ -10,8 +10,35 @@ class Order extends Model
         'invoice_number', 'user_id', 'buyer_name', 'product_id', 'product_name', 'quantity', 'product_type', 'provider',
         'price', 'discount', 'total_amount', 'bill_amount', 'bill_admin_fee', 'bill_penalty', 'bill_total', 'bill_reference', 'payment_status', 'order_status', 'account_details',
         'email', 'whatsapp', 'voucher_code', 'discount_amount', 'sn_or_account',
-        'api_trx_id', 'notes'
+        'api_trx_id', 'notes', 'kiosbank_mode', 'provider_amount', 'provider_product_code', 'provider_customer_id'
     ];
+
+    protected $hidden = ['guest_access_token'];
+
+    protected $casts = [
+        'guest_access_token' => 'encrypted',
+        'fulfillment_started_at' => 'datetime',
+        'provider_amount' => 'integer',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Order $order) {
+            if (!$order->user_id) {
+                $order->guest_access_token = \Illuminate\Support\Str::random(64);
+            }
+        });
+    }
+
+    public function invoiceUrl(): string
+    {
+        $parameters = ['orderId' => $this->invoice_number];
+        if (!$this->user_id && $this->guest_access_token) {
+            $parameters['token'] = $this->guest_access_token;
+        }
+
+        return route('order.invoice', $parameters);
+    }
 
     protected $appends = ['provider'];
 

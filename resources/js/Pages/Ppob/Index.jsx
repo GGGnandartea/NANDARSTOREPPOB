@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 
-import { OPERATORS, GAMES, EWALLETS, STREAMING_SERVICES, PPOB_TABS, BILL_TABS, BILL_TAB_SERVICE, fmt } from './Partials/PpobConstants';
+import { OPERATORS, GAMES, EWALLETS, STREAMING_SERVICES, PPOB_TABS, BILL_TABS, fmt } from './Partials/PpobConstants';
 import { BILL_SERVICES, extractBillSummary } from './Partials/PpobBillUtils';
-import { PDAM_PRODUCTS } from './Partials/PdamProducts';
 import PpobHeader from './Partials/PpobHeader';
 import PpobPromoBanner from './Partials/PpobPromoBanner';
 import PpobTabNav from './Partials/PpobTabNav';
@@ -21,7 +20,8 @@ export default function PpobIndex({ store, initialPulsa }) {
   const user = auth?.user;
   const userBalance = user?.balance ?? 0;
 
-  const VALID_TABS = PPOB_TABS.map((t) => t.id);
+  // Pascabayar is a PLN sub-option; keep existing deep links working.
+  const VALID_TABS = [...PPOB_TABS.map((t) => t.id), 'pln_postpaid'];
 
   // Baca parameter ?tab= dari URL saat inisialisasi
   const [activeTab, setActiveTab] = useState(() => {
@@ -66,7 +66,6 @@ export default function PpobIndex({ store, initialPulsa }) {
   const [pulsaType, setPulsaType] = useState('pulsa'); // 'pulsa' | 'data'
 
   // PLN Token (prabayar) state
-  const [plnType, setPlnType] = useState('prepaid'); // 'prepaid' (token) — pascabayar punya tab sendiri
   const [plnCustomerId, setPlnCustomerId] = useState('');
 
   // Game state
@@ -163,6 +162,7 @@ export default function PpobIndex({ store, initialPulsa }) {
   // Fetch products when category / operator / game / ewallet / streaming changes.
   // Tab tagihan tidak memakai katalog produk: nominalnya berasal dari hasil inquiry.
   useEffect(() => {
+    const controller = new AbortController();
     if (BILL_TABS.includes(activeTab)) {
       setProducts([]);
       setSelectedProduct(null);
@@ -190,22 +190,23 @@ export default function PpobIndex({ store, initialPulsa }) {
       prefix = selectedStreaming.id;
     }
 
-    fetchProducts(category, prefix);
+    fetchProducts(category, prefix, controller.signal);
+    return () => controller.abort();
   }, [activeTab, selectedOperator, selectedGame, selectedEwallet, selectedStreaming]);
 
-  const fetchProducts = async (cat, pref) => {
+  const fetchProducts = async (cat, pref, signal) => {
     setIsLoadingProducts(true);
     setSelectedProduct(null);
     try {
-      const res = await fetch(`/ppob/products?category=${cat}&prefix=${pref}`);
+      setProducts([]);
+      const res = await fetch(`/ppob/products?category=${encodeURIComponent(cat)}&prefix=${encodeURIComponent(pref)}`, { signal, headers: { Accept: 'application/json' } });
       const data = await res.json();
-      if (data.status === 'success') {
-        setProducts(data.data || []);
-      }
+      if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Gagal memuat produk.');
+      if (!signal.aborted) setProducts(data.data || []);
     } catch (err) {
-      console.error('Error fetching PPOB products:', err);
+      if (err.name !== 'AbortError') Swal.fire({ icon: 'error', title: 'Produk belum tersedia', text: err.message });
     } finally {
-      setIsLoadingProducts(false);
+      if (!signal.aborted) setIsLoadingProducts(false);
     }
   };
 
@@ -462,7 +463,6 @@ export default function PpobIndex({ store, initialPulsa }) {
           setCheckoutModal(false);
           setQrisData(data);
           setQrisTimer(300);
-          startQrisPolling(data.order_id);
         }
       } else {
         Swal.fire({
@@ -504,22 +504,40 @@ export default function PpobIndex({ store, initialPulsa }) {
     return () => clearInterval(interval);
   }, [qrisData, qrisTimer]);
 
-  const startQrisPolling = (orderId) => {
+  useEffect(() => {
+    if (!qrisData?.order_id) return;
+    let disposed = false;
+    let inFlight = false;
+    const controller = new AbortController();
     const poller = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const res = await fetch(`/ppob/status/${orderId}`);
+        const res = await fetch(`/ppob/status/${encodeURIComponent(qrisData.order_id)}`, { signal: controller.signal });
         const data = await res.json();
+        if (disposed || !res.ok) return;
         if (data.status === 'completed' || data.payment_status === 'paid') {
           clearInterval(poller);
           setQrisData(null);
           setCheckoutModal(false);
           setSuccessOrder(data);
+        } else if (['expired', 'failed', 'canceled'].includes(data.payment_status)) {
+          clearInterval(poller);
+          setQrisData(null);
+          Swal.fire({ icon: 'warning', title: 'Pembayaran berakhir', text: 'Silakan buat pesanan baru.' });
         }
       } catch (e) {
-        // quiet poll
+        // The next interval retries temporary connection errors.
+      } finally {
+        inFlight = false;
       }
     }, 3500);
-  };
+    return () => {
+      disposed = true;
+      controller.abort();
+      clearInterval(poller);
+    };
+  }, [qrisData]);
 
   const copyToClipboard = (text) => {
     if (!text) return;
@@ -560,8 +578,6 @@ export default function PpobIndex({ store, initialPulsa }) {
               setPhoneNumber={setPhoneNumber}
               selectedOperator={selectedOperator}
               setSelectedOperator={setSelectedOperator}
-              plnType={plnType}
-              setPlnType={setPlnType}
               plnCustomerId={plnCustomerId}
               setPlnCustomerId={setPlnCustomerId}
               setSelectedProduct={setSelectedProduct}

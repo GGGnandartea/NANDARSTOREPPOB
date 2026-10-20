@@ -21,6 +21,15 @@ export default function PpobQrisModal({
           <p className="text-xs text-gray-400">Selesaikan sebelum waktu berakhir</p>
         </div>
 
+        {qrisData.invoice_url && (
+          <div className="text-xs text-gray-500">
+            <a href={qrisData.invoice_url} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-600 underline">
+              Buka dan simpan tautan invoice
+            </a>
+            <p className="mt-1">Simpan tautan ini secara pribadi untuk mengakses pesanan tamu.</p>
+          </div>
+        )}
+
         {qrisData.url_qris && (
           <div className="p-3 bg-white rounded-2xl border inline-block shadow-inner">
             <img src={qrisData.url_qris} alt="QRIS" className="w-52 h-52 mx-auto object-contain" />

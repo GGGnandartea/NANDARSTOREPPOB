@@ -148,6 +148,11 @@
                     <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'inline' : 'hidden'" class="whitespace-nowrap font-bold">Markup API</span>
                 </a>
 
+                <a href="{{ route('admin.ppob.settings') }}" class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') ? 'active' : '' }}">
+                    <span class="w-5 h-5 shrink-0 text-cyan-500 font-black text-center">K</span>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'inline' : 'hidden'" class="whitespace-nowrap font-bold">Konfigurasi Kiosbank</span>
+                </a>
+
                 <a href="{{ route('admin.ppob.products') }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
                    class="sidebar-link {{ request()->routeIs('admin.ppob.products*') ? 'active' : '' }}">

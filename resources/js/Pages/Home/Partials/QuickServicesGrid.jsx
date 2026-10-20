@@ -3,8 +3,6 @@ import { Link } from '@inertiajs/react';
 
 export default function QuickServicesGrid({
     filters,
-    handleCategoryTipe,
-    scrollToSection,
     setShowTrackModal,
     effectiveAdminWa,
     store,
@@ -28,8 +26,8 @@ export default function QuickServicesGrid({
                 </span>
             </div>
 
-            {/* Grid: 5 kolom di HP (2 baris pas untuk 10 layanan), 10 kolom di Desktop */}
-            <div className="grid grid-cols-5 md:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-3">
+            {/* Tujuh layanan: empat kolom di HP, satu baris di desktop. */}
+            <div className="grid grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
                 {/* 1. Pulsa & Data */}
                 <Link
                     href="/ppob?tab=pulsa"
@@ -49,9 +47,9 @@ export default function QuickServicesGrid({
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[7px] font-black uppercase">Token</span>
+                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[7px] font-black uppercase">PLN</span>
                     </div>
-                    <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-amber-600 dark:group-hover:text-amber-400">Token PLN</span>
+                    <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-amber-600 dark:group-hover:text-amber-400">PLN</span>
                 </Link>
 
                 {/* 3. Top Up E-Wallet */}
@@ -89,45 +87,7 @@ export default function QuickServicesGrid({
                     <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400">Air PDAM</span>
                 </Link>
 
-                {/* 6. Akun Streaming */}
-                <button
-                    type="button"
-                    onClick={() => handleCategoryTipe('Streaming')}
-                    className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-rose-50/60 dark:hover:bg-white/5 transition-all text-center"
-                >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-800/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-rose-500 text-white text-[7px] font-black uppercase">Film</span>
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-rose-600 dark:group-hover:text-rose-400">Streaming</span>
-                </button>
-
-                {/* 7. Aplikasi & AI */}
-                <button
-                    type="button"
-                    onClick={() => handleCategoryTipe('')}
-                    className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-indigo-50/60 dark:hover:bg-white/5 transition-all text-center"
-                >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Aplikasi &amp; AI</span>
-                </button>
-
-                {/* 8. Paling Laris */}
-                <button
-                    type="button"
-                    onClick={() => scrollToSection('paling-laris')}
-                    className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-orange-50/60 dark:hover:bg-white/5 transition-all text-center"
-                >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-200/80 dark:border-orange-800/40 text-orange-600 dark:text-orange-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M12 23c-4.97 0-9-4.03-9-9 0-3.8 2.38-7.05 5.74-8.35.5-.19 1.04.14 1.13.66.1.58-.2 1.14-.72 1.39C6.88 8.84 5 11.23 5 14c0 3.86 3.14 7 7 7s7-3.14 7-7c0-2.43-1.42-4.59-3.52-5.59-.5-.24-.76-.79-.64-1.33.12-.54.67-.88 1.21-.74C19.78 7.63 22 10.6 22 14c0 4.97-4.03 9-9 9z"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-orange-500 text-white text-[7px] font-black uppercase">HOT</span>
-                    </div>
-                    <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-orange-600 dark:group-hover:text-orange-400">Paling Laris</span>
-                </button>
-
-                {/* 9. Lacak Pesanan */}
+                {/* 6. Lacak Pesanan */}
                 <button
                     type="button"
                     onClick={() => setShowTrackModal(true)}
@@ -139,7 +99,7 @@ export default function QuickServicesGrid({
                     <span className="text-[10px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-orange-500">Lacak Order</span>
                 </button>
 
-                {/* 10. Hubungi CS */}
+                {/* 7. Hubungi CS */}
                 <a
                     href={`https://wa.me/${effectiveAdminWa}?text=Halo%20Admin%20${encodeURIComponent(store?.name || 'NandarStore')},%20saya%20butuh%20bantuan`}
                     target="_blank"

@@ -98,6 +98,9 @@ class PpobController extends Controller
      */
     public function inquiry(Request $request)
     {
+        if (!$this->kiosbank->isEnabled()) {
+            return response()->json(['status' => 'error', 'message' => 'Layanan PPOB sedang dinonaktifkan.'], 503);
+        }
         $request->validate([
             'product_id'  => 'required|string',
             'customer_id' => 'required|string',
@@ -128,6 +131,7 @@ class PpobController extends Controller
                     'service_fee'  => (int) ($result['service_fee'] ?? 0),
                     'grand_total'  => (int) ($result['grand_total'] ?? $result['total']),
                     'customer_name'=> $result['customer_name'] ?? '',
+                    'kiosbank_mode' => $this->kiosbank->getMode(),
                     'expires_at'   => now()->addMinutes(10)->timestamp,
                 ], now()->addMinutes(10));
             }
@@ -147,6 +151,9 @@ class PpobController extends Controller
      */
     public function checkout(Request $request)
     {
+        if (!$this->kiosbank->isEnabled() || !$this->kiosbank->isConfigured()) {
+            return response()->json(['status' => 'error', 'message' => 'Layanan PPOB belum tersedia. Hubungi admin.'], 503);
+        }
         $request->validate([
             'product_code'   => 'required|string',
             'product_name'   => 'required|string',
@@ -182,6 +189,7 @@ class PpobController extends Controller
                 || $cachedInquiry['product_id'] !== $productCode
                 || $cachedInquiry['customer_id'] !== $customerId
                 || ($cachedInquiry['expires_at'] ?? 0) < now()->timestamp
+                || ($cachedInquiry['kiosbank_mode'] ?? null) !== $this->kiosbank->getMode()
             ) {
                 return response()->json([
                     'status'  => 'error',
@@ -202,15 +210,17 @@ class PpobController extends Controller
         // Validasi integritas harga dari database PpobProduct jika produk terdaftar.
         // Produk tagihan tidak ada di katalog karena nominalnya dari inquiry biller.
         $officialProduct = $isBillPayment ? null : \App\Models\PpobProduct::where('code', $productCode)->first();
-        if ($officialProduct && $officialProduct->price > 0) {
+        if (!$isBillPayment && (!$officialProduct || $officialProduct->status !== 'active')) {
+            return response()->json(['status' => 'error', 'message' => 'Produk tidak tersedia. Pilih ulang produk PPOB.'], 422);
+        }
+        if ($officialProduct) {
             $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($officialProduct->reseller_price);
-            $baseExpectedPrice = (int) ($isReseller ? $officialProduct->reseller_price : $officialProduct->price);
-            if ($nominal < $baseExpectedPrice) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Validasi keamanan gagal: Nominal transaksi tidak valid atau tidak sesuai katalog resmi.'
-                ], 400);
-            }
+            $nominal = (int) ($isReseller ? $officialProduct->reseller_price : $officialProduct->price);
+            $productName = $officialProduct->name;
+        }
+        $providerAmount = $isBillPayment ? $billTotal : (int) $officialProduct->base_price;
+        if ($nominal <= 0 || $providerAmount <= 0) {
+            return response()->json(['status' => 'error', 'message' => 'Harga produk belum tersedia. Hubungi admin.'], 422);
         }
 
         // Diskon voucher jika ada
@@ -222,7 +232,7 @@ class PpobController extends Controller
                 $discount = ($voucher->type === 'nominal') ? $voucher->value : ($nominal * $voucher->value) / 100;
                 if ($discount >= $nominal) $discount = $nominal - 1;
                 $nominal = $nominal - $discount;
-                $voucher->increment('used_count');
+                $voucher->increment('used');
             }
         }
 
@@ -264,7 +274,11 @@ class PpobController extends Controller
                 'product_id'     => null,
                 'product_name'   => $productName,
                 'product_type'   => 'ppob',
+                'kiosbank_mode'  => $this->kiosbank->getMode(),
                 'provider'       => 'Kiosbank',
+                'provider_amount' => $providerAmount,
+                'provider_product_code' => $productCode,
+                'provider_customer_id' => $customerId,
                 'price'          => $nominal + $discount,
                 'discount'       => (int) round($discount),
                 'total_amount'   => $nominal,
@@ -297,10 +311,11 @@ class PpobController extends Controller
             return response()->json([
                 'status'         => 'success',
                 'invoice_number' => $order->invoice_number,
+                'invoice_url' => $order->invoiceUrl(),
                 'order_status'   => $order->order_status,
                 'sn_or_account'  => $order->sn_or_account,
-                'message'        => 'Transaksi berhasil! ' . ($order->sn_or_account ? 'SN: ' . $order->sn_or_account : 'Pesanan sedang diproses.'),
-                'redirect_url'   => route('order.invoice', $order->invoice_number),
+                'message'        => $order->order_status === 'completed' ? 'Layanan berhasil diproses.' : 'Pembayaran diterima. Status layanan: '.$order->order_status.'.',
+                'redirect_url'   => $order->invoiceUrl(),
             ]);
         }
 
@@ -340,7 +355,11 @@ class PpobController extends Controller
             'product_id'     => null,
             'product_name'   => $productName,
             'product_type'   => 'ppob',
+            'kiosbank_mode'  => $this->kiosbank->getMode(),
             'provider'       => 'Kiosbank',
+            'provider_amount' => $providerAmount,
+            'provider_product_code' => $productCode,
+            'provider_customer_id' => $customerId,
             'price'          => $nominal + $discount,
             'discount'       => (int) round($discount),
             'total_amount'   => $totalNominal,
@@ -358,9 +377,12 @@ class PpobController extends Controller
             'notes'          => "No Tujuan: " . $customerId . " | Kode: " . $productCode,
         ]);
 
+        \App\Services\OrderAccessService::grantGuestSession($request, $order);
+
         return response()->json([
             'status'         => 'success',
             'invoice_number' => $orderIdGateway,
+            'invoice_url' => $order->invoiceUrl(),
             'total_nominal'  => $totalNominal,
             'url_qris'       => $urlQris,
             'order_id'       => $orderIdGateway,
@@ -373,7 +395,7 @@ class PpobController extends Controller
      */
     public function checkOrderStatus($orderId)
     {
-        $order = Order::where('invoice_number', $orderId)->first();
+        $order = request()->attributes->get('authorized_order');
 
         if (!$order) {
             return response()->json(['status' => 'NOT_FOUND'], 404);
@@ -381,16 +403,18 @@ class PpobController extends Controller
 
         // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
         if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
-            $order->update([
-                'payment_status' => 'expired',
-                'order_status'   => 'expired',
-            ]);
+            Order::whereKey($order->id)->where('payment_status', 'pending')
+                ->whereRaw("LOWER(order_status) IN ('pending', 'processing')")
+                ->update(['payment_status' => 'expired', 'order_status' => 'expired']);
+            $order->refresh();
         }
 
         return response()->json([
             'status'         => $order->order_status,
+            'order_status'   => $order->order_status,
             'payment_status' => $order->payment_status,
             'invoice_number' => $order->invoice_number,
+            'invoice_url' => $order->invoiceUrl(),
             'sn_or_account'  => $order->sn_or_account,
             'notes'          => $order->notes,
         ]);

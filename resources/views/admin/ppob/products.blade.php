@@ -5,6 +5,12 @@
 @section('content')
 <div class="max-w-7xl mx-auto space-y-6" x-data="ppobAdmin()">
 
+    <nav class="flex flex-wrap gap-4 text-sm font-bold text-cyan-600" aria-label="Menu PPOB">
+        <a href="{{ route('admin.ppob.products') }}">Produk &amp; Margin</a>
+        <a href="{{ route('admin.ppob.deposit') }}">Saldo Deposit</a>
+        <a href="{{ route('admin.ppob.settings') }}">Konfigurasi &amp; Mode</a>
+    </nav>
+
     <!-- Alert Notifikasi -->
     @if(session('success'))
         <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-bold text-sm flex items-center gap-3 shadow-sm">
@@ -30,7 +36,7 @@
                 <span>Mode pengembangan aktif. Transaksi, inquiry, dan saldo berjalan secara sandbox (aman untuk testing).</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="{{ route('admin.settings') }}" class="font-bold underline hover:text-amber-600 dark:hover:text-amber-200">Ubah di Pengaturan API →</a>
+                <a href="{{ route('admin.ppob.settings') }}" class="font-bold underline hover:text-amber-600 dark:hover:text-amber-200">Ubah Konfigurasi Kiosbank →</a>
             </div>
         </div>
     @endif

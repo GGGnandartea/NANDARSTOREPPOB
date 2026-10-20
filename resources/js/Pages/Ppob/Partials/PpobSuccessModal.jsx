@@ -8,6 +8,15 @@ export default function PpobSuccessModal({
   isCopied,
 }) {
   if (!successOrder) return null;
+  const status = successOrder.order_status || successOrder.status;
+  const completed = status === 'completed';
+  const failed = ['failed', 'refunded'].includes(status);
+  const title = completed ? 'Layanan Berhasil!' : failed ? 'Layanan Belum Berhasil' : 'Pembayaran Diterima';
+  const description = completed
+    ? 'Layanan PPOB Anda telah selesai diproses.'
+    : failed
+      ? 'Periksa invoice atau hubungi admin untuk tindak lanjut pesanan.'
+      : 'Pesanan masih diproses provider. Pantau perkembangannya melalui invoice.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -17,8 +26,8 @@ export default function PpobSuccessModal({
         </div>
 
         <div>
-          <h3 className="text-xl font-black text-gray-900 dark:text-white">Pembayaran Berhasil!</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Layanan PPOB Anda telah berhasil diproses secara otomatis.</p>
+          <h3 className="text-xl font-black text-gray-900 dark:text-white">{title}</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
         </div>
 
         {successOrder.invoice_number && (
@@ -61,7 +70,7 @@ export default function PpobSuccessModal({
 
           <div className="flex gap-2">
             <a
-              href={successOrder.redirect_url || `/order/invoice/${successOrder.invoice_number}`}
+              href={successOrder.invoice_url || successOrder.redirect_url || `/order/invoice/${successOrder.invoice_number}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 py-2.5 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-gray-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"

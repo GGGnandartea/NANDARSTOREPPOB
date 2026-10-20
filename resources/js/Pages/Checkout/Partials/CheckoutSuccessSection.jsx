@@ -6,6 +6,7 @@ export default function CheckoutSuccessSection({
   completedOrder,
   balanceSuccess,
   orderId,
+  invoiceUrl,
   handleCopyAccount,
   copied,
   product,
@@ -139,7 +140,7 @@ export default function CheckoutSuccessSection({
       {/* ACTION BUTTONS */}
       <div className="space-y-2.5 pt-1">
         <a
-          href={`/order/invoice/${currentOrderId}`}
+          href={completedOrder?.invoice_url || balanceSuccess?.invoice_url || invoiceUrl || `/order/invoice/${currentOrderId}`}
           target="_blank"
           rel="noreferrer"
           className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black py-3.5 px-4 rounded-2xl shadow-xl shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer text-sm"

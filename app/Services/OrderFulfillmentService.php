@@ -22,6 +22,57 @@ class OrderFulfillmentService
      */
     public static function fulfillOrder(Order $order): array
     {
+        $order->refresh();
+        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement'], true)) {
+            return ['status' => 'error', 'is_ready' => false, 'message' => 'Pembayaran belum dikonfirmasi.'];
+        }
+
+        if ($order->fulfillment_started_at || $order->api_trx_id
+            || in_array(strtolower($order->order_status), ['completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed'], true)) {
+            return self::existingResult($order);
+        }
+
+        if ($order->product_type === 'ppob' && !$order->fulfillment_started_at
+            && !$order->api_trx_id && (int) $order->provider_amount <= 0) {
+            return ['status' => 'error', 'is_ready' => false, 'message' => 'Nominal provider belum tercatat. Admin perlu memverifikasi nominal provider pesanan lama sebelum memprosesnya.'];
+        }
+
+        // Persist the claim before contacting a provider. A timeout or crash must
+        // never clear it: the provider might already have accepted the purchase.
+        $claimed = Order::whereKey($order->id)->whereNull('fulfillment_started_at')
+            ->where(function ($query) {
+                $query->whereNull('api_trx_id')->orWhere('api_trx_id', '');
+            })
+            ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement')")
+            ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'expired', 'failed')")
+            ->update(['fulfillment_started_at' => now()]);
+
+        $order->refresh();
+        if (!$claimed) {
+            return self::existingResult($order);
+        }
+
+        try {
+            return self::fulfillClaimedOrder($order);
+        } catch (\Throwable $e) {
+            Log::error('[FULFILLMENT-RECONCILE] Order '.$order->invoice_number.': '.$e->getMessage());
+            return ['status' => 'processing', 'is_ready' => false, 'message' => 'Proses telah dimulai. Periksa status provider sebelum tindakan berikutnya; pesanan tidak dikirim ulang otomatis.'];
+        }
+    }
+
+    private static function existingResult(Order $order): array
+    {
+        return [
+            'status' => $order->order_status,
+            'is_ready' => in_array(strtolower($order->order_status), ['completed', 'success', 'lunas'], true),
+            'is_refunded' => $order->order_status === 'refunded',
+            'sn_or_account' => $order->sn_or_account,
+            'message' => 'Pesanan sudah pernah diproses. Gunakan pemeriksaan status provider untuk melanjutkan pemantauan.',
+        ];
+    }
+
+    private static function fulfillClaimedOrder(Order $order): array
+    {
         // ─── 0. FULFILLMENT PRODUK PPOB KIOSBANK ─────────────────────────────────
         if ($order->product_type === 'ppob') {
             $targetNumber = $order->whatsapp ?: '08123456789';
@@ -32,9 +83,11 @@ class OrderFulfillmentService
             if (!empty($order->notes) && preg_match('/Kode:\s*([^\s|]+)/i', $order->notes, $m2)) {
                 $prodCode = trim($m2[1]);
             }
-            $nominal = (int) ($order->total_amount ?: $order->price);
+            $targetNumber = $order->provider_customer_id ?: $targetNumber;
+            $prodCode = $order->provider_product_code ?: $prodCode;
+            $nominal = (int) $order->provider_amount;
 
-            $kiosbank = new KiosbankService();
+            $kiosbank = new KiosbankService($order->kiosbank_mode);
             // Kiosbank mengharuskan referenceID berupa 12 digit angka unik.
             // Untuk produk tagihan, pakai referenceID inquiry agar pembayaran
             // merujuk pada data inquiry yang sama (berlaku maksimal 10 menit).
@@ -116,7 +169,13 @@ class OrderFulfillmentService
 
                 // Notifikasi WhatsApp jika akun pembeli terverifikasi WA
                 try {
-                    WebhookController::sendOrderNotification($order);
+                    DB::afterCommit(function () use ($order) {
+                        try {
+                            WebhookController::sendOrderNotification($order);
+                        } catch (\Throwable $e) {
+                            Log::warning('[ORDER-NOTIFICATION] '.$order->invoice_number.': '.$e->getMessage());
+                        }
+                    });
                 } catch (\Exception $e) {
                     Log::error('[PPOB-WA-NOTIF-ERROR] ' . $e->getMessage());
                 }
@@ -201,8 +260,14 @@ class OrderFulfillmentService
                     $order->payment_status  = 'paid';
                     $order->save();
 
-                    // Kirim notifikasi WA
-                    WebhookController::sendOrderNotification($order);
+                    // Deliver credentials only after allocation has committed.
+                    DB::afterCommit(function () use ($order) {
+                        try {
+                            WebhookController::sendOrderNotification($order);
+                        } catch (\Throwable $e) {
+                            Log::warning('[ORDER-NOTIFICATION] '.$order->invoice_number.': '.$e->getMessage());
+                        }
+                    });
 
                     return [
                         'status'        => 'completed',
@@ -300,27 +365,6 @@ class OrderFulfillmentService
                             $isReady = true;
                         } elseif (!empty($snList)) {
                             $snAkun = implode("\n\n---\n\n", $snList);
-                        }
-                    } else {
-                        // Jika sudah ada api_trx_id, ambil dari riwayat
-                        $riwayatRes = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
-                            'koneksi'  => 'get_riwayat',
-                            'id_user'  => $idUser,
-                            'key_user' => $keyUser,
-                        ])->json();
-
-                        if (is_array($riwayatRes)) {
-                            foreach ($riwayatRes as $item) {
-                                $matchesStok = isset($item['id_stok']) && (string)$item['id_stok'] === (string)$apiTrxId;
-                                $matchesProduk = isset($item['id_produk']) && (string)$item['id_produk'] === (string)$idProdukAsli;
-                                if ($matchesStok || $matchesProduk) {
-                                    if (!empty($item['sn']) && !self::isWaitingText($item['sn'])) {
-                                        $snAkun = $item['sn'];
-                                        $isReady = true;
-                                        break;
-                                    }
-                                }
-                            }
                         }
                     }
                 } catch (\Exception $e) {
@@ -433,6 +477,11 @@ class OrderFulfillmentService
      */
     public static function checkAndSyncApiOrder(Order $order): array
     {
+        $order->refresh();
+        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement'], true)
+            || in_array(strtolower($order->order_status), ['refunded', 'canceled', 'cancelled', 'failed'], true)) {
+            return self::existingResult($order);
+        }
         // Jika sudah ada akun yang sah dan status sudah selesai, langsung kembalikan
         if ($order->order_status === 'completed' && !empty($order->sn_or_account) && !self::isWaitingText($order->sn_or_account)) {
             return [
@@ -457,21 +506,13 @@ class OrderFulfillmentService
         $apiTrxId = $order->api_trx_id;
         $snAkun = null;
 
-        // JIKA BELUM MEMILIKI api_trx_id KARENA SEBELUMNYA GAGAL TEMBAK (CONTOH: API KEY SALAH SEBELUM DIPERBAIKI), COBA FULFILL LAGI
-        if (empty($apiTrxId)) {
-            $retry = self::fulfillOrder($order);
-            $order->refresh();
-            if ($order->order_status === 'completed' || !empty($order->api_trx_id)) {
-                return $retry;
-            }
-            $apiTrxId = $order->api_trx_id;
-        }
+        // A missing provider ID after a timeout is ambiguous. Status checks must
+        // never place a new purchase as a side effect of reading an invoice.
 
         // CEK STATUS KE PREFLIX MENGGUNAKAN get_riwayat
         if (str_starts_with($apiProductId, 'PREFLIX-')) {
             $idUser  = Setting::where('key', 'preflix_id_user')->value('value');
             $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-            $idProdukAsli = str_replace('PREFLIX-', '', $apiProductId);
 
             try {
                 $statusRes = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
@@ -480,24 +521,7 @@ class OrderFulfillmentService
                     'key_user' => $keyUser,
                 ])->json();
 
-                if (is_array($statusRes)) {
-                    foreach ($statusRes as $item) {
-                        $match = false;
-                        if (!empty($apiTrxId) && isset($item['id_stok']) && (string)$item['id_stok'] === (string)$apiTrxId) {
-                            $match = true;
-                        } elseif (isset($item['id_produk']) && (string)$item['id_produk'] === (string)$idProdukAsli) {
-                            $match = true;
-                        }
-
-                        if ($match && !empty($item['sn']) && !self::isWaitingText($item['sn'])) {
-                            $snAkun = $item['sn'];
-                            if (empty($order->api_trx_id) && isset($item['id_stok'])) {
-                                $order->api_trx_id = (string) $item['id_stok'];
-                            }
-                            break;
-                        }
-                    }
-                }
+                $snAkun = self::preflixCredentialsForOrder($order, $statusRes);
             } catch (\Exception $e) {
                 Log::warning("[PREFLIX-SYNC-ERROR] " . $e->getMessage());
             }
@@ -519,11 +543,17 @@ class OrderFulfillmentService
 
         // JIKA AKUN SUDAH DISEDIAKAN OLEH PROVIDER!
         if (!empty($snAkun) && !self::isWaitingText($snAkun)) {
-            $order->sn_or_account   = $snAkun;
-            $order->account_details = $snAkun;
-            $order->order_status    = 'completed';
-            $order->payment_status  = 'paid';
-            $order->save();
+            $updated = Order::whereKey($order->id)
+                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement')")
+                ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed')")
+                ->update([
+                    'sn_or_account' => $snAkun, 'account_details' => $snAkun,
+                    'order_status' => 'completed', 'payment_status' => 'paid',
+                ]);
+            $order->refresh();
+            if (!$updated) {
+                return self::existingResult($order);
+            }
 
             // Kirim pesan WhatsApp otomatis
             WebhookController::sendOrderNotification($order);
@@ -542,6 +572,35 @@ class OrderFulfillmentService
             'sn_or_account' => $order->sn_or_account,
             'is_updated'    => false,
         ];
+    }
+
+    private static function preflixCredentialsForOrder(Order $order, mixed $history): ?string
+    {
+        if (!is_array($history)) {
+            return null;
+        }
+        $quantity = max(1, (int) $order->quantity);
+        $ids = array_values(array_filter(explode(',', (string) $order->api_trx_id)));
+        $credentials = [];
+        $usedRows = [];
+        for ($index = 0; $index < $quantity; $index++) {
+            $reference = $order->invoice_number.($quantity > 1 ? '-ITEM'.($index + 1) : '');
+            foreach ($history as $row => $item) {
+                if (!is_array($item) || isset($usedRows[$row])) {
+                    continue;
+                }
+                $matchesId = count($ids) === $quantity && isset($item['id_stok'])
+                    && (string) $item['id_stok'] === $ids[$index];
+                $matchesReference = isset($item['catatan']) && $item['catatan'] === $reference;
+                if (($matchesId || $matchesReference) && !empty($item['sn']) && !self::isWaitingText($item['sn'])) {
+                    $credentials[] = ($quantity > 1 ? '[Akun '.($index + 1)."]:\n" : '').$item['sn'];
+                    $usedRows[$row] = true;
+                    break;
+                }
+            }
+        }
+
+        return count($credentials) === $quantity ? implode("\n\n---\n\n", $credentials) : null;
     }
 
     /**
@@ -653,6 +712,19 @@ class OrderFulfillmentService
      * Mengembalikan dana 100% secara otomatis ke saldo akun pembeli terdaftar (Auto-Refund).
      */
     public static function handleOutOfStockAutoRefund(Order $order, Product $product): array
+    {
+        return DB::transaction(function () use ($order, $product) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            if (!in_array(strtolower($locked->payment_status), ['paid', 'success', 'settlement'], true)
+                || in_array(strtolower($locked->order_status), ['refunded', 'completed', 'success', 'lunas'], true)) {
+                return self::existingResult($locked);
+            }
+
+            return self::refundClaimedOrder($locked, $product);
+        });
+    }
+
+    private static function refundClaimedOrder(Order $order, Product $product): array
     {
         $refundAmount = (int) ($order->total_amount ?: ($order->price ?: 0));
         $buyer = $order->user_id ? User::find($order->user_id) : null;

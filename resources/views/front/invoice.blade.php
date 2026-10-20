@@ -573,12 +573,12 @@
 
         @if($isWaiting)
         (function() {
-            var invoiceNum = "{{ $order->invoice_number }}";
+            var statusUrl = @json(route('checkout.status', array_filter(['orderId' => $order->invoice_number, 'token' => $order->user_id ? null : $order->guest_access_token])));
             var pollCount = 0;
             var maxPoll = 50;
             var pollInterval = setInterval(function() {
                 pollCount++;
-                fetch('/checkout/status/' + invoiceNum)
+                fetch(statusUrl)
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
                         if (data && data.is_ready && data.sn_or_account) {

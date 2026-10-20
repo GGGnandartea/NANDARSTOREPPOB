@@ -42,6 +42,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderId, setOrderId] = useState(null);
   const [qrisUrl, setQrisUrl] = useState(null);
+  const [invoiceUrl, setInvoiceUrl] = useState(null);
   const [totalNominal, setTotalNominal] = useState(0);
   const [orderStatus, setOrderStatus] = useState('WAITING_PAYMENT');
   const [balanceSuccess, setBalanceSuccess] = useState(null); // { order_id, message }
@@ -371,6 +372,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         setOrderId(data.order_id);
         setTotalNominal(data.total_nominal);
         setQrisUrl(data.url_qris);
+        setInvoiceUrl(data.invoice_url);
       } else {
         Swal.fire('Mohon Maaf', data.message || 'Gagal memproses pembayaran.', 'error');
       }
@@ -545,6 +547,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
               formatTimer={formatTimer}
               totalNominal={totalNominal}
               orderId={orderId}
+              invoiceUrl={invoiceUrl}
               qrisUrl={qrisUrl}
               handleCancel={handleCancel}
               fmt={fmt}
@@ -558,6 +561,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
               completedOrder={completedOrder}
               balanceSuccess={balanceSuccess}
               orderId={orderId}
+              invoiceUrl={invoiceUrl}
               handleCopyAccount={handleCopyAccount}
               copied={copied}
               product={product}

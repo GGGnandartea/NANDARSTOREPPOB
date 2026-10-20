@@ -11,17 +11,17 @@ Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.det
 
 Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
 Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process')->middleware('throttle:payments');
-Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling');
-Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+');
-Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+');
-Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:resend_wa');
+Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
+Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
+Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
+Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:resend_wa')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 
 // --- RUTE LAYANAN PPOB KIOSBANK ---
 Route::get('/ppob', [PpobController::class, 'index'])->name('ppob.index');
 Route::get('/ppob/products', [PpobController::class, 'getProducts'])->name('ppob.products');
 Route::post('/ppob/inquiry', [PpobController::class, 'inquiry'])->name('ppob.inquiry')->middleware('throttle:ppob_inquiry');
 Route::post('/ppob/checkout', [PpobController::class, 'checkout'])->name('ppob.checkout')->middleware('throttle:payments');
-Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling');
+Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 // ----------------------------------
 
 
@@ -66,7 +66,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // Area Admin Panel
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
     Route::post('/orders/{id}/status', [AdminController::class, 'updateOrderStatus'])->name('orders.update_status');
@@ -100,6 +100,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // --------------------------
 
     // --- RUTE MANAJEMEN PPOB KIOSBANK & DEPOSIT ADMIN ---
+    Route::get('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'edit'])->name('ppob.settings');
+    Route::post('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'update'])->name('ppob.settings.update');
     Route::get('/ppob/products', [AdminController::class, 'ppobProducts'])->name('ppob.products');
     Route::post('/ppob/products/bulk-margin', [AdminController::class, 'bulkUpdatePpobMargin'])->name('ppob.products.bulk_margin');
     Route::post('/ppob/products/{id}/update', [AdminController::class, 'updatePpobProduct'])->name('ppob.products.update');

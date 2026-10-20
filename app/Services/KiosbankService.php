@@ -39,41 +39,41 @@ class KiosbankService
         '81' => 'AAE.AAAC', // Smartfren
     ];
 
-    public function __construct()
+    public function __construct(?string $mode = null)
     {
-        // Default mode: development (Sandbox)
-        $this->mode = Setting::where('key', 'kiosbank_mode')->value('value') ?: 'development';
+        $configuration = new KiosbankConfiguration();
+        $this->mode = $mode ?? $configuration->mode();
+        $profile = $configuration->profile($this->mode);
+        foreach (['host', 'port', 'protocol', 'username', 'password', 'mitra'] as $field) {
+            $this->{$field} = $profile[$field];
+        }
+        $this->accountId = $profile['account_id'];
+        $this->merchantId = $profile['merchant_id'];
+        $this->merchantName = $profile['merchant_name'];
+        $this->counterId = $profile['counter_id'];
+        $this->privateKey = $profile['private_key'] ?: null;
+        $this->publicKey = $profile['public_key'] ?: null;
+        $this->markupType = Setting::where('key', 'kiosbank_markup_type')->value('value') ?: 'fixed';
+        $this->markupValue = (int) (Setting::where('key', 'kiosbank_markup_value')->value('value') ?? 1000);
+        $this->enabled = Setting::where('key', 'kiosbank_enabled')->value('value') !== '0';
+    }
 
-        $isDev = ($this->mode === 'development');
-        $defaultHost = $isDev ? 'development.kiosbank.com' : 'transaksi.kiosbank.com';
-        $defaultPort = $isDev ? '4432' : '8899';
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
 
-        $this->host         = Setting::where('key', 'kiosbank_host')->value('value') ?: $defaultHost;
-        $this->port         = Setting::where('key', 'kiosbank_port')->value('value') ?: $defaultPort;
-        $this->protocol     = Setting::where('key', 'kiosbank_protocol')->value('value') ?: 'https';
+    protected function sessionCacheKey(): string
+    {
+        return 'kiosbank_session_id_'.hash('sha256', json_encode([
+            $this->mode, $this->getBaseUrl(), $this->username, $this->password,
+            $this->merchantId, $this->accountId, $this->counterId, $this->privateKey,
+        ]));
+    }
 
-        // Default kredensial sandbox resmi KIOSBANK (DJI) untuk testing
-        $defaultUser        = $isDev ? 'dji' : '';
-        $defaultPass        = $isDev ? 'abcde' : '';
-        $defaultMitra       = 'DJI';
-        $defaultAccount     = $isDev ? 'ujicoba' : '';
-        $defaultMerchantId  = $isDev ? 'DJI000343' : '';
-        $defaultMerchantName= $isDev ? 'PT.Testing' : 'NandarStore';
-
-        $this->username     = Setting::where('key', 'kiosbank_username')->value('value') ?: $defaultUser;
-        $this->password     = Setting::where('key', 'kiosbank_password')->value('value') ?: $defaultPass;
-        $this->mitra        = Setting::where('key', 'kiosbank_mitra')->value('value') ?: $defaultMitra;
-        $this->accountId    = Setting::where('key', 'kiosbank_account_id')->value('value') ?: $defaultAccount;
-        $this->merchantId   = Setting::where('key', 'kiosbank_merchant_id')->value('value') ?: $defaultMerchantId;
-        $this->merchantName = Setting::where('key', 'kiosbank_merchant_name')->value('value') ?: $defaultMerchantName;
-        $this->counterId    = Setting::where('key', 'kiosbank_counter_id')->value('value') ?: '1';
-        $this->markupType   = Setting::where('key', 'kiosbank_markup_type')->value('value') ?: 'fixed';
-        $this->markupValue  = (int) (Setting::where('key', 'kiosbank_markup_value')->value('value') ?: 1000);
-        $this->enabled      = (Setting::where('key', 'kiosbank_enabled')->value('value') ?? '1') === '1';
-
-        // Kunci Rahasia RSA Asymmetric (2048-bit)
-        $this->privateKey   = Setting::where('key', 'kiosbank_private_key')->value('value') ?: null;
-        $this->publicKey    = Setting::where('key', 'kiosbank_public_key')->value('value') ?: null;
+    protected function sessionExpiresAt(): \DateTimeInterface
+    {
+        return now('Asia/Jakarta')->endOfDay();
     }
 
     /**
@@ -97,7 +97,7 @@ class KiosbankService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->username) && !empty($this->password) && !empty($this->merchantId);
+        return !empty($this->username) && !empty($this->password) && !empty($this->merchantId) && !empty($this->accountId);
     }
 
     /**
@@ -132,101 +132,21 @@ class KiosbankService
             return ['status' => 'error', 'message' => 'Kredensial Kiosbank belum dikonfigurasi.'];
         }
 
-        $fullUrl = $this->getBaseUrl() . $path;
+        try {
+            $response = \Illuminate\Support\Facades\Http::withDigestAuth($this->username, $this->password)
+                ->acceptJson()->connectTimeout(8)->timeout(20)
+                ->send($method, $this->getBaseUrl().$path, ['json' => $params]);
 
-        // Langkah 1: Request inisial untuk memicu response HTTP 401 dan mengambil header WWW-Authenticate
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $fullUrl,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 8,
-            CURLOPT_HEADER         => true,
-            CURLOPT_CUSTOMREQUEST  => 'GET',
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_SSL_VERIFYPEER => 0,
-        ]);
-        $rawChallenge = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            if (!$response->successful() || !is_array($response->json())) {
+                return ['status' => 'error', 'http_code' => $response->status(), 'message' => 'Respons Kiosbank tidak valid atau otentikasi ditolak.'];
+            }
 
-        if (!$rawChallenge) {
-            Log::warning("[KIOSBANK] Gagal terhubung ke host: {$fullUrl}");
-            return ['status' => 'error', 'message' => 'Gagal terhubung ke server Kiosbank. Pastikan IP telah di-whitelist oleh DJI atau gunakan Developer Mode Sandbox.'];
+            return $response->json();
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning('[KIOSBANK-CONNECTION] Tidak dapat terhubung ke '.$this->getBaseUrl());
+
+            return ['status' => 'error', 'message' => 'Tidak dapat terhubung ke Kiosbank. Periksa koneksi dan whitelist IP server.'];
         }
-
-        // Langkah 2: Ekstrak header WWW-Authenticate
-        $authParams = $this->parseWwwAuthenticate($rawChallenge);
-        if (empty($authParams['nonce'])) {
-            Log::warning("[KIOSBANK] Tidak menerima header WWW-Authenticate yang valid dari {$fullUrl}. Raw: " . substr($rawChallenge, 0, 300));
-            return ['status' => 'error', 'message' => 'Respon otentikasi tidak valid dari server Kiosbank.'];
-        }
-
-        // Langkah 3: Hitung Digest response
-        $realm = $authParams['realm'] ?? $authParams['Digest realm'] ?? 'Design Jaya Indonesia';
-        $nonce = $authParams['nonce'];
-        $qop   = $authParams['qop'] ?? 'auth';
-        $opaque= $authParams['opaque'] ?? '';
-        $nc    = '1';
-        $cnonce= uniqid('ns_', true);
-
-        $a1 = md5($this->username . ':' . $realm . ':' . $this->password);
-        $a2 = md5($method . ':' . $path);
-        $response = md5($a1 . ':' . $nonce . ':' . $nc . ':' . $cnonce . ':' . $qop . ':' . $a2);
-
-        $digestHeader = 'Authorization: Digest ' . implode(',', [
-            'username="' . $this->username . '"',
-            'realm="' . $realm . '"',
-            'nonce="' . $nonce . '"',
-            'uri="' . $path . '"',
-            'qop="' . $qop . '"',
-            'nc="' . $nc . '"',
-            'cnonce="' . $cnonce . '"',
-            'response="' . $response . '"',
-            'opaque="' . $opaque . '"'
-        ]);
-
-        // Langkah 4: Kirim request sesungguhnya dengan Digest Header dan Body JSON
-        $chPost = curl_init();
-        $payload = json_encode($params);
-
-        curl_setopt_array($chPost, [
-            CURLOPT_URL            => $fullUrl,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 20,
-            CURLOPT_HEADER         => true,
-            CURLOPT_CUSTOMREQUEST  => $method,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                $digestHeader,
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_SSL_VERIFYPEER => 0,
-        ]);
-
-        $rawResponse = curl_exec($chPost);
-        $headerSize = curl_getinfo($chPost, CURLINFO_HEADER_SIZE);
-        $resCode = curl_getinfo($chPost, CURLINFO_HTTP_CODE);
-        curl_close($chPost);
-
-        if (!$rawResponse) {
-            return ['status' => 'error', 'message' => 'Server Kiosbank tidak merespon pengiriman data.'];
-        }
-
-        $body = substr($rawResponse, $headerSize);
-        $data = json_decode($body, true);
-
-        if (json_last_error() === JSON_ERROR_NONE && is_array($data)) {
-            return $data;
-        }
-
-        return [
-            'status'   => 'error',
-            'http_code'=> $resCode,
-            'message'  => 'Format respon bukan JSON yang valid',
-            'raw'      => substr($body, 0, 400)
-        ];
     }
 
     /**
@@ -333,7 +253,7 @@ class KiosbankService
      */
     public function signOnRsa(bool $forceRefresh = false): array
     {
-        $cacheKey = 'kiosbank_session_id_' . md5($this->username . $this->merchantId . $this->mode);
+        $cacheKey = $this->sessionCacheKey();
 
         if (!$forceRefresh) {
             $cached = Cache::get($cacheKey);
@@ -370,7 +290,6 @@ class KiosbankService
             return [
                 'ok'             => false,
                 'message'        => 'Gagal menghasilkan RSA Signature. Periksa kembali format RSA Private Key Anda.',
-                'string_to_sign' => $stringToSign,
                 'x_date'         => $xDate,
             ];
         }
@@ -390,8 +309,8 @@ class KiosbankService
                 'X-Date: ' . $xDate,
                 'Authorization: ' . $signature,
             ],
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_SSL_VERIFYPEER => 0,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_SSL_VERIFYPEER => true,
         ]);
 
         $rawResponse = curl_exec($ch);
@@ -413,9 +332,9 @@ class KiosbankService
 
         if ($sessionId) {
             // Cache sampai pukul 23:55 WIB hari ini
-            $secondsUntilMidnight = max(60, now()->endOfDay()->subMinutes(5)->diffInSeconds(now()));
+            $secondsUntilMidnight = $this->sessionExpiresAt();
             Cache::put($cacheKey, $sessionId, $secondsUntilMidnight);
-            Log::info("[KIOSBANK-SIGNON-RSA-SUCCESS] SessionID didapat: {$sessionId}");
+            Log::info("[KIOSBANK-SIGNON-RSA-SUCCESS] Sesi aktif untuk mode ".$this->mode);
 
             return [
                 'ok'         => true,
@@ -435,7 +354,6 @@ class KiosbankService
             'message'        => $data['description'] ?? ($data['message'] ?? 'Sign On gagal: ' . substr($rawResponse, 0, 200)),
             'raw'            => $data ?: $rawResponse,
             'x_date'         => $xDate,
-            'string_to_sign' => $stringToSign,
         ];
     }
 
@@ -482,7 +400,7 @@ class KiosbankService
      */
     public function signOn(bool $forceRefresh = false): ?string
     {
-        $cacheKey = 'kiosbank_session_id_' . md5($this->username . $this->merchantId . $this->mode);
+        $cacheKey = $this->sessionCacheKey();
 
         if (!$forceRefresh) {
             $cached = Cache::get($cacheKey);
@@ -512,9 +430,9 @@ class KiosbankService
 
         if (!empty($res['SessionID']) || !empty($res['sessionID'])) {
             $sessionId = $res['SessionID'] ?? $res['sessionID'];
-            $secondsUntilMidnight = max(60, now()->endOfDay()->subMinutes(5)->diffInSeconds(now()));
+            $secondsUntilMidnight = $this->sessionExpiresAt();
             Cache::put($cacheKey, $sessionId, $secondsUntilMidnight);
-            Log::info("[KIOSBANK-SIGNON-SUCCESS] SessionID didapat: {$sessionId}");
+            Log::info("[KIOSBANK-SIGNON-SUCCESS] Sesi aktif untuk mode ".$this->mode);
             return $sessionId;
         }
 
@@ -580,7 +498,7 @@ class KiosbankService
 
         // Fallback untuk Developer Mode (Sandbox)
         if ($this->isDeveloperMode()) {
-            $sandboxDeposit = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?: 11251850);
+            $sandboxDeposit = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?? 11251850);
             return [
                 'ok'             => true,
                 'saldo'          => $sandboxDeposit,
@@ -629,6 +547,10 @@ class KiosbankService
                     'maintenance' => array_values($maintList),
                 ];
             }
+        }
+
+        if (!$this->isDeveloperMode()) {
+            return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
         }
 
         // Mock response data dari dokumentasi resmi untuk Developer Mode
@@ -702,9 +624,11 @@ class KiosbankService
             }
 
             if (empty($prices)) {
+                $failedPrefixes[] = $targetPrefix;
                 continue;
             }
 
+            $template = PpobProduct::where('prefix_id', $targetPrefix)->first();
             foreach ($prices as $code => $info) {
                 if ($info['price'] <= 0) {
                     continue;
@@ -719,12 +643,29 @@ class KiosbankService
                         'reseller_price' => $product->reseller_price ? max(0, $price - 300) : null,
                     ]);
                     $updated++;
+                } elseif ($template) {
+                    $price = $this->applyMarkup($info['price']);
+                    PpobProduct::create([
+                        'code' => $code,
+                        'name' => $info['name'],
+                        'category' => $template->category,
+                        'operator' => $template->operator,
+                        'prefix_id' => $targetPrefix,
+                        'base_price' => $info['price'],
+                        'margin' => $price - $info['price'],
+                        'price' => $price,
+                        'reseller_price' => max(0, $price - 300),
+                        'status' => 'active',
+                        'provider' => 'kiosbank',
+                    ]);
+                    $created++;
                 }
             }
         }
 
         return [
             'status' => 'success',
+            'created_count' => $created,
             'updated_count' => $updated,
             'prefixes' => count($targets),
             'failed_prefixes' => $failedPrefixes,
@@ -918,6 +859,10 @@ class KiosbankService
             }
         }
 
+        if (!$this->isDeveloperMode()) {
+            return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
+        }
+
         return [
             'status'        => 'success',
             'rc'            => '00',
@@ -994,7 +939,7 @@ class KiosbankService
             if (($res['rc'] ?? null) === '00') {
                 $data = $res['data'] ?? [];
                 return [
-                    'status'       => 'success',
+                    'status'       => in_array(strtoupper(trim($data['status'] ?? 'BERHASIL')), ['BERHASIL', 'SUKSES'], true) ? 'success' : 'processing',
                     'rc'           => '00',
                     'reference_id' => trim($data['noReferensi'] ?? $data['RF'] ?? $refId),
                     'sn'           => trim($data['token'] ?? $data['TK'] ?? $data['noReferensi'] ?? $data['RF'] ?? $refId),
@@ -1006,6 +951,10 @@ class KiosbankService
                 'rc'      => $res['rc'] ?? '99',
                 'message' => $res['description'] ?? $this->getResponseCodeMessage($res['rc'] ?? '99'),
             ];
+        }
+
+        if (!$this->isDeveloperMode()) {
+            return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
         }
 
         return [
@@ -1046,7 +995,7 @@ class KiosbankService
 
                 if (isset($res['rc']) && $res['rc'] === '00') {
                     $data = $res['data'] ?? [];
-                    $status = strtoupper($data['status'] ?? 'BERHASIL');
+                    $status = strtoupper(trim($data['status'] ?? 'SEDANG DIPROSES'));
 
                     return [
                         'status'       => ($status === 'BERHASIL' || $status === 'SUKSES') ? 'success' : 'processing',
@@ -1072,9 +1021,16 @@ class KiosbankService
             }
         }
 
+        if (!$this->isDeveloperMode()) {
+            return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
+        }
+
         // Sandbox payment simulation untuk developer mode
         // Kurangi saldo sandbox jika cukup
-        $currentSandbox = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?: 11251850);
+        $currentSandbox = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?? 11251850);
+        if ($currentSandbox < $totalNominal) {
+            return ['status' => 'failed', 'rc' => '99', 'message' => 'Saldo simulasi Development tidak mencukupi.'];
+        }
         $newSandbox = max(0, $currentSandbox - $totalNominal);
         Setting::updateOrCreate(['key' => 'kiosbank_sandbox_deposit'], ['value' => (string) $newSandbox]);
 
@@ -1127,7 +1083,7 @@ class KiosbankService
             return $this->makeDigestRequest('/Services/Check-Status', $params, 'POST');
         }
 
-        return ['status' => 'mock_success', 'rc' => '00', 'message' => 'Status transaksi normal'];
+        return ['status' => 'error', 'rc' => '99', 'message' => 'Status transaksi belum dapat dikonfirmasi ke Kiosbank.'];
     }
 
     /**
@@ -1326,7 +1282,7 @@ class KiosbankService
 
         foreach ($items as $item) {
             $price = $item['base_price'] + $item['margin'];
-            PpobProduct::updateOrCreate(
+            PpobProduct::firstOrCreate(
                 ['code' => $item['code']],
                 [
                     'name'           => $item['name'],
@@ -1352,17 +1308,20 @@ class KiosbankService
         $this->ensureCatalogSeeded();
 
         $activeStatus = $this->getActiveProductStatus();
+        if (($activeStatus['status'] ?? '') !== 'success') {
+            throw new \RuntimeException($activeStatus['message'] ?? 'Status produk belum tersedia dari Kiosbank.');
+        }
         $maintenanceCodes = $activeStatus['maintenance'] ?? [];
         $activeCodes      = $activeStatus['active'] ?? [];
 
         $updatedCount = 0;
 
         if (!empty($maintenanceCodes)) {
-            $updatedCount += PpobProduct::whereIn('code', $maintenanceCodes)->update(['status' => 'maintenance']);
+            $updatedCount += PpobProduct::whereIn('code', $maintenanceCodes)->where('status', '!=', 'inactive')->update(['status' => 'maintenance']);
         }
 
         if (!empty($activeCodes)) {
-            $updatedCount += PpobProduct::whereIn('code', $activeCodes)->update(['status' => 'active']);
+            $updatedCount += PpobProduct::whereIn('code', $activeCodes)->where('status', '!=', 'inactive')->update(['status' => 'active']);
         }
 
         return [
@@ -1380,7 +1339,7 @@ class KiosbankService
     protected function getFallbackPulsa(string $prefixId): array
     {
         $this->ensureCatalogSeeded();
-        return PpobProduct::where('category', 'pulsa')->get()->toArray();
+        return PpobProduct::where('category', 'pulsa')->where('prefix_id', $prefixId)->get()->toArray();
     }
 
     /**

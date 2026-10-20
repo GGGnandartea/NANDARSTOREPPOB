@@ -25,6 +25,9 @@ export default function TrackOrderModal({
                     </button>
                 </div>
                 <div className="p-6">
+                    <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                        Masuk dengan akun pembelian untuk melacak invoice. Pembeli tamu dapat membuka tautan invoice pribadi yang disimpan saat checkout.
+                    </p>
                     <form onSubmit={handleTrackOrder} className="flex flex-col gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5">Nomor Invoice / Order ID</label>

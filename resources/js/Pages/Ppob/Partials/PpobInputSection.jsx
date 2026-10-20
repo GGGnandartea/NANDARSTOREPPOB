@@ -11,8 +11,6 @@ export default function PpobInputSection({
   selectedOperator,
   setSelectedOperator,
   // PLN state
-  plnType,
-  setPlnType,
   plnCustomerId,
   setPlnCustomerId,
   setSelectedProduct,
@@ -149,13 +147,13 @@ export default function PpobInputSection({
               className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
             />
             <p className="text-[10px] text-gray-400 mt-1">
-              Masukkan 11-12 digit nomor meteran. Tagihan listrik bulanan ada di menu
+              Masukkan 11–12 digit nomor meteran. Untuk tagihan bulanan, pilih
               <button
                 type="button"
                 onClick={() => onSwitchTab && onSwitchTab('pln_postpaid')}
                 className="ml-1 font-bold text-emerald-600 hover:underline"
               >
-                Tagihan PLN
+                Pascabayar
               </button>.
             </p>
           </div>

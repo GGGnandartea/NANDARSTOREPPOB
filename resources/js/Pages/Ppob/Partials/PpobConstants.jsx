@@ -139,8 +139,7 @@ export const STREAMING_SERVICES = [
 
 export const PPOB_TABS = [
   { id: 'pulsa', label: 'Pulsa & Data', iconKey: 'Pulsa', desc: 'Semua Operator' },
-  { id: 'pln', label: 'Token PLN', iconKey: 'Pln', desc: 'Token Prabayar' },
-  { id: 'pln_postpaid', label: 'Tagihan PLN', iconKey: 'Pln', desc: 'Pascabayar & Non-Taglis' },
+  { id: 'pln', label: 'PLN', iconKey: 'Pln', desc: 'Prabayar & Pascabayar' },
   { id: 'pdam', label: 'PDAM', iconKey: 'Tagihan', desc: 'Air Bersih' },
   { id: 'bpjs', label: 'BPJS', iconKey: 'Tagihan', desc: 'Kesehatan' },
   { id: 'game', label: 'Voucher Game', iconKey: 'Game', desc: 'MLBB, FF, Genshin' },
@@ -150,12 +149,6 @@ export const PPOB_TABS = [
 
 /** Tab yang memakai alur cek tagihan (inquiry) bukan katalog produk. */
 export const BILL_TABS = ['pdam', 'pln_postpaid', 'bpjs'];
-
-export const BILL_TAB_SERVICE = {
-  pdam: 'pdam',
-  pln_postpaid: 'pln_postpaid',
-  bpjs: 'bpjs',
-};
 
 
 export const fmt = {

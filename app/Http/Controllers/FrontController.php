@@ -48,6 +48,32 @@ class FrontController extends Controller
             if(!empty($p->category) && !in_array($p->category, $manualCategories)) { $manualCategories[] = $p->category; }
         }
 
+        // Rank brands by units from successful purchases in the rolling last 30 days.
+        // Aggregate in SQL so credentials and other order details are never loaded.
+        $brandSales = [];
+        $recentSales = Order::whereBetween('created_at', [now()->subDays(30), now()])
+            ->whereIn('payment_status', ['paid', 'success', 'settlement'])
+            ->whereIn('order_status', ['completed', 'success', 'lunas'])
+            ->whereIn('product_type', ['local', 'api'])
+            ->select('product_id', 'product_name')
+            ->selectRaw('SUM(COALESCE(quantity, 1)) as units_sold')
+            ->groupBy('product_id', 'product_name')
+            ->with('product:id,name')
+            ->get();
+
+        foreach ($recentSales as $sale) {
+            $name = $sale->product?->name ?? $sale->product_name;
+            $brand = explode(' ', trim($name))[0] ?? '';
+            $brandSales[$brand] = ($brandSales[$brand] ?? 0) + (int) $sale->units_sold;
+        }
+        $categories = $categories->map(function ($category) use ($brandSales) {
+            $category['sales_last_30_days'] = $brandSales[$category['name']] ?? 0;
+            return $category;
+        })->sort(function ($a, $b) {
+            return ($b['sales_last_30_days'] <=> $a['sales_last_30_days'])
+                ?: strnatcasecmp($a['name'], $b['name']);
+        })->values();
+
         if ($request->filled('search')) {
             $cleanSearch = trim(strip_tags((string) $request->search));
             $cleanSearch = substr($cleanSearch, 0, 80);
@@ -554,7 +580,7 @@ class FrontController extends Controller
             }
 
             // Simpan Pesanan ke Database dengan field lengkap
-            Order::create([
+            $order = Order::create([
                 'user_id'         => Auth::id(), 
                 'buyer_name'      => $buyerName,
                 'invoice_number'  => $data['data']['orderId'], 
@@ -574,8 +600,11 @@ class FrontController extends Controller
                 'discount_amount' => round($discount),
             ]);
 
+            \App\Services\OrderAccessService::grantGuestSession($request, $order);
+
             return response()->json([
-                'status'        => 'success', 
+                'status'        => 'success',
+                'invoice_url'   => $order->invoiceUrl(),
                 'order_id'      => $data['data']['orderId'], 
                 'total_nominal' => $data['data']['total_nominal'], 
                 'url_qris'      => $data['data']['url_qris']
@@ -587,17 +616,17 @@ class FrontController extends Controller
     }
 
     public function checkStatus($orderId) {
-        $order = Order::where('invoice_number', $orderId)->first();
+        $order = request()->attributes->get('authorized_order');
         if (!$order) {
             return response()->json(['status' => 'NOT_FOUND']);
         }
 
         // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
         if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
-            $order->update([
-                'payment_status' => 'expired',
-                'order_status'   => 'expired',
-            ]);
+            Order::whereKey($order->id)->where('payment_status', 'pending')
+                ->whereRaw("LOWER(order_status) IN ('pending', 'processing')")
+                ->update(['payment_status' => 'expired', 'order_status' => 'expired']);
+            $order->refresh();
         }
 
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
@@ -618,6 +647,7 @@ class FrontController extends Controller
         return response()->json([
             'status'         => $retStatus,
             'order_id'       => $order->invoice_number,
+            'invoice_url'    => $order->invoiceUrl(),
             'product_name'   => $order->product_name,
             'quantity'       => (int) ($order->quantity ?? 1),
             'product_type'   => $order->product_type,
@@ -635,9 +665,10 @@ class FrontController extends Controller
     }
 
     public function invoice($orderId) {
-        $order = Order::where('invoice_number', $orderId)
-            ->orWhere('id', $orderId)
-            ->firstOrFail();
+        $order = request()->attributes->get('authorized_order');
+        if (!$order->user_id && !request()->query('token')) {
+            return redirect($order->invoiceUrl());
+        }
 
         // Otomatis sinkronisasi akun API saat invoice dibuka jika masih menunggu
         if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
@@ -1370,19 +1401,7 @@ class FrontController extends Controller
 
     // Kirim Ulang Invoice & Detail Akun ke WhatsApp Terverifikasi
     public function resendOrderWa($orderId) {
-        $order = Order::where('invoice_number', $orderId)
-            ->orWhere('id', $orderId)
-            ->first();
-
-        if (!$order) {
-            return response()->json(['status' => 'error', 'message' => 'Pesanan tidak ditemukan.'], 404);
-        }
-
-        // Cek izin: Hanya pemilik pesanan atau admin
-        $currentUser = Auth::user();
-        if ($currentUser && $currentUser->role !== 'admin' && $order->user_id && $order->user_id !== $currentUser->id) {
-            return response()->json(['status' => 'error', 'message' => 'Akses ditolak.'], 403);
-        }
+        $order = request()->attributes->get('authorized_order');
 
         $result = \App\Http\Controllers\WebhookController::sendOrderNotification($order);
 

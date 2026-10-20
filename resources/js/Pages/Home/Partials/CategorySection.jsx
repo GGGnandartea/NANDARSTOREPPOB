@@ -16,7 +16,10 @@ export default function CategorySection({
             {/* SLIDER KATEGORI POPULER */}
             <div id="katalog-produk" className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-4 sm:p-6 mb-4 relative group/slider scroll-mt-20">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm sm:text-base font-extrabold text-black dark:text-white">Kategori Premium Populer</h2>
+                    <div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-black dark:text-white">Kategori Premium Populer</h2>
+                        <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Terlaris berdasarkan penjualan 30 hari terakhir</p>
+                    </div>
                     <button onClick={() => setShowCategoryModal(true)} className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline transition-colors cursor-pointer bg-orange-50 dark:bg-orange-900/30 px-3 py-1.5 rounded-full">
                         Lihat Semua
                     </button>

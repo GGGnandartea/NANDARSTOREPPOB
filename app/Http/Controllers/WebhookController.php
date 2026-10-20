@@ -17,7 +17,7 @@ class WebhookController extends Controller
         $webhook_secret = 'nandar-nandar-nandar-tea-tea';
         $signature_header = $request->header('X-Callback-Signature');
         $event_header = $request->header('X-Callback-Event');
-        
+
         $payload_raw = $request->getContent();
         $payload = json_decode($payload_raw, true);
 
@@ -25,47 +25,40 @@ class WebhookController extends Controller
         if (!$payload) return response()->json(['error' => 'Invalid Payload'], 400);
 
         $expected_signature = hash_hmac('sha256', $payload_raw, $webhook_secret);
-        if (!hash_equals($expected_signature, $signature_header)) {
+        if (!is_string($signature_header) || !hash_equals($expected_signature, $signature_header)) {
             return response()->json(['error' => 'Akses Ditolak (Signature Salah)'], 403);
         }
 
-        // 2. PROSES PEMBAYARAN BERHASIL
-        if ($event_header === 'payment.success' && $payload['status'] === 'terbayar') {
-            $orderId = $payload['orderId'];
-            
-            // Cari pesanan yang statusnya PENDING atau PROCESSING
-            $order = Order::where('invoice_number', $orderId)
-                ->whereIn('payment_status', ['pending', 'unpaid', 'PENDING'])
-                ->first();
-
-            if (!$order) {
-                // Fallback cari berdasarkan invoice_number saja
-                $order = Order::where('invoice_number', $orderId)->first();
+        if ($event_header === 'payment.success' && ($payload['status'] ?? '') === 'terbayar') {
+            $orderId = $payload['orderId'] ?? null;
+            if (!is_string($orderId) || $orderId === '') {
+                return response()->json(['error' => 'Invalid orderId'], 400);
             }
-
+            $order = Order::where('invoice_number', $orderId)->first();
             if ($order) {
-                $order->payment_status = 'paid';
-                $order->order_status   = 'processing';
-                $order->save();
-
-                // FULFILLMENT DENGAN SERVER WAITING & AUTO-POLLING API
+                // Only the first payment confirmation changes payment state.
+                // A replay must never reset a completed/refunded order.
+                Order::whereKey($order->id)
+                    ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
+                    ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
+                    ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
                 \App\Services\OrderFulfillmentService::fulfillOrder($order);
             }
         }
-        
+
         // Selalu kembalikan respon 200 OK ke payment gateway agar tidak dianggap timeout/error
         return response()->json(['message' => 'Webhook Berhasil Diterima'], 200);
     }
 
     public function handleTopup(Request $request) {
         $payload = $request->all();
-        
+
         // Cari order ID dari payload
         $orderId = $payload['orderId'] ?? $payload['order_id'] ?? $payload['reference'] ?? null;
         $statusRaw = strtoupper($payload['status'] ?? $payload['payment_status'] ?? '');
-        
+
         if (!$orderId) return response()->json(['message' => 'Invalid payload'], 400);
-        
+
         $topup = \App\Models\TopupRequest::where('order_id_gateway', $orderId)
             ->orWhere('invoice_number', $orderId)
             ->first();
@@ -77,10 +70,10 @@ class WebhookController extends Controller
         if ($topup->status === 'paid' || $topup->status === 'success') {
             return response()->json(['message' => 'OK - already processed']);
         }
-        
+
         if (in_array($statusRaw, ['PAID', 'SUCCESS', 'LUNAS', 'SETTLEMENT', 'TERBAYAR'])) {
             $topup->update(['status' => 'paid']);
-            
+
             // Tambah saldo user
             $user = \App\Models\User::find($topup->user_id);
             if ($user) {
@@ -95,7 +88,7 @@ class WebhookController extends Controller
         } elseif (in_array($statusRaw, ['EXPIRED', 'FAILED', 'CANCELED'])) {
             $topup->update(['status' => 'expired']);
         }
-        
+
         return response()->json(['message' => 'OK']);
     }
 
@@ -224,8 +217,8 @@ class WebhookController extends Controller
         Log::info('[PREMKU-WEBHOOK-RECEIVED] ' . $rawPayload);
 
         // 1. Ambil Signature dari Header (X-Premku-Signature)
-        $signature = $request->header('X-Premku-Signature') 
-            ?? $request->header('x-premku-signature') 
+        $signature = $request->header('X-Premku-Signature')
+            ?? $request->header('x-premku-signature')
             ?? ($_SERVER['HTTP_X_PREMKU_SIGNATURE'] ?? '');
 
         // 2. Verifikasi HMAC-SHA256 menggunakan API Secret dari panel Admin
@@ -298,8 +291,8 @@ class WebhookController extends Controller
                 }
             }
 
-            $snText = !empty($formattedAccounts) 
-                ? implode("\n---\n", $formattedAccounts) 
+            $snText = !empty($formattedAccounts)
+                ? implode("\n---\n", $formattedAccounts)
                 : (\App\Services\OrderFulfillmentService::extractSnFromData($data) ?? 'Akun berhasil dikirim oleh provider.');
 
             // Update status pesanan ke database
@@ -496,8 +489,8 @@ class WebhookController extends Controller
         }
 
         // 1. Cari data pengguna akun pembeli
-        $buyerUser = $order->user_id 
-            ? \App\Models\User::find($order->user_id) 
+        $buyerUser = $order->user_id
+            ? \App\Models\User::find($order->user_id)
             : \App\Models\User::where('whatsapp', $order->whatsapp)->first();
 
         // 2. Cek apakah nomor WhatsApp terverifikasi (SYARAT UTAMA: KHUSUS YANG SUDAH VERIF WA)
@@ -524,14 +517,14 @@ class WebhookController extends Controller
         $nominal = $order->total_amount ?: ($order->price ?: 0);
         $totalFormatted = number_format($nominal, 0, ',', '.');
         $snAkun = $order->sn_or_account ?: ($order->account_details ?: 'Pesanan sedang diproses.');
-        $invoiceUrl = url('/order/invoice/' . $order->invoice_number);
+        $invoiceUrl = $order->invoiceUrl();
         $metode = str_starts_with($order->invoice_number, 'BAL-') ? 'Saldo Akun' : 'QRIS Otomatis';
         $tanggal = $order->created_at ? $order->created_at->format('d M Y, H:i') : now()->format('d M Y, H:i');
         $qty = (int) ($order->quantity ?? 1);
         if ($qty < 1) $qty = 1;
 
-        $isPpob = ($order->product_type === 'ppob') 
-            || (isset($product) && $product->type === 'ppob') 
+        $isPpob = ($order->product_type === 'ppob')
+            || (isset($product) && $product->type === 'ppob')
             || str_starts_with($order->invoice_number, 'PPOB-');
 
         $adminWa = \App\Models\Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
@@ -596,4 +589,4 @@ class WebhookController extends Controller
             return false;
         }
     }
-}
+}
