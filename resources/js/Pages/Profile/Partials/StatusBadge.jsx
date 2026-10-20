@@ -9,7 +9,7 @@ export default function StatusBadge({ status }) {
     PROCESSING: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     REFUNDED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
     FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    EXPIRED: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+    EXPIRED: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300',
   };
   const labels = {
     PAID: 'Lunas',
@@ -22,6 +22,6 @@ export default function StatusBadge({ status }) {
     EXPIRED: 'Kadaluarsa'
   };
   const s = (status || '').toUpperCase();
-  return <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${map[s] || 'bg-gray-100 text-gray-500'}`}>{labels[s] || s || '-'}</span>;
+  return <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${map[s] || 'bg-gray-100 text-gray-500'}`}>{labels[s] || s || '-'}</span>;
 }
 

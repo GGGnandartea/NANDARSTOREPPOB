@@ -23,7 +23,7 @@ use App\Services\PreflixApiService;
 class FrontController extends Controller
 {
     public function index(Request $request, PremkuApiService $premkuService, PreflixApiService $preflixService) {
-        $query = Product::where('status', 'available')->orderBy('name', 'asc');
+        $query = Product::withAvailableAccountStock()->where('status', 'available')->orderBy('name', 'asc');
 
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
@@ -246,7 +246,7 @@ class FrontController extends Controller
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
 
-        $query = Product::where('status', 'available');
+        $query = Product::withAvailableAccountStock()->where('status', 'available');
         if ($disabledPreflix) {
             $query->where(function($q) {
                 $q->where('type', '!=', 'api')->orWhere('api_product_id', 'NOT LIKE', 'PREFLIX-%');
@@ -493,7 +493,7 @@ class FrontController extends Controller
 
         // Cek stok lokal sebelum memproses transaksi
         if ($product->type === 'local' && ($product->process_type ?? 'auto') !== 'manual') {
-            $availableStock = \App\Models\LocalAccount::where('product_id', $product->id)->where('is_sold', false)->count();
+            $availableStock = $product->stock;
             if ($availableStock < $qty) {
                 return response()->json([
                     'status'  => 'error',
@@ -605,7 +605,11 @@ class FrontController extends Controller
             return response()->json([
                 'status'        => 'success',
                 'invoice_url'   => $order->invoiceUrl(),
-                'order_id'      => $data['data']['orderId'], 
+                'order_id'      => $data['data']['orderId'],
+                'order_status' => $order->order_status,
+                'payment_status' => $order->payment_status,
+                'placed_at' => $order->created_at?->toIso8601String(),
+                'updated_at' => $order->updated_at?->toIso8601String(),
                 'total_nominal' => $data['data']['total_nominal'], 
                 'url_qris'      => $data['data']['url_qris']
             ]);
@@ -613,6 +617,25 @@ class FrontController extends Controller
             \Illuminate\Support\Facades\Log::error('Order creation error: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => 'Gagal menyimpan pesanan: ' . $e->getMessage()]);
         }
+    }
+
+    public function guestOrderHistory(Request $request)
+    {
+        $grants = $request->session()->get('guest_orders', []);
+        $orders = Order::whereNull('user_id')->whereIn('id', array_keys(is_array($grants) ? $grants : []))
+            ->latest()->limit(100)->get()
+            ->filter(fn ($order) => is_string($grants[$order->id] ?? null)
+                && $order->guest_access_token
+                && hash_equals(hash('sha256', $order->guest_access_token), $grants[$order->id]))
+            ->map(fn ($order) => [
+                'order_id' => $order->invoice_number,
+                'product_name' => $order->product_name,
+                'invoice_url' => $order->invoiceUrl(),
+                'created_at' => $order->created_at?->toIso8601String(),
+            ])->values();
+
+        return response()->json(['orders' => $orders])
+            ->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
     }
 
     public function checkStatus($orderId) {
@@ -639,6 +662,9 @@ class FrontController extends Controller
         $isWaiting = \App\Services\OrderFulfillmentService::isWaitingText($snAkun);
         $isSuccess = in_array(strtolower($order->order_status ?? ''), ['completed', 'lunas', 'success']);
 
+        $isReady = !$isWaiting && $isSuccess
+            && in_array(strtolower($order->payment_status ?? ''), ['paid', 'success', 'settlement', 'lunas'], true);
+
         $retStatus = strtoupper($order->order_status ?? 'PENDING');
         if ($order->payment_status === 'paid' && $retStatus === 'PENDING') {
             $retStatus = 'PAID';
@@ -646,6 +672,10 @@ class FrontController extends Controller
 
         return response()->json([
             'status'         => $retStatus,
+            'is_guest'       => !$order->user_id,
+            'order_status'   => $order->order_status,
+            'updated_at'     => $order->updated_at?->toIso8601String(),
+            'placed_at'      => $order->created_at?->toIso8601String(),
             'order_id'       => $order->invoice_number,
             'invoice_url'    => $order->invoiceUrl(),
             'product_name'   => $order->product_name,
@@ -658,8 +688,8 @@ class FrontController extends Controller
             'email'          => $order->email,
             'whatsapp'       => $order->whatsapp,
             'payment_status' => $order->payment_status,
-            'sn_or_account'  => $snAkun,
-            'is_ready'       => !$isWaiting && $isSuccess,
+            'sn_or_account'  => $isReady ? $snAkun : null,
+            'is_ready'       => $isReady,
             'created_at'     => $order->created_at ? $order->created_at->format('d M Y, H:i') : null,
         ]);
     }
@@ -808,6 +838,7 @@ class FrontController extends Controller
             ->count();
 
         return Inertia::render('Profile', [
+            'favoriteProducts' => fn () => $user->favoriteProducts()->orderByPivot('created_at', 'desc')->get(['products.id', 'products.name', 'products.image', 'products.price', 'products.stock', 'products.status', 'products.type', 'products.process_type']),
             'orders'    => $orders,
             'topups'    => $mutations,
             'mutations' => $mutations,
@@ -890,9 +921,7 @@ class FrontController extends Controller
 
         // Cek stok lokal sebelum memotong saldo untuk mencegah race condition
         if ($product->type === 'local' && $product->process_type !== 'manual') {
-            $availableStock = \App\Models\LocalAccount::where('product_id', $product->id)
-                ->where('is_sold', false)
-                ->count();
+            $availableStock = $product->stock;
 
             if ($availableStock < $qty) {
                 return response()->json([
@@ -998,6 +1027,10 @@ class FrontController extends Controller
             return response()->json([
                 'status'        => 'refunded',
                 'order_id'      => $invoiceNumber,
+                'order_status' => $order->order_status,
+                'payment_status' => $order->payment_status,
+                'placed_at' => $order->created_at?->toIso8601String(),
+                'updated_at' => $order->updated_at?->toIso8601String(),
                 'product_name'  => $product->name,
                 'product_type'  => $order->product_type,
                 'total_nominal' => $nominal,
@@ -1014,6 +1047,10 @@ class FrontController extends Controller
         return response()->json([
             'status'        => 'success',
             'order_id'      => $invoiceNumber,
+                'order_status' => $order->order_status,
+                'payment_status' => $order->payment_status,
+                'placed_at' => $order->created_at?->toIso8601String(),
+                'updated_at' => $order->updated_at?->toIso8601String(),
             'product_name'  => $product->name,
             'product_type'  => $order->product_type,
             'total_nominal' => $nominal,

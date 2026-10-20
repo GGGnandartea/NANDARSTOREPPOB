@@ -21,7 +21,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
 
   return (
     <div className="flex justify-center mt-6">
-      <div className="inline-flex items-center gap-1 sm:gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700/80 shadow-sm text-xs font-bold text-gray-500 dark:text-gray-400">
+      <div className="inline-flex items-center gap-1 sm:gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700/80 shadow-sm text-xs font-bold text-gray-500 dark:text-gray-300">
         {/* Prev Button */}
         <button
           type="button"
@@ -51,7 +51,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
               className={`min-w-[28px] sm:min-w-[32px] h-7 sm:h-8 px-2 sm:px-2.5 rounded-xl flex items-center justify-center font-black transition cursor-pointer ${
                 isActive
                   ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                  : 'hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-400'
+                  : 'hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300'
               }`}
             >
               {p}

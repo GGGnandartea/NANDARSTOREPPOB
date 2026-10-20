@@ -68,7 +68,7 @@ export default function TopupModal({ onClose, onSuccess }) {
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2 block">Nominal Top Up</label>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 block">Nominal Top Up</label>
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   {presets.map(p => (
                     <button key={p} type="button" onClick={() => setAmount(String(p))} className={`py-2 rounded-xl text-xs font-black border transition cursor-pointer ${amount === String(p) ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}>
@@ -88,7 +88,7 @@ export default function TopupModal({ onClose, onSuccess }) {
 
           {step === 'qris' && (
             <div className="text-center">
-              <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-1">Total Dibayar</p>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Total Dibayar</p>
               <p className="text-3xl font-black text-gray-900 dark:text-white mb-4">{fmt.rp(total)}</p>
               <div className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-3 inline-block mb-4">
                 {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-52 h-52 object-contain" /> : <div className="w-52 h-52 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center text-gray-400 text-xs font-bold">Memuat QRIS...</div>}
@@ -96,7 +96,7 @@ export default function TopupModal({ onClose, onSuccess }) {
               <div className="flex items-center justify-center gap-2 text-blue-500 font-bold text-xs animate-pulse bg-blue-50 dark:bg-blue-900/20 py-2.5 rounded-xl mb-3">
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>Menunggu pembayaran...
               </div>
-              <p className="text-[10px] text-gray-400 mb-3">ID: <span className="font-mono text-gray-600 dark:text-gray-400">{orderId}</span></p>
+              <p className="text-[11px] text-gray-400 mb-3">ID: <span className="font-mono text-gray-600 dark:text-gray-300">{orderId}</span></p>
               <button onClick={onClose} className="text-gray-400 hover:text-red-500 text-xs font-bold transition cursor-pointer">Tutup (bayar nanti)</button>
             </div>
           )}
@@ -107,7 +107,7 @@ export default function TopupModal({ onClose, onSuccess }) {
                 <Icon.Check className="w-10 h-10 text-green-500" />
               </div>
               <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Top Up Berhasil!</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Saldo kamu bertambah <span className="font-black text-green-600">{fmt.rp(total)}</span></p>
+              <p className="text-sm text-gray-500 dark:text-gray-300 mb-5">Saldo kamu bertambah <span className="font-black text-green-600">{fmt.rp(total)}</span></p>
               <button onClick={onClose} className="w-full bg-gray-900 text-white font-black py-3 rounded-2xl cursor-pointer">Selesai</button>
             </div>
           )}

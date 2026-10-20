@@ -44,7 +44,7 @@ export default function CheckoutSuccessSection({
 
           {/* Requested Text: Big & Prominent */}
           <div className="space-y-1.5 relative z-10">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-600 dark:text-orange-400 text-[11px] font-black uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
               Pembayaran Berhasil • Menyiapkan Lisensi
             </span>
@@ -61,7 +61,7 @@ export default function CheckoutSuccessSection({
             <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative shadow-inner">
               <div className="h-full w-1/2 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 rounded-full animate-progress-slide"></div>
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
+            <p className="text-[11px] text-gray-400 dark:text-gray-300 font-medium">
               ⚡ Sedang memproses dan menyiapkan lisensi Anda secara otomatis...
             </p>
           </div>
@@ -77,7 +77,7 @@ export default function CheckoutSuccessSection({
 
           <div>
             <h3 className="text-2xl font-black text-gray-900 dark:text-white">Hore, Pembayaran Berhasil!</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+            <p className="text-gray-500 dark:text-gray-300 text-xs mt-1">
               Pesanan telah lunas. Detail akun &amp; dokumen invoice Anda siap diakses di bawah ini.
             </p>
           </div>
@@ -85,7 +85,7 @@ export default function CheckoutSuccessSection({
           {/* KOTAK DETAIL AKUN & KREDENSIAL */}
           <div className="bg-[#0b1121] text-white p-5 rounded-3xl border border-gray-800 text-left shadow-xl relative overflow-hidden">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[10px] font-black tracking-widest uppercase text-orange-400 flex items-center gap-1.5">
+              <span className="text-[11px] font-black tracking-widest uppercase text-orange-400 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
@@ -94,7 +94,7 @@ export default function CheckoutSuccessSection({
               <button
                 type="button"
                 onClick={() => handleCopyAccount(accountText)}
-                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-extrabold transition cursor-pointer flex items-center gap-1"
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[11px] font-extrabold transition cursor-pointer flex items-center gap-1"
               >
                 {copied ? '✓ Tersalin!' : '📋 Salin Akun'}
               </button>
@@ -104,7 +104,7 @@ export default function CheckoutSuccessSection({
               {accountText}
             </div>
 
-            <p className="text-[10px] text-gray-400 mt-2 font-medium">
+            <p className="text-[11px] text-gray-400 mt-2 font-medium">
               *Simpan email &amp; password atau kode lisensi ini baik-baik.
             </p>
           </div>
@@ -114,25 +114,25 @@ export default function CheckoutSuccessSection({
       {/* RINGKASAN TRANSAKSI */}
       <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 p-4 rounded-2xl text-left space-y-2 text-xs">
         <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
-          <span className="text-gray-400 font-bold">No. Invoice</span>
+          <span className="text-gray-400 font-medium">No. Invoice</span>
           <span className="font-mono font-bold text-gray-900 dark:text-white select-all">{currentOrderId}</span>
         </div>
         <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
-          <span className="text-gray-400 font-bold">Layanan</span>
+          <span className="text-gray-400 font-medium">Layanan</span>
           <span className="font-bold text-gray-900 dark:text-white truncate max-w-[200px]">{productName}</span>
         </div>
         {displayQty > 1 && (
           <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
-            <span className="text-gray-400 font-bold">Jumlah Pembelian</span>
+            <span className="text-gray-400 font-medium">Jumlah Pembelian</span>
             <span className="font-black text-orange-500 px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/20">{displayQty} pcs</span>
           </div>
         )}
         <div className="flex justify-between items-center py-1 border-b border-gray-200/50 dark:border-gray-700/50">
-          <span className="text-gray-400 font-bold">Metode Bayar</span>
+          <span className="text-gray-400 font-medium">Metode Bayar</span>
           <span className="font-bold text-gray-900 dark:text-white">{balanceSuccess ? 'Saldo Akun' : 'QRIS Otomatis'}</span>
         </div>
         <div className="flex justify-between items-center py-1">
-          <span className="text-gray-400 font-bold">Total Lunas</span>
+          <span className="text-gray-400 font-medium">Total Lunas</span>
           <span className="font-black text-orange-500 text-sm">{fmt.rp(totalAmount)}</span>
         </div>
       </div>
@@ -170,11 +170,11 @@ export default function CheckoutSuccessSection({
               <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
                 {waSentSuccess ? '✓ Terkirim ke WhatsApp!' : 'Detail Akun & Invoice ke WhatsApp'}
               </p>
-              <span className="text-[9px] bg-emerald-500/20 text-emerald-500 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[11px] bg-emerald-500/20 text-emerald-500 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Otomatis
               </span>
             </div>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-[11px] text-gray-500 dark:text-gray-300 mt-1">
               Pesan otomatis berisi detail akun dan invoice resmi dikirimkan ke nomor WhatsApp terverifikasi:{' '}
               <strong className="text-gray-900 dark:text-white font-mono">{user.whatsapp}</strong>
             </p>

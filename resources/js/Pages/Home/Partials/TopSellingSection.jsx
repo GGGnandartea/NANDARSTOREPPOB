@@ -32,12 +32,12 @@ export default function TopSellingSection({
                                 <h2 className="text-base sm:text-lg font-black text-gray-900 dark:text-white leading-tight">
                                     Paling Banyak Dibeli Hari Ini
                                 </h2>
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 tracking-wider uppercase shadow-xs">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 tracking-wider uppercase shadow-xs">
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
                                     Realtime
                                 </span>
                             </div>
-                            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-0.5">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-300 mt-0.5">
                                 Harga spesial dengan stok terbatas.
                             </p>
                         </div>
@@ -91,7 +91,7 @@ export default function TopSellingSection({
                                     className="flex items-center gap-2.5 bg-gray-50 dark:bg-gray-800/80 hover:bg-emerald-50/40 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700/80 rounded-2xl p-2.5 min-w-[200px] sm:min-w-[220px] max-w-[260px] hover:border-emerald-500 hover:shadow-md transition-all group cursor-pointer shrink-0 snap-start relative overflow-hidden"
                                 >
                                     {/* Ranking Badge Mini */}
-                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-md flex items-center justify-center font-black text-[9px] z-10 ${
+                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-md flex items-center justify-center font-black text-[11px] z-10 ${
                                         rankNumber === 1
                                             ? 'bg-amber-400 text-gray-950 shadow-xs'
                                             : rankNumber === 2
@@ -120,14 +120,14 @@ export default function TopSellingSection({
                                                 )}
                                             </div>
                                         ) : (
-                                            <span className="text-[10px] font-black text-gray-400">NS</span>
+                                            <span className="text-[11px] font-medium text-gray-400">NS</span>
                                         )}
                                     </div>
 
                                     {/* Info Produk */}
                                     <div className="flex flex-col min-w-0 flex-1">
                                         <div className="flex items-center gap-1">
-                                            <span className="text-xs font-black text-gray-900 dark:text-white line-clamp-1 group-hover:text-emerald-500 transition-colors">
+                                            <span className="text-[13px] font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-emerald-500 transition-colors">
                                                 {product.name}
                                             </span>
                                         </div>
@@ -135,21 +135,21 @@ export default function TopSellingSection({
                                         {/* Realtime Sales Tag */}
                                         <div className="mt-0.5 flex items-center gap-1">
                                             {product.is_ppob && (
-                                                <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40 uppercase">
+                                                <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40 uppercase">
                                                     PPOB
                                                 </span>
                                             )}
                                             {isHotToday ? (
-                                                <span className="text-[9px] font-black text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-900/40 inline-flex items-center gap-1">
+                                                <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-900/40 inline-flex items-center gap-1">
                                                     <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
                                                     🔥 {product.sales_label || `${product.today_sales} dibeli hari ini`}
                                                 </span>
                                             ) : product.total_sales > 0 ? (
-                                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 inline-flex items-center gap-0.5">
+                                                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 inline-flex items-center gap-0.5">
                                                     ⚡ {product.sales_label || `${product.total_sales} terjual`}
                                                 </span>
                                             ) : (
-                                                <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
+                                                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
                                                     ⭐ Terpopuler
                                                 </span>
                                             )}
@@ -160,7 +160,7 @@ export default function TopSellingSection({
                                                 Rp {new Intl.NumberFormat('id-ID').format(product.price)}
                                             </span>
                                             {product.stock !== undefined && product.stock !== null && !product.is_ppob && (
-                                                <span className="text-[9px] font-semibold text-gray-400 truncate">
+                                                <span className="text-[11px] font-semibold text-gray-400 truncate">
                                                     • Sisa {product.stock}
                                                 </span>
                                             )}

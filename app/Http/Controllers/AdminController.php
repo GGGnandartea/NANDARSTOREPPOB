@@ -749,7 +749,7 @@ class AdminController extends Controller
     }
 
     public function localProducts(Request $request) {
-        $query = Product::where('type', 'local')->orderBy('id', 'desc');
+        $query = Product::withAvailableAccountStock()->where('type', 'local')->orderBy('id', 'desc');
         if ($request->search) $query->where('name', 'like', '%' . $request->search . '%');
         $localProducts = $query->get(); return view('admin.local_products', compact('localProducts'));
     }
@@ -779,6 +779,7 @@ class AdminController extends Controller
     public function updateLocalProduct(Request $request, $id) {
         $request->validate([
             'name'           => 'required|string|max:150',
+            'process_type'   => 'sometimes|in:auto,manual',
             'category'       => 'nullable|string|max:100',
             'price'          => 'required|numeric|min:0',
             'reseller_price' => 'nullable|numeric|min:0',
@@ -790,7 +791,9 @@ class AdminController extends Controller
         $product->price = $request->price;
         $product->reseller_price = $request->reseller_price ?: null;
         $product->description = $request->description;
-        $product->process_type = $request->process_type === 'manual' ? 'manual' : 'auto';
+        if ($request->has('process_type')) {
+            $product->process_type = $request->process_type;
+        }
         if ($request->hasFile('image')) {
             if ($product->image) { $oldPath = str_replace('/storage/', '', $product->image); if(Storage::disk('public')->exists($oldPath)) Storage::disk('public')->delete($oldPath); }
             $imagePath = $request->file('image')->store('products', 'public'); $product->image = '/storage/' . $imagePath;
@@ -806,7 +809,9 @@ class AdminController extends Controller
     public function localAccounts(Request $request, $id) {
         $product = Product::with('accounts')->findOrFail($id); $query = LocalAccount::where('product_id', $id)->orderBy('id', 'desc');
         if ($request->search) $query->where('email', 'like', '%' . $request->search . '%');
-        $accounts = $query->get(); return view('admin.local_accounts', compact('product', 'accounts'));
+        $accounts = $query->get();
+        $availableStock = $product->availableAccountStock();
+        return view('admin.local_accounts', compact('product', 'accounts', 'availableStock'));
     }
     public function storeLocalAccount(Request $request, $id) {
         $request->validate([

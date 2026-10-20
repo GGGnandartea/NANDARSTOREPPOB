@@ -9,11 +9,11 @@ export default function ProfileNavbar({
 }) {
   return (
     <nav className="glass-nav sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 min-h-16 gap-2 flex items-center justify-between">
+        <div className="flex items-center gap-1 sm:gap-3">
           <button 
             onClick={() => setSidebarOpen(true)} 
-            className="md:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+            className="md:hidden min-h-11 min-w-11 p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
             aria-label="Buka Menu Sidebar"
           >
             <Icon.Menu className="w-5 h-5 dark:text-white" />
@@ -26,7 +26,7 @@ export default function ProfileNavbar({
         <div className="flex items-center gap-2">
           <button 
             onClick={toggleDark} 
-            className="p-2 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white transition cursor-pointer"
+            className="min-h-11 min-w-11 flex items-center justify-center p-2 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white transition cursor-pointer"
             title="Ganti Mode Gelap / Terang"
           >
             {isDark ? (
@@ -35,8 +35,8 @@ export default function ProfileNavbar({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
             )}
           </button>
-          <Link href="/" className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-orange-500 dark:text-gray-400 dark:hover:text-orange-400 transition">
-            <Icon.Home className="w-4 h-4" /><span className="hidden sm:block">Beranda</span>
+          <Link href="/" className="min-h-11 flex items-center justify-center gap-1.5 rounded-xl px-2 sm:px-3 bg-orange-500/10 text-xs font-bold text-gray-500 hover:text-orange-500 dark:text-gray-300 dark:hover:text-orange-400 transition">
+            <Icon.Home className="w-4 h-4" /><span>Kembali ke Beranda</span>
           </Link>
         </div>
       </div>

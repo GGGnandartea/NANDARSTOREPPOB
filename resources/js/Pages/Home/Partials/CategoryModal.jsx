@@ -19,7 +19,7 @@ export default function CategoryModal({
                         </div>
                         <div>
                             <h3 className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Semua Kategori Premium</h3>
-                            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">Pilih brand untuk melihat daftar produk.</p>
+                            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-300 mt-0.5">Pilih brand untuk melihat daftar produk.</p>
                         </div>
                     </div>
                     <button onClick={() => setShowCategoryModal(false)} className="p-2.5 text-gray-400 hover:text-white bg-gray-100 hover:bg-red-500 dark:bg-gray-700 dark:hover:bg-red-500 transition-colors rounded-full cursor-pointer shadow-sm absolute top-4 right-4 sm:top-6 sm:right-6" aria-label="Tutup Modal Kategori">
@@ -36,7 +36,7 @@ export default function CategoryModal({
                                 <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center border-2 transition-all shadow-sm ${!filters.category ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30 text-orange-500' : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-400 group-hover:border-orange-200'}`}>
                                     <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                                 </div>
-                                <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight line-clamp-2 ${!filters.category ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>Semua<br/>Brand</span>
+                                <span className={`text-[11px] sm:text-xs font-bold text-center leading-tight line-clamp-2 ${!filters.category ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>Semua<br/>Brand</span>
                             </div>
 
                             {categoryList.map((cat, index) => (
@@ -48,7 +48,7 @@ export default function CategoryModal({
                                             <div className="w-full h-full bg-gray-200 dark:bg-gray-600 rounded-xl flex items-center justify-center font-black text-gray-400 text-xs">NS</div>
                                         )}
                                     </div>
-                                    <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight line-clamp-2 max-w-[80px] ${filters.category === cat.name ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'}`}>{cat.name}</span>
+                                    <span className={`text-[11px] sm:text-xs font-bold text-center leading-tight line-clamp-2 max-w-[80px] ${filters.category === cat.name ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'}`}>{cat.name}</span>
                                 </div>
                             ))}
                         </div>

@@ -19,7 +19,7 @@ export default function PpobBanner({ filters }) {
                             <h3 className="text-sm sm:text-base font-black text-gray-900 dark:text-white tracking-tight">
                                 Pusat Layanan PPOB, Pulsa &amp; Tagihan
                             </h3>
-                            <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                            <span className="text-[11px] sm:text-[11px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
                                 Transaksi Otomatis &amp; Instan
                             </span>
                         </div>

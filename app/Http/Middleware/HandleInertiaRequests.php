@@ -25,6 +25,7 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            'favoriteProductIds' => fn () => $request->user()?->favoriteProducts()->pluck('products.id')->all() ?? [],
             'store' => [
                 'name'                => \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'NandarStore',
                 'logo'                => \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null,

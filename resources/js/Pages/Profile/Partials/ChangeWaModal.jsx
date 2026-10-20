@@ -69,7 +69,7 @@ export default function ChangeWaModal({ onClose, currentWhatsapp, onNumberChange
 
         <div className="p-6 space-y-4">
           <div className="p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-xs">
-            <span className="text-gray-500 dark:text-gray-400 font-bold">Nomor Tersimpan Saat Ini:</span>
+            <span className="text-gray-500 dark:text-gray-300 font-medium">Nomor Tersimpan Saat Ini:</span>
             <span className="font-mono font-black text-gray-800 dark:text-gray-200">
               {currentWhatsapp || '(Belum diatur)'}
             </span>
@@ -82,7 +82,7 @@ export default function ChangeWaModal({ onClose, currentWhatsapp, onNumberChange
           </div>
 
           <div>
-            <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider mb-2 block">
               Nomor WhatsApp Baru
             </label>
             <input
@@ -121,7 +121,7 @@ export default function ChangeWaModal({ onClose, currentWhatsapp, onNumberChange
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-2.5 text-xs text-gray-500 dark:text-gray-400 font-bold hover:text-gray-800 dark:hover:text-gray-200 transition cursor-pointer"
+              className="w-full py-2.5 text-xs text-gray-500 dark:text-gray-300 font-bold hover:text-gray-800 dark:hover:text-gray-200 transition cursor-pointer"
             >
               Batal
             </button>

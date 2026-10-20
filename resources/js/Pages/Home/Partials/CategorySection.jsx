@@ -18,7 +18,7 @@ export default function CategorySection({
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-sm sm:text-base font-extrabold text-black dark:text-white">Kategori Premium Populer</h2>
-                        <p className="mt-1 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Terlaris berdasarkan penjualan 30 hari terakhir</p>
+                        <p className="mt-1 text-[11px] sm:text-xs text-gray-500 dark:text-gray-300">Terlaris berdasarkan penjualan 30 hari terakhir</p>
                     </div>
                     <button onClick={() => setShowCategoryModal(true)} className="text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline transition-colors cursor-pointer bg-orange-50 dark:bg-orange-900/30 px-3 py-1.5 rounded-full">
                         Lihat Semua
@@ -34,7 +34,7 @@ export default function CategorySection({
                         <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center border-2 transition-all ${!filters.category && !filters.tipe ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30 text-orange-500' : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-gray-400 group-hover:border-orange-200 shadow-sm'}`}>
                             <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                         </div>
-                        <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight line-clamp-2 ${!filters.category && !filters.tipe ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>Semua<br/>Brand</span>
+                        <span className={`text-[11px] sm:text-xs font-bold text-center leading-tight line-clamp-2 ${!filters.category && !filters.tipe ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>Semua<br/>Brand</span>
                     </div>
                     {categoryList.map((cat, index) => (
                         <div key={index} onClick={() => handleCategoryBrand(cat.name)} className="flex flex-col items-center gap-2 cursor-pointer snap-start min-w-[70px] group">
@@ -45,7 +45,7 @@ export default function CategorySection({
                                     <div className="w-full h-full bg-gray-200 dark:bg-gray-600 rounded-xl flex items-center justify-center font-black text-gray-400 text-xs">NS</div>
                                 )}
                             </div>
-                            <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight line-clamp-2 max-w-[80px] ${filters.category === cat.name ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>{cat.name}</span>
+                            <span className={`text-[11px] sm:text-xs font-bold text-center leading-tight line-clamp-2 max-w-[80px] ${filters.category === cat.name ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>{cat.name}</span>
                         </div>
                     ))}
                 </div>
@@ -62,11 +62,11 @@ export default function CategorySection({
                 </button>
                 
                 <div ref={typeContainerRef} className="flex gap-2.5 sm:gap-3 overflow-x-auto hide-scroll pb-2 px-1 scroll-smooth">
-                    <button onClick={() => handleCategoryTipe('')} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-extrabold whitespace-nowrap transition-all border shadow-sm cursor-pointer ${!filters.tipe && !filters.category ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-400'}`}>
+                    <button onClick={() => handleCategoryTipe('')} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-extrabold whitespace-nowrap transition-all border shadow-sm cursor-pointer ${!filters.tipe && !filters.category ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-gray-900 dark:border-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400'}`}>
                         Semua Tipe
                     </button>
                     {manualCategories.map((tipe, idx) => (
-                        <button key={idx} onClick={() => handleCategoryTipe(tipe)} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-extrabold whitespace-nowrap transition-all border shadow-sm cursor-pointer ${filters.tipe === tipe ? 'bg-orange-500 text-white border-orange-500' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-orange-300'}`}>
+                        <button key={idx} onClick={() => handleCategoryTipe(tipe)} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-extrabold whitespace-nowrap transition-all border shadow-sm cursor-pointer ${filters.tipe === tipe ? 'bg-orange-500 text-white border-orange-500' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-orange-300'}`}>
                             {tipe}
                         </button>
                     ))}

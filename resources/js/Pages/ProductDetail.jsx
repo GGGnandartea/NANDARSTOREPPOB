@@ -1,3 +1,4 @@
+import FavoriteButton from '../Components/FavoriteButton';
 import React, { useEffect, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
@@ -82,6 +83,7 @@ export default function ProductDetail({ product, auth }) {
                             )}
                         </div>
 
+                        <div className="my-3"><FavoriteButton productId={product.id} productName={product.name} /></div>
                         {/* Judul & Harga */}
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white leading-tight mb-4">
                             {product.name}

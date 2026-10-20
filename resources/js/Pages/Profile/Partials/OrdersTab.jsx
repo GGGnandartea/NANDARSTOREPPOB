@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { Icon, fmt } from './ProfileIcons';
 import StatusBadge from './StatusBadge';
+import OrderProgress from '../../../Components/OrderProgress';
 import Pagination from './Pagination';
 
 export default function OrdersTab({
@@ -68,12 +69,12 @@ export default function OrdersTab({
           <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
             <span>{header.title}</span>
             {activeCategory === 'ppob' && (
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+              <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                 ⚡ PPOB
               </span>
             )}
             {activeCategory === 'app' && (
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
+              <span className="text-[11px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
                 💎 Premium
               </span>
             )}
@@ -89,6 +90,7 @@ export default function OrdersTab({
         </div>
       </div>
 
+      <button type="button" onClick={() => router.reload({ only: ['orders'], preserveScroll: true })} className="min-h-11 mb-3 px-4 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200">Perbarui Status Pesanan</button>
       {/* FILTER TABS: APLIKASI VS PPOB VS SEMUA */}
       <div className="flex items-center gap-2 p-1.5 bg-gray-100 dark:bg-gray-800/80 rounded-2xl mb-4 border border-gray-200/60 dark:border-gray-700/60 overflow-x-auto">
         <button
@@ -103,7 +105,7 @@ export default function OrdersTab({
           <Icon.App className="w-3.5 h-3.5" />
           <span>Aplikasi Premium</span>
           <span
-            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+            className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               activeCategory === 'app'
                 ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -125,7 +127,7 @@ export default function OrdersTab({
           <Icon.Ppob className="w-3.5 h-3.5 text-emerald-500" />
           <span>PPOB</span>
           <span
-            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+            className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               activeCategory === 'ppob'
                 ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -147,7 +149,7 @@ export default function OrdersTab({
           <Icon.History className="w-3.5 h-3.5" />
           <span>Semua Transaksi</span>
           <span
-            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+            className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               activeCategory === 'all'
                 ? 'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
@@ -239,11 +241,11 @@ export default function OrdersTab({
                     </span>
                     <StatusBadge status={o.order_status || o.payment_status} />
                     {o.product_type === 'ppob' ? (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         ⚡ PPOB
                       </span>
                     ) : (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         ⚡ Akun Premium
                       </span>
                     )}
@@ -257,8 +259,10 @@ export default function OrdersTab({
                     )}
                   </p>
 
+                  <OrderProgress order={o} />
+
                   {o.notes && !/premku|preflix|provider|api|invalid|\[internal/i.test(o.notes) && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 italic break-words">
+                    <p className="text-xs text-gray-500 dark:text-gray-300 mb-2 italic break-words">
                       Catatan: {o.notes}
                     </p>
                   )}
@@ -266,7 +270,7 @@ export default function OrdersTab({
                   {o.sn_or_account && (
                     <div className="mt-2.5 p-3 sm:p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-xl">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                           Detail Akun / Serial Number
                         </p>
                         <button
@@ -277,7 +281,7 @@ export default function OrdersTab({
                             showToast('success', 'Detail akun berhasil disalin ke clipboard!');
                             setTimeout(() => setCopiedSnId(null), 2500);
                           }}
-                          className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                          className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
                         >
                           {copiedSnId === (o.id || o.invoice_number) ? (
                             <>
@@ -342,7 +346,7 @@ export default function OrdersTab({
                     {fmt.rp(o.total_amount || o.price)}
                   </p>
                   {isReseller && o.discount_amount > 0 && (
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
                       Diskon {fmt.rp(o.discount_amount)}
                     </span>
                   )}

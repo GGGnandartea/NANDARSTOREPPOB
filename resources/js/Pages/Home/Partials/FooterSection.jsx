@@ -22,7 +22,7 @@ export default function FooterSection({
                             )}
                             <span className="font-black text-gray-900 dark:text-white text-xl tracking-tight">{store?.name || 'NandarStore'}</span>
                         </div>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed font-medium">
+                        <p className="text-gray-500 dark:text-gray-300 text-sm leading-relaxed font-medium">
                             Platform digital andalan untuk upgrade produktivitas dan hiburanmu tanpa bikin dompet boncos. Nikmati pengalaman belanja akun premium yang 100% aman, diproses otomatis secara instan, dengan penawaran harga spesial.
                         </p>
                         <div className="flex items-center gap-3 mt-2">
@@ -39,27 +39,27 @@ export default function FooterSection({
                         <h3 className="font-black text-gray-900 dark:text-white tracking-widest text-sm uppercase mb-1">Layanan</h3>
                         <ul className="space-y-3">
                             <li>
-                                <Link href="/" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                <Link href="/" className="text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Beranda
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/ppob" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                <Link href="/ppob" className="text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Layanan PPOB
                                 </Link>
                             </li>
                             <li>
-                                <button onClick={() => setShowTrackModal(true)} className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors cursor-pointer">
+                                <button onClick={() => setShowTrackModal(true)} className="text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors cursor-pointer">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Lacak Pesanan
                                 </button>
                             </li>
                             <li>
-                                <Link href="/faq" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                <Link href="/faq" className="text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Pusat Bantuan &amp; FAQ
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/syarat-ketentuan" className="text-gray-500 dark:text-gray-400 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
+                                <Link href="/syarat-ketentuan" className="text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 font-medium text-sm flex items-center gap-2 transition-colors">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg> Syarat &amp; Ketentuan
                                 </Link>
                             </li>
@@ -73,13 +73,13 @@ export default function FooterSection({
                                 <div className="mt-0.5 text-orange-500">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                 </div>
-                                <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">Jawa Barat, Indonesia.</span>
+                                <span className="text-gray-500 dark:text-gray-300 font-medium text-sm">Jawa Barat, Indonesia.</span>
                             </li>
                             <li className="flex items-start gap-3">
                                 <div className="mt-0.5 text-orange-500">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                                 </div>
-                                <span className="text-gray-500 dark:text-gray-400 font-medium text-sm">+62 823-1745-8496</span>
+                                <span className="text-gray-500 dark:text-gray-300 font-medium text-sm">+62 823-1745-8496</span>
                             </li>
                         </ul>
                     </div>
@@ -87,10 +87,10 @@ export default function FooterSection({
                 </div>
                 
                 <div className="mt-12 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <p className="text-gray-500 dark:text-gray-500 text-xs font-bold text-center md:text-left">
+                    <p className="text-gray-500 dark:text-gray-300 text-xs font-medium text-center md:text-left">
                         &copy; {new Date().getFullYear()} {store?.name || 'NandarStore'}. Hak Cipta Dilindungi.
                     </p>
-                    <p className="text-gray-500 dark:text-gray-500 text-xs font-bold text-center">
+                    <p className="text-gray-500 dark:text-gray-300 text-xs font-medium text-center">
                         Made with <span className="text-red-500">❤</span> by <span className="text-orange-500">{store?.name || 'NandarStore'}</span>
                     </p>
                 </div>

@@ -24,7 +24,7 @@ export default function HeroBanner({
             </div>
             
             {/* BANNER CAROUSEL: Full Width on Desktop, Compact & Proporsional on Mobile */}
-            <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:max-w-[1720px] 2xl:mx-auto relative z-10 mb-5 sm:mb-7">
+            <div className="w-full px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 2xl:max-w-[1720px] 2xl:mx-auto relative z-10 mb-1 sm:mb-3">
                 <div 
                     className="w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl sm:shadow-2xl relative bg-white dark:bg-gray-900 aspect-[16/7] sm:aspect-[21/9] md:aspect-[3.2/1] lg:aspect-[3.6/1] xl:aspect-[3.8/1] border border-gray-200/80 dark:border-white/10 group select-none"
                     onMouseEnter={() => setIsHoveredBanner(true)}
@@ -80,7 +80,7 @@ export default function HeroBanner({
                                     {hasText && (
                                         <div className="relative z-20 w-full h-full flex flex-col justify-center px-6 sm:px-12 md:px-16 lg:px-20 py-4 max-w-3xl">
                                             {banner.badge && (
-                                                <span className="inline-block self-start px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-full text-[9px] sm:text-[10px] md:text-xs font-black text-white mb-1.5 sm:mb-2 uppercase tracking-wider shadow-sm">
+                                                <span className="inline-block self-start px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] sm:text-[11px] md:text-xs font-black text-white mb-1.5 sm:mb-2 uppercase tracking-wider shadow-sm">
                                                     {banner.badge}
                                                 </span>
                                             )}
@@ -90,7 +90,7 @@ export default function HeroBanner({
                                                 </h2>
                                             )}
                                             {(banner.subtitle || banner.desc) && (
-                                                <p className="text-white/85 text-[10px] sm:text-xs md:text-sm font-medium max-w-[240px] sm:max-w-md lg:max-w-lg line-clamp-2 drop-shadow">
+                                                <p className="text-white/85 text-[11px] sm:text-xs md:text-sm font-medium max-w-[240px] sm:max-w-md lg:max-w-lg line-clamp-2 drop-shadow">
                                                     {banner.subtitle || banner.desc}
                                                 </p>
                                             )}
@@ -132,21 +132,25 @@ export default function HeroBanner({
                         </>
                     )}
 
-                    {/* Indicators Dots */}
-                    {bannerList.length > 1 && (
-                        <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2 z-30">
-                            {bannerList.map((_, idx) => (
-                                <button 
-                                    key={idx} 
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setCurrentBanner(idx); }} 
-                                    className={`h-1.5 sm:h-2 rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer shadow-sm ${currentBanner === idx ? 'bg-orange-500 w-6 sm:w-8' : 'bg-white/40 hover:bg-white/70 w-2 sm:w-2.5'}`}
-                                    aria-label={`Go to banner ${idx + 1}`}
-                                />
-                            ))}
-                        </div>
-                    )}
+
                 </div>
+                {/* Small visual dots with separate, comfortable touch targets. */}
+                {bannerList.length > 1 && (
+                    <div className="flex items-center justify-center" aria-label="Pilih banner">
+                        {bannerList.map((_, idx) => (
+                            <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setCurrentBanner(idx)}
+                                className="w-11 h-11 flex items-center justify-center rounded-full"
+                                aria-label={`Lihat banner ${idx + 1}`}
+                                aria-current={currentBanner === idx ? 'true' : undefined}
+                            >
+                                <span aria-hidden="true" className={`h-1.5 rounded-full transition-all duration-300 ${currentBanner === idx ? 'bg-orange-500 w-5' : 'bg-gray-300 dark:bg-gray-600 w-1.5'}`} />
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">

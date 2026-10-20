@@ -87,7 +87,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 p-5 flex items-center justify-between text-gray-950">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest bg-black/20 px-2 py-0.5 rounded-full inline-block mb-1">Aktivasi Seumur Hidup</span>
+            <span className="text-[11px] font-black uppercase tracking-widest bg-black/20 px-2 py-0.5 rounded-full inline-block mb-1">Aktivasi Seumur Hidup</span>
             <h3 className="font-black text-lg">Upgrade ke Reseller VIP</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center text-gray-950 hover:bg-black/30 transition cursor-pointer" aria-label="Tutup Upgrade Reseller">
@@ -100,9 +100,9 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
             <div className="space-y-4">
               <div className="text-center pb-2">
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  <p className="text-xs text-gray-400 font-bold uppercase">Biaya Upgrade</p>
+                  <p className="text-xs text-gray-400 font-medium uppercase">Biaya Upgrade</p>
                   {isFree && (
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-white uppercase animate-pulse">
+                    <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-white uppercase animate-pulse">
                       {promoBadge}
                     </span>
                   )}
@@ -160,13 +160,13 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
                         </div>
                         <div className="text-left">
                           <p className="text-xs font-black text-white">Potong Saldo</p>
-                          <p className="text-[10px] text-gray-400">Saldo kamu: {fmt.rp(userBalance)}</p>
+                          <p className="text-[11px] text-gray-400">Saldo kamu: {fmt.rp(userBalance)}</p>
                         </div>
                       </div>
                       {userBalance >= fee ? (
-                        <span className="text-[9px] font-black bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Tersedia</span>
+                        <span className="text-[11px] font-black bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">Tersedia</span>
                       ) : (
-                        <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Kurang</span>
+                        <span className="text-[11px] font-black bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Kurang</span>
                       )}
                     </button>
 
@@ -181,10 +181,10 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
                         </div>
                         <div className="text-left">
                           <p className="text-xs font-black text-white">Bayar QRIS Instan</p>
-                          <p className="text-[10px] text-gray-400">Semua e-wallet &amp; mobile banking</p>
+                          <p className="text-[11px] text-gray-400">Semua e-wallet &amp; mobile banking</p>
                         </div>
                       </div>
-                      <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Otomatis</span>
+                      <span className="text-[11px] font-black bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">Otomatis</span>
                     </button>
                   </div>
 
@@ -203,7 +203,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
 
           {step === 'qris' && (
             <div className="text-center">
-              <p className="text-xs text-gray-400 font-bold uppercase mb-1">Total Pembayaran</p>
+              <p className="text-xs text-gray-400 font-medium uppercase mb-1">Total Pembayaran</p>
               <p className="text-3xl font-black text-amber-400 mb-4">{fmt.rp(qrisData?.total_nominal || 20000)}</p>
               
               <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mb-4">
@@ -217,7 +217,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
               <div className="flex items-center justify-center gap-2 text-amber-400 font-bold text-xs bg-amber-500/10 py-2.5 rounded-xl border border-amber-500/20 mb-3 animate-pulse">
                 <div className="w-2 h-2 rounded-full bg-amber-400"></div>Menunggu pembayaran...
               </div>
-              <p className="text-[10px] text-gray-400 mb-2">ID: <span className="font-mono text-gray-300">{qrisData?.order_id}</span></p>
+              <p className="text-[11px] text-gray-400 mb-2">ID: <span className="font-mono text-gray-300">{qrisData?.order_id}</span></p>
               <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-300 font-bold transition cursor-pointer">Tutup (bayar nanti)</button>
             </div>
           )}

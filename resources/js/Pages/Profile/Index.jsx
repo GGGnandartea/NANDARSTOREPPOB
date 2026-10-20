@@ -5,6 +5,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Icon } from './Partials/ProfileIcons';
 import ProfileNavbar from './Partials/ProfileNavbar';
 import ProfileSidebar from './Partials/ProfileSidebar';
+import FavoritesTab from './Partials/FavoritesTab';
 import DashboardTab from './Partials/DashboardTab';
 import OrdersTab from './Partials/OrdersTab';
 import MutationsTab from './Partials/MutationsTab';
@@ -15,8 +16,9 @@ import UpgradeResellerModal from './Partials/UpgradeResellerModal';
 import ChangeWaModal from './Partials/ChangeWaModal';
 import WaVerificationModal from './Partials/WaVerificationModal';
 
-export default function Profile({ orders = [], topups = [], mutations = [], stats = null, resellerSettings = null }) {
-  const { auth, flash, url } = usePage().props;
+export default function Profile({ favoriteProducts = [], orders = [], topups = [], mutations = [], stats = null, resellerSettings = null }) {
+  const { auth, flash } = usePage().props;
+  const { url } = usePage();
   const user = auth?.user;
   const isReseller = user?.role === 'reseller';
 
@@ -55,7 +57,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
         if (tabParam === 'orders' || tabParam === 'orders_app' || tabParam === 'history') return 'orders_app';
         if (tabParam === 'orders_all') return 'orders_all';
         if (tabParam === 'settings') return 'profile';
-        if (['dashboard', 'topup', 'security', 'profile'].includes(tabParam)) return tabParam;
+        if (['dashboard', 'topup', 'security', 'profile', 'favorites'].includes(tabParam)) return tabParam;
       }
     }
     return 'dashboard';
@@ -186,7 +188,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
         else if (tab === 'ppob' || tab === 'orders_ppob') setActiveMenu('orders_ppob');
         else if (tab === 'orders_all') setActiveMenu('orders_all');
         else if (tab === 'settings') setActiveMenu('profile');
-        else if (['dashboard', 'profile', 'topup', 'security'].includes(tab)) {
+        else if (['dashboard', 'profile', 'topup', 'security', 'favorites'].includes(tab)) {
           setActiveMenu(tab);
         }
       } else {
@@ -216,6 +218,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
   };
 
   const menus = [
+    { key: 'favorites', label: 'Produk Favorit', icon: Icon.Heart, count: favoriteProducts.length },
     { key: 'dashboard',   label: 'Dashboard',             icon: Icon.Dashboard },
     { key: 'orders_app',  label: 'Pesanan Aplikasi',      icon: Icon.App,     count: appOrders.length },
     { key: 'orders_ppob', label: 'Pesanan PPOB',          icon: Icon.Ppob,    count: ppobOrders.length },
@@ -247,7 +250,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
     activeMenu === 'orders';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors">
+    <div className="profile-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors">
       <Head>
         <title>{isReseller ? 'Profil VIP Reseller - NandarStore' : 'Profil Saya - NandarStore'}</title>
         <link
@@ -297,7 +300,7 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
       )}
 
       {/* MAIN LAYOUT */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8">
         <div className="flex gap-6 items-start">
           {/* DESKTOP SIDEBAR */}
           <aside className="hidden md:flex flex-col w-72 shrink-0 h-fit self-start">
@@ -324,6 +327,13 @@ export default function Profile({ orders = [], topups = [], mutations = [], stat
 
           {/* MAIN CONTENT */}
           <main className="flex-1 min-w-0">
+            <button type="button" onClick={() => handleMenuClick('favorites')} className="w-full mb-4 min-h-14 flex items-center gap-3 rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/20 px-4 py-3 text-left text-gray-900 dark:text-white">
+              <Icon.Heart className="w-5 h-5 text-rose-500" />
+              <span className="flex-1 text-sm font-semibold">Produk Favorit</span>
+              <span className="text-xs text-gray-600 dark:text-gray-300">{favoriteProducts.length} produk</span>
+              <Icon.ChevronRight className="w-4 h-4" />
+            </button>
+            {activeMenu === 'favorites' && <FavoritesTab products={favoriteProducts} />}
             {/* Dashboard Profil */}
             {activeMenu === 'dashboard' && (
               <DashboardTab

@@ -33,14 +33,14 @@
                 <div class="flex items-center gap-2 mt-1">
                     <span class="text-xs font-extrabold text-orange-500">Rp {{ number_format($product->price, 0, ',', '.') }}</span>
                     <span class="text-gray-300 dark:text-gray-700">•</span>
-                    <span class="text-xs font-bold text-blue-500">Stok Tersedia: {{ $product->stock }} Akun</span>
+                    <span class="text-xs font-bold text-blue-500">Stok Tersedia: {{ $availableStock }} Akun</span>
                 </div>
             </div>
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-            <span class="px-3.5 py-1.5 rounded-full {{ $product->stock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-300' }} text-xs font-black">
-                {{ $product->stock > 0 ? '● Siap Dijual' : '● Stok Kosong' }}
+            <span class="px-3.5 py-1.5 rounded-full {{ $availableStock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-300' }} text-xs font-black">
+                {{ $availableStock > 0 ? '● Siap Dijual' : '● Stok Kosong' }}
             </span>
         </div>
     </div>
@@ -115,9 +115,9 @@
         <div class="lg:col-span-2 admin-card overflow-hidden flex flex-col h-[650px]">
             <div class="p-5 border-b border-gray-100 dark:border-white/5 flex flex-col sm:flex-row justify-between items-center gap-3 bg-gray-50/50 dark:bg-black/20">
                 <div class="flex items-center gap-2.5 w-full sm:w-auto">
-                    <h3 class="font-black text-sm text-gray-900 dark:text-white">Daftar Akun Siap Jual</h3>
+                    <h3 class="font-black text-sm text-gray-900 dark:text-white">Daftar Stok Akun</h3>
                     <span class="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-emerald-300">
-                        {{ $product->stock }} Tersedia
+                        {{ $availableStock }} Tersedia
                     </span>
                     
                     @if($accounts->count() > 0)

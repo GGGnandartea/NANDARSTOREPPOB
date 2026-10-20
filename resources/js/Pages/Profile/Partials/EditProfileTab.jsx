@@ -27,32 +27,32 @@ export default function EditProfileTab({ user, onOpenWaModal, onOpenChangeWaModa
           {localError && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-bold p-3 rounded-2xl">{localError}</div>}
           
           <div>
-            <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">Nama Lengkap</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider mb-2 block">Nama Lengkap</label>
             <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition" required />
           </div>
           
           <div>
-            <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">Email</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider mb-2 block">Email</label>
             <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition" required />
           </div>
           
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">No. WhatsApp</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">No. WhatsApp</label>
               <div className="flex items-center gap-2">
                 {user?.is_whatsapp_verified ? (
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
+                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
                     ✅ Terverifikasi
                   </span>
                 ) : (
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700">
+                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700">
                     ⚠️ Belum Terverifikasi
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={() => onOpenChangeWaModal?.()}
-                  className="text-[10px] font-bold text-orange-500 hover:text-orange-600 hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-[11px] font-bold text-orange-500 hover:text-orange-600 hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <span>✏️</span> Ganti Nomor
                 </button>
@@ -67,7 +67,7 @@ export default function EditProfileTab({ user, onOpenWaModal, onOpenChangeWaModa
                   <span className="text-xl">✅</span>
                   <div>
                     <p className="text-xs font-black text-emerald-800 dark:text-emerald-300">Nomor WhatsApp Terverifikasi ({user?.whatsapp})</p>
-                    <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">Notifikasi pesanan dan invoice resmi otomatis aktif dikirim ke nomor ini.</p>
+                    <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium">Notifikasi pesanan dan invoice resmi otomatis aktif dikirim ke nomor ini.</p>
                   </div>
                 </div>
                 <button
@@ -84,7 +84,7 @@ export default function EditProfileTab({ user, onOpenWaModal, onOpenChangeWaModa
                   <span className="text-xl">📲</span>
                   <div>
                     <p className="text-xs font-black text-amber-800 dark:text-amber-300">Verifikasi Nomor WhatsApp</p>
-                    <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium">Verifikasi nomor Anda agar detail akun, password, dan invoice otomatis dikirim via WhatsApp!</p>
+                    <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 font-medium">Verifikasi nomor Anda agar detail akun, password, dan invoice otomatis dikirim via WhatsApp!</p>
                   </div>
                 </div>
                 <button

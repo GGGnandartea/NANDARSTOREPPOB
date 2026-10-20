@@ -1,76 +1,125 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import OrderProgress from '../../../Components/OrderProgress';
+import { orderProgress } from '../../../utils/orderProgress';
+import { savedGuestOrders, rememberGuestOrder } from '../../../utils/guestOrders';
 
 export default function TrackOrderModal({
-    showTrackModal,
-    setShowTrackModal,
-    trackOrderId,
-    setTrackOrderId,
-    handleTrackOrder,
-    trackLoading,
-    trackResult,
-    setTrackResult,
+    showTrackModal, setShowTrackModal, trackOrderId, setTrackOrderId,
+    handleTrackOrder, trackLoading, trackResult, setTrackResult,
 }) {
+    const [history, setHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState(false);
+    const [showAccount, setShowAccount] = useState(false);
+    const [copyMessage, setCopyMessage] = useState('');
+    const progress = trackResult?.order_id ? orderProgress(trackResult) : null;
+    const canShowAccount = trackResult?.is_ready && progress?.step === 2 && !progress?.exception && trackResult?.sn_or_account;
+
+    useEffect(() => { setShowAccount(false); setCopyMessage(''); }, [showTrackModal, trackResult?.order_id]);
+
+    useEffect(() => {
+        if (!showTrackModal) return;
+        const controller = new AbortController();
+        setHistory(savedGuestOrders());
+        setHistoryLoading(true);
+        setHistoryError(false);
+        fetch('/orders/guest-history', { signal: controller.signal, headers: { Accept: 'application/json' } })
+            .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+            .then(data => {
+                if (controller.signal.aborted) return;
+                const orders = Array.isArray(data.orders) ? data.orders : [];
+                [...orders].reverse().forEach(rememberGuestOrder);
+                const combined = [...orders, ...savedGuestOrders()];
+                setHistory(combined.filter((order, index) => combined.findIndex(item => item.order_id === order.order_id) === index));
+            })
+            .catch(() => { if (!controller.signal.aborted) setHistoryError(true); })
+            .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false); });
+        return () => controller.abort();
+    }, [showTrackModal, trackResult?.order_id]);
+
+    useEffect(() => {
+        if (!showTrackModal || !trackResult?.order_id || orderProgress(trackResult).terminal) return;
+        const controller = new AbortController();
+        let busy = false;
+        const timer = setInterval(async () => {
+            if (busy || document.hidden) return;
+            busy = true;
+            try {
+                const response = await fetch(`/checkout/status/${encodeURIComponent(trackResult.order_id)}`, { signal: controller.signal, headers: { Accept: 'application/json' } });
+                if (!response.ok) {
+                    if (!controller.signal.aborted) setTrackResult({ status: 'NOT_FOUND' });
+                    return;
+                }
+                const data = await response.json();
+                if (!controller.signal.aborted) setTrackResult(data);
+            } catch { /* The last known status remains visible during connection failures. */ }
+            finally { busy = false; }
+        }, 15000);
+        return () => { clearInterval(timer); controller.abort(); };
+    }, [showTrackModal, trackResult?.order_id, trackResult?.status, setTrackResult]);
+
+    const copy = async (value, success) => {
+        try { await navigator.clipboard.writeText(value); setCopyMessage(success); }
+        catch { setCopyMessage('Tidak dapat menyalin otomatis. Buka invoice untuk menyalin secara manual.'); }
+    };
     if (!showTrackModal) return null;
 
-    return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pb-20 sm:pb-4 bg-black/60 backdrop-blur-sm transition-opacity">
-            <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-fade-in-up border border-gray-100 dark:border-gray-700">
-                <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-                    <h3 className="text-lg font-black dark:text-white flex items-center gap-2">
-                        <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Lacak Pesanan
-                    </h3>
-                    <button onClick={() => { setShowTrackModal(false); setTrackResult(null); setTrackOrderId(''); }} className="p-2 text-gray-400 hover:text-red-500 transition-colors bg-white dark:bg-gray-700 rounded-full shadow-sm cursor-pointer" aria-label="Tutup Modal Lacak">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-                <div className="p-6">
-                    <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-                        Masuk dengan akun pembelian untuk melacak invoice. Pembeli tamu dapat membuka tautan invoice pribadi yang disimpan saat checkout.
-                    </p>
-                    <form onSubmit={handleTrackOrder} className="flex flex-col gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5">Nomor Invoice / Order ID</label>
-                            <input type="text" required value={trackOrderId} onChange={(e) => setTrackOrderId(e.target.value)} placeholder="Contoh: INV-123456" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-orange-500 text-sm font-bold dark:text-white transition-all outline-none" />
-                        </div>
-                        <button type="submit" disabled={trackLoading} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer">
-                            {trackLoading ? (
-                                <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            ) : (
-                                <>Cek Status Sekarang <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
-                            )}
-                        </button>
-                    </form>
+    return <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" aria-labelledby="track-order-title" className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-700">
+            <div className="sticky top-0 z-10 p-4 sm:p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
+                <h2 id="track-order-title" className="text-lg font-bold text-gray-900 dark:text-white">Riwayat & Detail Pesanan</h2>
+                <button type="button" onClick={() => { setShowTrackModal(false); setTrackResult(null); setTrackOrderId(''); }} className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-700" aria-label="Tutup Riwayat Pesanan">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div className="p-4 sm:p-6 space-y-5">
+                <p className="text-sm text-gray-600 dark:text-gray-300">Belanja tanpa login? Pilih riwayat di browser ini atau masukkan nomor invoice. Jika berpindah browser, gunakan tautan invoice pribadi yang disimpan saat pembelian.</p>
+                <form onSubmit={handleTrackOrder} className="space-y-3">
+                    <div>
+                        <label htmlFor="track-order-input" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Nomor Invoice atau Tautan Invoice Pribadi</label>
+                        <input id="track-order-input" type="text" required value={trackOrderId} onChange={e => setTrackOrderId(e.target.value)} placeholder="Nomor invoice atau tempel tautan pribadi" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
+                    </div>
+                    <button type="submit" disabled={trackLoading} className="min-h-11 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-3 rounded-xl disabled:opacity-60">{trackLoading ? 'Memuat pesanan...' : 'Lihat Detail Pesanan'}</button>
+                </form>
 
-                    {trackResult && (
-                        <div className={`mt-5 p-4 rounded-xl border flex flex-col items-center justify-center text-center gap-2 ${
-                            trackResult === 'SUCCESS' ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 
-                            trackResult === 'PENDING' ? 'bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800' : 
-                            'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                        }`}>
-                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Status Pesanan:</span>
-                            {trackResult === 'SUCCESS' && (
-                                <div className="space-y-2 mt-1">
-                                    <span className="text-green-600 dark:text-green-400 font-black text-xl uppercase tracking-widest block">Lunas &amp; Selesai ✓</span>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Pesanan telah berhasil diproses oleh sistem.</p>
-                                    <a 
-                                        href={`/order/invoice/${trackOrderId}`} 
-                                        target="_blank" 
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors mt-2"
-                                    >
-                                        <span>Buka Detail Akun &amp; Invoice PDF</span>
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                                    </a>
-                                </div>
-                            )}
-                            {trackResult === 'PENDING' && <span className="text-yellow-600 dark:text-yellow-400 font-black text-xl uppercase tracking-widest">Tertunda (Pending)</span>}
-                            {(trackResult !== 'SUCCESS' && trackResult !== 'PENDING') && <span className="text-red-600 dark:text-red-400 font-black text-lg uppercase tracking-widest">Tidak Ditemukan / Gagal</span>}
+                {trackResult && <div aria-live="polite">
+                    {trackResult.order_id ? <>
+                        <p className="text-xs text-gray-500 dark:text-gray-300 break-all">{trackResult.order_id}</p>
+                        <h3 className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{trackResult.product_name}</h3>
+                        <OrderProgress order={trackResult} />
+                        {canShowAccount && <section className="mb-3 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30">
+                            <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Detail Akun / Serial Number</h4>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                <button type="button" onClick={() => setShowAccount(value => !value)} aria-expanded={showAccount} className="min-h-11 px-3 rounded-lg border border-emerald-300 dark:border-emerald-700 text-sm text-emerald-800 dark:text-emerald-200">{showAccount ? 'Sembunyikan Akun' : 'Tampilkan Akun'}</button>
+                                <button type="button" onClick={() => copy(trackResult.sn_or_account, 'Detail akun berhasil disalin.')} className="min-h-11 px-3 rounded-lg bg-emerald-600 text-sm text-white">Salin Akun</button>
+                            </div>
+                            {showAccount && <pre className="mt-3 p-3 rounded-lg bg-white dark:bg-gray-900 whitespace-pre-wrap break-all text-sm leading-relaxed text-gray-900 dark:text-gray-100">{trackResult.sn_or_account}</pre>}
+                        </section>}
+                        {!progress.terminal && <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">Detail akun akan tersedia setelah pesanan selesai. Status diperiksa setiap 15 detik.</p>}
+                        <div className="flex flex-wrap gap-2">
+                            {trackResult.invoice_url && <a href={trackResult.invoice_url} className="inline-flex items-center min-h-11 px-4 rounded-xl bg-orange-500 text-white text-sm font-semibold">Buka Invoice & Detail</a>}
+                            {trackResult.is_guest && trackResult.invoice_url && <button type="button" onClick={() => copy(trackResult.invoice_url, 'Tautan invoice pribadi disalin. Simpan untuk membuka pesanan dari browser lain.')} className="min-h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200">Salin Tautan Pribadi</button>}
                         </div>
-                    )}
-                </div>
+                        {trackResult.is_guest && <p className="mt-3 text-xs text-gray-600 dark:text-gray-300">Simpan tautan pribadi Anda. Tautan ini dapat membuka detail akun dan tetap diperlukan jika data browser dihapus.</p>}
+                        {copyMessage && <p role="status" className="mt-2 text-xs text-gray-700 dark:text-gray-200">{copyMessage}</p>}
+                    </> : <p role="alert" className="text-sm text-red-600 dark:text-red-300">{trackResult.status === 'ERROR' ? 'Gagal memuat pesanan. Periksa nomor invoice, tautan, atau koneksi lalu coba lagi.' : 'Pesanan tidak dapat diakses. Gunakan browser saat membeli atau tempel tautan invoice pribadi Anda.'}</p>}
+                </div>}
+
+                <section className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-white">Riwayat Pembelian Tamu</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 mb-3">Pesanan yang tersimpan di browser ini, termasuk yang belum selesai.</p>
+                    {historyLoading && <p className="text-xs text-gray-500 dark:text-gray-300">Memuat riwayat...</p>}
+                    {historyError && <p className="text-xs text-amber-700 dark:text-amber-300">Riwayat sesi belum dapat dimuat. Anda tetap bisa membuka tautan yang tersimpan.</p>}
+                    {!historyLoading && !history.length && <p className="text-sm text-gray-600 dark:text-gray-300">Belum ada riwayat di browser ini. Tempel tautan invoice pribadi untuk membuka pesanan lama.</p>}
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {history.map(order => <button type="button" key={order.order_id} disabled={trackLoading} onClick={() => handleTrackOrder(null, order.invoice_url)} className="min-h-14 w-full text-left p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 disabled:opacity-50">
+                            <span className="block text-sm font-semibold text-gray-900 dark:text-white break-words">{order.product_name}</span>
+                            <span className="block text-xs text-gray-600 dark:text-gray-300 break-all mt-1">{order.order_id}</span>
+                            <span className="block text-xs text-orange-600 dark:text-orange-400 mt-1">Lihat status & detail akun</span>
+                        </button>)}
+                    </div>
+                </section>
             </div>
         </div>
-    );
+    </div>;
 }
-

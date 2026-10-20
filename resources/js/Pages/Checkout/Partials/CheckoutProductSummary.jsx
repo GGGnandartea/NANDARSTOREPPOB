@@ -14,7 +14,7 @@ export default function CheckoutProductSummary({ product, quantity = 1 }) {
           />
         )}
         <div className="min-w-0">
-          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Layanan Dipilih</p>
+          <p className="text-[11px] text-gray-400 font-medium uppercase tracking-widest">Layanan Dipilih</p>
           <h3 className="font-black text-gray-900 dark:text-white text-sm leading-tight truncate">{product.name}</h3>
         </div>
       </div>

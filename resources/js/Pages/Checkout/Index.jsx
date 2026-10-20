@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Head, usePage } from '@inertiajs/react';
+import { rememberGuestOrder } from '../../utils/guestOrders';
 import Swal from 'sweetalert2';
 
+import OrderProgress from '../../Components/OrderProgress';
 import CheckoutHeader from './Partials/CheckoutHeader';
 import CheckoutProductSummary from './Partials/CheckoutProductSummary';
 import CheckoutAdminAlert from './Partials/CheckoutAdminAlert';
@@ -18,7 +20,8 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const user = auth?.user;
   const userBalance = user?.balance ?? 0;
 
-  const maxStock = (product.type === 'local' && product.stock > 0) ? product.stock : 999;
+  const maxStock = product.type === 'local' && (product.process_type !== 'manual' || product.stock > 0)
+    ? Math.min(100, Math.max(0, Number(product.stock) || 0)) : 100;
 
   const [quantity, setQuantity] = useState(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -40,6 +43,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const [payMethod, setPayMethod] = useState('qris');
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [trackingData, setTrackingData] = useState(null);
   const [orderId, setOrderId] = useState(null);
   const [qrisUrl, setQrisUrl] = useState(null);
   const [invoiceUrl, setInvoiceUrl] = useState(null);
@@ -154,6 +158,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
     try {
       const res = await fetch(`/checkout/status/${orderId}`);
       const data = await res.json();
+          if (res.ok && data.order_id) setTrackingData(data);
       if (
         data.status === 'SUCCESS' ||
         data.status === 'LUNAS' ||
@@ -195,6 +200,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         try {
           const res = await fetch(`/checkout/status/${orderId}`);
           const data = await res.json();
+          if (res.ok && data.order_id) setTrackingData(data);
           if (
             data.status === 'SUCCESS' ||
             data.status === 'LUNAS' ||
@@ -225,6 +231,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         try {
           const res = await fetch(`/checkout/status/${currentOrderId}`);
           const data = await res.json();
+          if (res.ok && data.order_id) setTrackingData(data);
           if (data && data.sn_or_account && !isAccountPending(data.sn_or_account)) {
             setCompletedOrder((prev) => ({
               ...(prev || {}),
@@ -369,10 +376,12 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
       });
       const data = await res.json();
       if (res.ok && data.status === 'success') {
+        setTrackingData(data);
         setOrderId(data.order_id);
         setTotalNominal(data.total_nominal);
         setQrisUrl(data.url_qris);
         setInvoiceUrl(data.invoice_url);
+        if (!user) rememberGuestOrder({ ...data, product_name: product.name });
       } else {
         Swal.fire('Mohon Maaf', data.message || 'Gagal memproses pembayaran.', 'error');
       }
@@ -424,6 +433,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
       });
       const data = await res.json();
       if (res.ok && data.status === 'success') {
+        setTrackingData(data);
         setBalanceSuccess(data);
         setCompletedOrder({
           order_id: data.order_id,
@@ -469,7 +479,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const canGoBack = !orderId && !balanceSuccess;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center p-4 sm:p-6 font-jakarta">
+    <div className="checkout-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center p-4 sm:p-6 font-jakarta">
       <Head>
         <title>{`Checkout - ${store?.name || 'NandarStore'}`}</title>
         <link
@@ -489,6 +499,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         />
 
         <div className="p-6 sm:p-8">
+          {trackingData && <OrderProgress order={trackingData} />}
           {/* ═══ FORM INPUT ═══ */}
           {!orderId && !balanceSuccess && (
             <div>

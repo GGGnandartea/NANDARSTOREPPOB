@@ -60,11 +60,11 @@ export default function Navbar({
                                     value={searchTerm}
                                     onChange={handleInputChange}
                                     placeholder="Cari layanan..."
-                                    className="w-full pl-3.5 pr-9 sm:pl-4 sm:pr-12 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-full text-xs sm:text-sm font-semibold dark:text-white outline-none transition-colors shadow-inner"
+                                    className="min-h-11 w-full pl-3.5 pr-12 sm:pl-4 sm:pr-12 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-full text-sm font-medium dark:text-white outline-none transition-colors shadow-inner"
                                 />
                                 <button
                                     type="submit"
-                                    className="absolute right-1 sm:right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-7 sm:h-7 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer"
                                     title="Cari Produk"
                                 >
                                     <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -82,12 +82,12 @@ export default function Navbar({
                         >
                             <span>PPOB</span>
                             <span className="hidden sm:inline">&amp; Pulsa</span>
-                            <span className="hidden sm:inline-block text-[9px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
+                            <span className="hidden sm:inline-block text-[11px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
                         </Link>
 
                         <button
                             onClick={toggleDarkMode}
-                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-black dark:text-gray-400 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
+                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-black dark:text-gray-300 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
                             title="Ganti Mode Gelap / Terang"
                         >
                             {isDark ? (
@@ -134,7 +134,7 @@ export default function Navbar({
                                                     </div>
                                                     <div className="flex-1 overflow-hidden">
                                                         <p className="text-sm font-black text-white truncate">{auth.user.name}</p>
-                                                        <span className="inline-block text-[9px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full mt-0.5">
+                                                        <span className="inline-block text-[11px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full mt-0.5">
                                                             Mode Pantau Toko
                                                         </span>
                                                     </div>
@@ -156,7 +156,7 @@ export default function Navbar({
                                                     </div>
                                                     <div className="flex-1">
                                                         <p className="font-black text-sm">Dashboard Admin</p>
-                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400">Kembali ke panel kelola</p>
+                                                        <p className="text-[11px] text-gray-500 dark:text-gray-300">Kembali ke panel kelola</p>
                                                     </div>
                                                 </Link>
 
@@ -194,7 +194,7 @@ export default function Navbar({
                                                     <div className="w-6 h-6 rounded-md bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                                     </div>
-                                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Saldo</span>
+                                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300">Saldo</span>
                                                 </div>
                                                 <span className="text-sm font-black text-green-500 dark:text-green-400">Rp {new Intl.NumberFormat('id-ID').format(auth.user.balance || 0)}</span>
                                             </div>

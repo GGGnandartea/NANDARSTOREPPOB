@@ -12,6 +12,7 @@ Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.det
 Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
 Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process')->middleware('throttle:payments');
 Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
+Route::get('/orders/guest-history', [FrontController::class, 'guestOrderHistory'])->middleware('throttle:polling')->name('orders.guest_history');
 Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:resend_wa')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
@@ -50,6 +51,8 @@ Route::get('/reseller/payment-status/{orderId}', [AuthController::class, 'checkR
 
 // Halaman Profil User (login wajib)
 Route::middleware(['auth'])->group(function () {
+    Route::put('/favorites/{product}', [\App\Http\Controllers\FavoriteController::class, 'store'])->name('favorites.store');
+    Route::delete('/favorites/{product}', [\App\Http\Controllers\FavoriteController::class, 'destroy'])->name('favorites.destroy');
     Route::get('/profile', [FrontController::class, 'profile'])->name('profile');
     Route::post('/profile/buy-balance', [FrontController::class, 'buyWithBalance'])->name('buy.balance')->middleware('throttle:payments');
     Route::post('/topup/create', [FrontController::class, 'createTopup'])->name('topup.create')->middleware('throttle:payments');

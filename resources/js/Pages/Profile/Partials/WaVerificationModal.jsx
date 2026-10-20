@@ -141,7 +141,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">Nomor WhatsApp Anda</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider mb-2 block">Nomor WhatsApp Anda</label>
                 <input
                   type="text"
                   value={whatsapp}
@@ -167,7 +167,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
           {step === 'waiting' && verificationData && (
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1 text-xs">
-                <span className="text-gray-500 dark:text-gray-400 font-bold">
+                <span className="text-gray-500 dark:text-gray-300 font-medium">
                   Nomor: <span className="font-mono font-bold text-gray-900 dark:text-white">{verificationData.whatsapp || whatsapp}</span>
                 </span>
                 <button
@@ -184,7 +184,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
               </div>
 
               <div className="text-center">
-                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400">Kode Unik Verifikasi Anda:</span>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Kode Unik Verifikasi Anda:</span>
                 <div className="mt-2 flex items-center justify-center gap-2">
                   <div className="px-5 py-2.5 bg-gray-900 dark:bg-black border-2 border-emerald-500 rounded-2xl font-mono text-2xl font-black text-emerald-400 tracking-wider shadow-inner">
                     {verificationData.code}
@@ -223,7 +223,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
                   Menunggu Pesan Terkirim ke Bot WhatsApp...
                 </div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+                <p className="text-[11px] text-gray-500 dark:text-gray-300 font-medium">
                   Status akan otomatis terverifikasi begitu bot mendeteksi chat masuk berisi kode unik Anda.
                 </p>
               </div>
@@ -264,7 +264,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
                 <Icon.Check className="w-8 h-8" />
               </div>
               <h4 className="text-lg font-black text-gray-900 dark:text-white mb-1">WhatsApp Berhasil Diverifikasi!</h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-5">
+              <p className="text-xs text-gray-500 dark:text-gray-300 font-medium mb-5">
                 Nomor Anda telah terkonfirmasi. Mulai sekarang rincian pesanan dan invoice akan otomatis dikirimkan ke WhatsApp Anda.
               </p>
               <button

@@ -8,8 +8,8 @@ export default function FloatingActionMenu({
     store,
 }) {
     return (
-        <div className="fixed bottom-16 sm:bottom-6 right-3.5 sm:right-6 z-40 flex flex-col items-end gap-3">
-            <div className={`flex flex-col gap-3 transition-all duration-300 origin-bottom ${showFabMenu ? 'scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-10 pointer-events-none'}`}>
+        <div className="store-contact-menu pointer-events-none fixed bottom-16 sm:bottom-6 right-3.5 sm:right-6 z-40 flex flex-col items-end gap-3">
+            <div inert={!showFabMenu} aria-hidden={!showFabMenu} className={`flex flex-col gap-3 transition-all duration-300 origin-bottom ${showFabMenu ? 'pointer-events-auto scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-10 pointer-events-none'}`}>
                 <a href={whatsappGroupLink || "https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H"} target="_blank" rel="noreferrer" className="flex items-center gap-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-xl px-4 py-3 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group cursor-pointer">
                     <span className="text-xs font-extrabold text-gray-700 dark:text-gray-200">Join Grup WA</span>
                     <div className="w-8 h-8 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center">
@@ -23,10 +23,9 @@ export default function FloatingActionMenu({
                     </div>
                 </a>
             </div>
-            <button 
-                onClick={() => setShowFabMenu(!showFabMenu)} 
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white shadow-[0_10px_30px_-10px_rgba(249,115,22,0.6)] transition-all duration-300 cursor-pointer ${showFabMenu ? 'bg-gray-800 dark:bg-gray-700 rotate-45' : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-1 hover:scale-105'}`}
-                aria-label="Toggle Menu Kontak Cepat"
+            <button aria-label="Buka atau tutup bantuan WhatsApp" aria-expanded={showFabMenu}
+                onClick={() => setShowFabMenu(!showFabMenu)}
+                className={`pointer-events-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white shadow-[0_10px_30px_-10px_rgba(249,115,22,0.6)] transition-all duration-300 cursor-pointer ${showFabMenu ? 'bg-gray-800 dark:bg-gray-700 rotate-45' : 'bg-orange-500 hover:bg-orange-600 hover:-translate-y-1 hover:scale-105'}`}
             >
                 {showFabMenu ? (
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>

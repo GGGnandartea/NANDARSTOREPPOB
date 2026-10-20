@@ -32,6 +32,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function favoriteProducts()
+    {
+        return $this->belongsToMany(Product::class, 'product_favorites')->withTimestamps();
+    }
+
     // Relasi untuk menarik data Mutasi Saldo
     public function transactionLogs() {
         return $this->hasMany(TransactionLog::class)->orderBy('id', 'desc');

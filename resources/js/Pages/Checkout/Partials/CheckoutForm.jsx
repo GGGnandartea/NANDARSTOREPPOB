@@ -7,7 +7,7 @@ export default function CheckoutForm({
   product,
   quantity = 1,
   setQuantity,
-  maxStock = 999,
+  maxStock = 100,
   unitPrice,
   subtotal,
   buyerName,
@@ -40,7 +40,7 @@ export default function CheckoutForm({
     <div className="space-y-4">
       {/* Field Nama Pembeli */}
       <div>
-        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">
+        <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest mb-1.5">
           Nama Pembeli / Panggilan <span className="text-orange-500">*</span>
         </label>
         <input
@@ -56,20 +56,20 @@ export default function CheckoutForm({
       {/* Field WhatsApp */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
             Nomor WhatsApp
           </label>
           {!user ? (
-            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-200 dark:border-gray-700">
+            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full flex items-center gap-1 border border-gray-200 dark:border-gray-700">
               🔒 Khusus Akun Terdaftar
             </span>
           ) : user?.is_whatsapp_verified ? (
-            <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20">
+            <span className="text-[11px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               🔒 Terverifikasi (Terkunci)
             </span>
           ) : (
-            <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
               Belum Verifikasi
             </span>
           )}
@@ -82,7 +82,7 @@ export default function CheckoutForm({
               value=""
               readOnly
               placeholder="Fitur kirim WhatsApp dinonaktifkan (Khusus Akun Terdaftar)"
-              className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-100/90 dark:bg-gray-800/60 p-3.5 rounded-2xl text-xs font-semibold text-gray-400 dark:text-gray-500 cursor-not-allowed select-none transition outline-none"
+              className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-100/90 dark:bg-gray-800/60 p-3.5 rounded-2xl text-xs font-semibold text-gray-400 dark:text-gray-300 cursor-not-allowed select-none transition outline-none"
             />
           ) : (
             <input
@@ -139,10 +139,10 @@ export default function CheckoutForm({
       {/* Field Email (Opsional) */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
             Email Aktif <span className="text-gray-400 font-normal lowercase">(opsional, jika diperlukan)</span>
           </label>
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
+          <span className="text-[11px] font-medium text-gray-400 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
             Opsional
           </span>
         </div>
@@ -153,14 +153,14 @@ export default function CheckoutForm({
           placeholder="Kosongkan jika tidak ada"
           className="w-full bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 p-3.5 rounded-2xl text-sm font-bold text-gray-900 dark:text-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition outline-none"
         />
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+        <p className="text-[11px] text-gray-400 dark:text-gray-300 mt-1">
           *Opsional — isi jika kamu memerlukan salinan invoice / bukti pembelian dikirim ke email.
         </p>
       </div>
 
       {/* Field Catatan (Opsional) */}
       <div>
-        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">
+        <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest mb-1.5">
           Catatan (Opsional)
         </label>
         <input
@@ -175,10 +175,10 @@ export default function CheckoutForm({
       {/* Kuantitas Pembelian */}
       <div className="bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/80 p-3.5 rounded-2xl">
         <div className="flex items-center justify-between mb-2">
-          <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          <label className="text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest">
             Jumlah Pembelian
           </label>
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">
+          <span className="text-[11px] font-medium text-gray-400 dark:text-gray-300">
             {product.type === 'local' ? (
               product.stock > 0 ? (
                 <span>Tersedia: <strong className="text-emerald-500 font-black">{product.stock} pcs</strong></span>
@@ -224,7 +224,7 @@ export default function CheckoutForm({
             </button>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Subtotal</p>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Subtotal</p>
             <p className="text-base font-black text-gray-900 dark:text-white">{fmt.rp(subtotal || (unitPrice * quantity))}</p>
           </div>
         </div>
@@ -232,7 +232,7 @@ export default function CheckoutForm({
 
       {/* Voucher */}
       <div>
-        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5">
+        <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest mb-1.5">
           Kode Voucher (Opsional)
         </label>
         <div className="flex gap-2">
@@ -280,7 +280,7 @@ export default function CheckoutForm({
           </div>
         )}
         <div className="flex justify-between text-sm mb-1">
-          <span className="font-bold text-gray-400">Harga Satuan {isReseller ? 'Normal' : ''}</span>
+          <span className="font-medium text-gray-400">Harga Satuan {isReseller ? 'Normal' : ''}</span>
           <span className={`font-bold ${isReseller ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
             {fmt.rp(product.price)}
           </span>
@@ -293,13 +293,13 @@ export default function CheckoutForm({
         )}
         {quantity > 1 && (
           <div className="flex justify-between text-sm mb-1">
-            <span className="font-bold text-gray-400">Jumlah Beli</span>
+            <span className="font-medium text-gray-400">Jumlah Beli</span>
             <span className="font-black text-gray-900 dark:text-white">{quantity} pcs</span>
           </div>
         )}
         {quantity > 1 && (
           <div className="flex justify-between text-sm mb-1">
-            <span className="font-bold text-gray-400">Subtotal</span>
+            <span className="font-medium text-gray-400">Subtotal</span>
             <span className="font-bold text-gray-900 dark:text-white">{fmt.rp(subtotal || (unitPrice * quantity))}</span>
           </div>
         )}
@@ -310,14 +310,14 @@ export default function CheckoutForm({
           </div>
         )}
         <div className="flex justify-between items-end mt-3">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Bayar</span>
+          <span className="text-[11px] font-medium text-gray-400 uppercase tracking-widest">Total Bayar</span>
           <span className="text-3xl font-black text-gray-900 dark:text-white">{fmt.rp(finalPrice)}</span>
         </div>
       </div>
 
       {/* ─── PILIH METODE PEMBAYARAN ─── */}
       <div>
-        <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">
+        <p className="text-[11px] font-medium text-gray-500 dark:text-gray-300 uppercase tracking-widest mb-2">
           Metode Pembayaran
         </p>
         <div className="space-y-2">
@@ -340,9 +340,9 @@ export default function CheckoutForm({
             </div>
             <div className="flex-1 text-left">
               <p className="font-black text-sm text-gray-900 dark:text-white">QRIS Otomatis</p>
-              <p className="text-[10px] text-gray-400">E-Wallet, M-Banking — Instan</p>
+              <p className="text-[11px] text-gray-400">E-Wallet, M-Banking — Instan</p>
             </div>
-            <span className="text-[9px] font-black bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full uppercase">
+            <span className="text-[11px] font-black bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full uppercase">
               Populer
             </span>
           </button>
@@ -367,7 +367,7 @@ export default function CheckoutForm({
               </div>
               <div className="flex-1 text-left">
                 <p className="font-black text-sm text-gray-900 dark:text-white">Bayar dengan Saldo</p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[11px] text-gray-400">
                   Saldo kamu:{' '}
                   <span className={`font-bold ${canPayBalance ? 'text-green-600' : 'text-red-500'}`}>
                     {fmt.rp(userBalance)}
@@ -375,12 +375,12 @@ export default function CheckoutForm({
                 </p>
               </div>
               {!canPayBalance && (
-                <span className="text-[9px] font-black bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-black bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
                   Kurang
                 </span>
               )}
               {canPayBalance && (
-                <span className="text-[9px] font-black bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-black bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
                   Cukup ✓
                 </span>
               )}
@@ -389,12 +389,13 @@ export default function CheckoutForm({
         </div>
       </div>
 
+      {maxStock <= 0 && <p role="status" className="rounded-xl bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">Stok produk ini belum tersedia. Silakan pilih produk lain atau hubungi admin.</p>}
       {/* TOMBOL BAYAR */}
       {payMethod === 'qris' ? (
         <button
           type="button"
           onClick={handleQrisCheckout}
-          disabled={isProcessing || !buyerName.trim()}
+          disabled={maxStock <= 0 || isProcessing || !buyerName.trim()}
           className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-500/25 transition active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
         >
           {isProcessing ? (
@@ -406,14 +407,14 @@ export default function CheckoutForm({
               Memproses...
             </>
           ) : (
-            'Bayar via QRIS →'
+            maxStock <= 0 ? 'Stok Habis' : 'Bayar via QRIS →'
           )}
         </button>
       ) : (
         <button
           type="button"
           onClick={handleBalanceCheckout}
-          disabled={isProcessing || !buyerName.trim() || !canPayBalance}
+          disabled={maxStock <= 0 || isProcessing || !buyerName.trim() || !canPayBalance}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-500/25 transition active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-60 cursor-pointer mt-2"
         >
           {isProcessing ? (
@@ -425,7 +426,7 @@ export default function CheckoutForm({
               Memproses...
             </>
           ) : (
-            `Bayar ${fmt.rp(finalPrice)} dari Saldo →`
+            maxStock <= 0 ? 'Stok Habis' : `Bayar ${fmt.rp(finalPrice)} dari Saldo →`
           )}
         </button>
       )}

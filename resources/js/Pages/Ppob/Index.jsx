@@ -1,3 +1,4 @@
+import { rememberGuestOrder } from '../../utils/guestOrders';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import Swal from 'sweetalert2';
@@ -455,6 +456,7 @@ export default function PpobIndex({ store, initialPulsa }) {
       }
 
       if (res.ok && data.status === 'success') {
+        if (!user) rememberGuestOrder({ ...data, product_name: selectedProduct.name });
         if (paymentMethod === 'balance') {
           setCheckoutModal(false);
           setSuccessOrder(data);

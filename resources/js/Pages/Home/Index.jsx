@@ -1,3 +1,4 @@
+import { orderLookup, rememberGuestOrder, savedGuestOrders } from '../../utils/guestOrders';
 import React, { useState, useEffect, useRef } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 
@@ -44,6 +45,11 @@ export default function Home({
     const [trackOrderId, setTrackOrderId] = useState('');
     const [trackResult, setTrackResult] = useState(null);
     const [trackLoading, setTrackLoading] = useState(false);
+    const trackRequestRef = useRef(null);
+    useEffect(() => {
+        if (!showTrackModal) { trackRequestRef.current?.abort(); setTrackLoading(false); }
+        return () => trackRequestRef.current?.abort();
+    }, [showTrackModal]);
 
     const [showFabMenu, setShowFabMenu] = useState(false);
     
@@ -274,22 +280,30 @@ export default function Home({
         return Math.floor(numPrice * (1 + (markup / 100)));
     };
 
-    const handleTrackOrder = async (e) => {
-        e.preventDefault();
-        if(!trackOrderId) return;
+    const handleTrackOrder = async (e, lookupInput = trackOrderId) => {
+        e?.preventDefault();
+        if (!lookupInput) return;
+        trackRequestRef.current?.abort();
+        const controller = new AbortController();
+        trackRequestRef.current = controller;
         setTrackLoading(true); setTrackResult(null);
         try {
-            const res = await fetch(`/checkout/status/${trackOrderId}`);
+            const saved = savedGuestOrders().find(order => order.order_id === lookupInput.trim());
+            const lookup = orderLookup(saved?.invoice_url || lookupInput);
+            setTrackOrderId(lookup.orderId);
+            const res = await fetch(lookup.statusUrl, { signal: controller.signal, headers: { Accept: 'application/json' } });
             const data = await res.json();
-            setTrackResult(data.status);
+            if (controller.signal.aborted) return;
+            setTrackResult(res.ok ? data : { status: 'NOT_FOUND' });
+            if (res.ok && data.is_guest) rememberGuestOrder(data);
         } catch (error) {
-            setTrackResult('ERROR');
+            if (!controller.signal.aborted) setTrackResult({ status: 'ERROR' });
         }
-        setTrackLoading(false);
+        if (!controller.signal.aborted) setTrackLoading(false);
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 font-jakarta pb-20 sm:pb-0">
+        <div className="storefront-ui min-h-screen flex flex-col bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 font-jakarta pb-20 sm:pb-0">
             <Head>
                 <title>{`${store?.name || 'NandarStore'} - Platform Digital & Akun Premium`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -339,7 +353,7 @@ export default function Home({
 
             {/* LIVE NOTIFICATION TOAST */}
             <RecentPurchaseToast 
-                showNotif={showNotif}
+                showNotif={showNotif && !showFabMenu && !showTrackModal && !showCategoryModal}
                 activeNotif={activeNotif}
             />
 

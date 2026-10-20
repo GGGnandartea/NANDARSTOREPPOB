@@ -45,7 +45,7 @@ export default function MutationsTab({
         {/* Total Pengeluaran Sejak Daftar */}
         <div className="bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-transparent border border-rose-500/20 dark:border-rose-500/30 rounded-2xl p-4 relative overflow-hidden shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
               Total Pengeluaran
             </span>
@@ -56,7 +56,7 @@ export default function MutationsTab({
           <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 tracking-tight">
             -{fmt.rp(totalExpenseCalc)}
           </p>
-          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-300 mt-1 flex items-center gap-1">
             <span>🛍️</span> {totalExpenseCount}x transaksi belanja sejak daftar
           </p>
         </div>
@@ -64,7 +64,7 @@ export default function MutationsTab({
         {/* Total Pemasukan Sejak Daftar */}
         <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20 dark:border-emerald-500/30 rounded-2xl p-4 relative overflow-hidden shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Total Pemasukan
             </span>
@@ -75,7 +75,7 @@ export default function MutationsTab({
           <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
             +{fmt.rp(totalIncomeCalc)}
           </p>
-          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-300 mt-1 flex items-center gap-1">
             <span>✓</span> {totalIncomeCount}x transaksi top up sejak daftar
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function MutationsTab({
         {/* Sisa Saldo Aktif Saat Ini */}
         <div className="sm:col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/20 dark:border-blue-500/30 rounded-2xl p-4 relative overflow-hidden shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               Sisa Saldo Aktif
             </span>
@@ -94,7 +94,7 @@ export default function MutationsTab({
           <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
             {fmt.rp(user?.balance)}
           </p>
-          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-300 mt-1 flex items-center gap-1">
             <span>⚡</span> Saldo siap digunakan bertransaksi
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function MutationsTab({
           }`}
         >
           <span>↓ Pemasukan</span>
-          <span className="text-[10px] opacity-80">({allMutations.filter(m => m.type === 'income').length})</span>
+          <span className="text-[11px] opacity-80">({allMutations.filter(m => m.type === 'income').length})</span>
         </button>
         <button
           type="button"
@@ -135,7 +135,7 @@ export default function MutationsTab({
           }`}
         >
           <span>↑ Pengeluaran</span>
-          <span className="text-[10px] opacity-80">({allMutations.filter(m => m.type === 'expense').length})</span>
+          <span className="text-[11px] opacity-80">({allMutations.filter(m => m.type === 'expense').length})</span>
         </button>
       </div>
 
@@ -205,27 +205,27 @@ export default function MutationsTab({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
                         {isIncome && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
+                          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700">
                             Pemasukan
                           </span>
                         )}
                         {isExpense && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-700">
+                          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-700">
                             Pengeluaran
                           </span>
                         )}
                         {isPending && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 animate-pulse">
+                          <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 animate-pulse">
                             Menunggu Pembayaran
                           </span>
                         )}
                         {isExpired && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 border border-gray-300 dark:border-gray-700">
                             Kadaluarsa
                           </span>
                         )}
                         {m.invoice_number && (
-                          <span className="font-mono text-[10px] text-gray-400 truncate">
+                          <span className="font-mono text-[11px] text-gray-400 truncate">
                             #{m.invoice_number}
                           </span>
                         )}
@@ -236,9 +236,9 @@ export default function MutationsTab({
                       </p>
 
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[10px] text-gray-400">{fmt.date(m.created_at)}</p>
+                        <p className="text-[11px] text-gray-400">{fmt.date(m.created_at)}</p>
                         {isPending && (
-                          <span className="text-[10px] font-bold text-amber-500">
+                          <span className="text-[11px] font-bold text-amber-500">
                             (Kadaluarsa dlm 10 menit)
                           </span>
                         )}

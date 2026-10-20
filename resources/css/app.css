@@ -110,3 +110,30 @@ html.dark *,
 .dark * {
   scrollbar-color: #475569 rgba(255, 255, 255, 0.06);
 }
+
+/* Storefront rhythm and accessible touch targets. */
+.storefront-ui, .profile-ui, .checkout-ui {
+  font-size: 14px;
+  line-height: 1.6;
+}
+:where(.storefront-ui, .profile-ui, .checkout-ui) button {
+  min-height: 44px;
+}
+:where(.storefront-ui, .profile-ui, .checkout-ui) :is(button, a, input, select):focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 3px;
+}
+:where(.storefront-ui, .profile-ui, .checkout-ui) p.text-xs {
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (max-width: 639px) {
+  .storefront-ui { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  .store-bottom-nav { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+  .store-contact-menu, .store-purchase-toast {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+  .store-contact-menu { right: 12px; }
+  .store-purchase-toast { max-width: calc(100vw - 88px); }
+  :where(.storefront-ui, .profile-ui, .checkout-ui) :is(input, select, textarea) { font-size: 16px; }
+}

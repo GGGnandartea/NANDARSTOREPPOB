@@ -23,7 +23,7 @@ export default function CheckoutQrisSection({
           disabled={cooldown > 0 || isCheckingManual}
           className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 transition shadow-lg ${
             cooldown > 0 || isCheckingManual
-              ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700 cursor-not-allowed select-none'
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-300 border border-gray-200 dark:border-gray-700 cursor-not-allowed select-none'
               : 'bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/25 active:scale-[0.98] cursor-pointer'
           }`}
         >
@@ -76,7 +76,7 @@ export default function CheckoutQrisSection({
               MOHON SEGERA LAKUKAN PEMBAYARAN SEBELUM KEDALUWARSA!
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-300">
                 Batas Waktu Bayar:
               </span>
               <span
@@ -94,9 +94,9 @@ export default function CheckoutQrisSection({
         </div>
       </div>
 
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
+      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
       <p className="text-4xl font-black text-gray-900 dark:text-white mb-4">{fmt.rp(totalNominal)}</p>
-      <p className="text-[10px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-900/20 py-1.5 px-3 rounded-lg inline-block mb-5 border border-orange-100 dark:border-orange-800">
+      <p className="text-[11px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-900/20 py-1.5 px-3 rounded-lg inline-block mb-5 border border-orange-100 dark:border-orange-800">
         ⚠️ Scan QRIS menggunakan E-Wallet / M-Banking Anda.
       </p>
       <div className="inline-flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold py-2 px-4 rounded-xl mb-5">
@@ -108,7 +108,7 @@ export default function CheckoutQrisSection({
           {qrisUrl ? (
             <img src={qrisUrl} alt="QRIS Code" className="w-full h-full object-contain" />
           ) : (
-            <span className="text-gray-400 font-bold text-xs">Memuat QRIS...</span>
+            <span className="text-gray-400 font-medium text-xs">Memuat QRIS...</span>
           )}
         </div>
       </div>

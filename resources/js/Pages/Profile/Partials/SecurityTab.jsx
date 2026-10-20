@@ -25,7 +25,7 @@ export default function SecurityTab({ flash }) {
 
   const inp = (label, val, setVal, key) => (
     <div>
-      <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">{label}</label>
+      <label className="text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider mb-2 block">{label}</label>
       <div className="relative">
         <input type={showPass[key] ? 'text' : 'password'} value={val} onChange={e => setVal(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-orange-500 outline-none pr-11 transition" required />
         <button type="button" onClick={() => setShowPass(p => ({ ...p, [key]: !p[key] }))} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer" aria-label={`Toggle ${label}`}>
