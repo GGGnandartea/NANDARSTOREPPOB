@@ -95,13 +95,13 @@
                         <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-md"
                              :class="{
                                  'bg-emerald-500 text-white': botConnected,
-                                 'bg-amber-500 text-white animate-pulse': botStatus === 'qr_ready' || botStatus === 'connecting',
+                                 'bg-amber-500 text-white animate-pulse': botStatus === 'qr_ready' || botStatus === 'connecting' || botStatus === 'initializing' || botStatus === 'disconnected',
                                  'bg-rose-500 text-white': botStatus === 'offline',
                                  'bg-gray-500 text-white': botStatus === 'checking'
                              }">
                             <span x-show="botConnected">🟢</span>
                             <span x-show="botStatus === 'qr_ready'">📱</span>
-                            <span x-show="botStatus === 'connecting' || botStatus === 'checking'">⏳</span>
+                            <span x-show="botStatus === 'connecting' || botStatus === 'checking' || botStatus === 'initializing' || botStatus === 'disconnected'">⏳</span>
                             <span x-show="botStatus === 'offline'">🔴</span>
                         </div>
 
@@ -121,7 +121,7 @@
                                         MENUNGGU SCAN QR
                                     </span>
                                 </template>
-                                <template x-if="botStatus === 'connecting'">
+                                <template x-if="botStatus === 'connecting' || botStatus === 'initializing' || botStatus === 'disconnected'">
                                     <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
                                         MENYAMBUNGKAN...
                                     </span>

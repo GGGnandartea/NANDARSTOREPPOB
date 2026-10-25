@@ -25,6 +25,8 @@
 /vendor
 /public/hot
 /public/storage
+/wa-gateway/node_modules
+/wa-gateway/session
 
 # Storage, Logs, Sessions, Caches
 *.log
