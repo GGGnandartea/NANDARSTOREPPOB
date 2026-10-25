@@ -25,7 +25,6 @@
 /vendor
 /public/hot
 /public/storage
-/public/build
 
 # Storage, Logs, Sessions, Caches
 *.log
