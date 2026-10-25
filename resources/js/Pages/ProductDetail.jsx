@@ -74,7 +74,7 @@ export default function ProductDetail({ product, auth }) {
                         {/* Label Tipe */}
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 text-[10px] font-extrabold px-3 py-1.5 rounded border border-orange-200 dark:border-orange-800/50 uppercase tracking-widest">
-                                {product.type === 'api' ? '⚡ Proses Instan' : '👨‍💻 Manual Admin'}
+                                {product.type === 'api' ? 'Proses Instan' : 'Manual Admin'}
                             </span>
                             {product.category && (
                                 <span className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 text-[10px] font-extrabold px-3 py-1.5 rounded border border-cyan-200 dark:border-cyan-800/50 uppercase tracking-widest">

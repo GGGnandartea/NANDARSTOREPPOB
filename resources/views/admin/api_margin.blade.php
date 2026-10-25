@@ -46,7 +46,7 @@
                 </div>
             </div>
             <button type="button" onclick="applyMassMargin()" class="w-full sm:w-auto gradient-orange text-white font-black py-3 px-6 rounded-xl transition-all shadow-md hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer text-xs">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
                 <span>Terapkan Massal</span>
             </button>
         </div>
@@ -195,7 +195,7 @@
                 <table class="w-full text-left admin-table whitespace-nowrap" id="apiTable">
                     <thead>
                         <tr>
-                            <th>Logo & Produk</th>
+                            <th>Logo (256x256 px) & Produk</th>
                             <th>Provider & Modal</th>
                             <th>Harga Jual (Markup)</th>
                             <th class="text-amber-500">👑 Harga Reseller</th>
@@ -227,12 +227,15 @@
                                 <!-- Kolom 1: Logo & Nama -->
                                 <td>
                                     <div class="flex items-start gap-3">
-                                        <div class="relative group/upload cursor-pointer w-11 h-11 rounded-xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden hover:border-orange-500 shrink-0 mt-0.5">
-                                            <img id="preview_{{ $item['api_id'] }}" src="{{ $savedImage }}" class="{{ $savedImage ? '' : 'hidden' }} w-full h-full object-cover">
-                                            <div id="upload_icon_{{ $item['api_id'] }}" class="{{ $savedImage ? 'hidden' : 'flex' }} flex-col items-center justify-center text-gray-400">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                        <div class="flex flex-col items-center gap-0.5 shrink-0 mt-0.5" title="Upload Logo Produk (Ukuran Ideal: 256 x 256 px atau 500 x 500 px)">
+                                            <div class="relative group/upload cursor-pointer w-11 h-11 rounded-xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden hover:border-orange-500">
+                                                <img id="preview_{{ $item['api_id'] }}" src="{{ $savedImage }}" class="{{ $savedImage ? '' : 'hidden' }} w-full h-full object-cover">
+                                                <div id="upload_icon_{{ $item['api_id'] }}" class="{{ $savedImage ? 'hidden' : 'flex' }} flex-col items-center justify-center text-gray-400">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                                </div>
+                                                <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="compressAndConvertToBase64(this, '{{ $item['api_id'] }}')">
                                             </div>
-                                            <input type="file" accept="image/png, image/jpeg, image/webp" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="compressAndConvertToBase64(this, '{{ $item['api_id'] }}')">
+                                            <span class="text-[8px] font-mono font-bold text-gray-400">256x256</span>
                                         </div>
                                         
                                         <input type="hidden" id="img_{{ $item['api_id'] }}" name="products[{{ $item['api_id'] }}][image]" value="{{ $savedImage }}">
@@ -365,6 +368,7 @@
         closeDescModal();
     }
     function compressAndConvertToBase64(input, apiId) {
+        if (window.validateAdminImageFile && !window.validateAdminImageFile(input)) return;
         const file = input.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = function(e) {

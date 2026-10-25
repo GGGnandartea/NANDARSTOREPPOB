@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/react';
 import { Icon } from './ProfileIcons';
 
 export default function ProfileNavbar({
+  sidebarOpen,
   setSidebarOpen,
   toggleDark,
   isDark,
@@ -15,6 +16,8 @@ export default function ProfileNavbar({
             onClick={() => setSidebarOpen(true)} 
             className="md:hidden min-h-11 min-w-11 p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
             aria-label="Buka Menu Sidebar"
+            aria-expanded={sidebarOpen}
+            aria-controls="profile-mobile-menu"
           >
             <Icon.Menu className="w-5 h-5 dark:text-white" />
           </button>

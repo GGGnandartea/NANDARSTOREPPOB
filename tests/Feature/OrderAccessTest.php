@@ -75,6 +75,7 @@ class OrderAccessTest extends TestCase
         $this->get($order->invoiceUrl())->assertOk()->assertSee('PRIVATE-CREDENTIALS')
             ->assertHeader('Cache-Control', 'no-store, private');
         $this->getJson('/checkout/status/'.$order->invoice_number)->assertOk();
+        $this->getJson('/orders/guest-history')->assertNotFound();
         $this->getJson('/ppob/status/'.$other->invoice_number)->assertNotFound();
         $this->get('/invoice/'.$order->invoice_number)->assertRedirect($order->invoiceUrl());
         $this->assertArrayNotHasKey('guest_access_token', $order->toArray());

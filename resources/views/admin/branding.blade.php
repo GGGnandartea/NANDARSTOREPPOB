@@ -35,6 +35,14 @@
         </div>
     @endif
 
+    <!-- Alert Error Validasi Gambar -->
+    @if($errors->any())
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-xs flex items-center gap-3 shadow-sm">
+            <div class="w-7 h-7 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">✕</div>
+            <div>{{ $errors->first() }}</div>
+        </div>
+    @endif
+
     <form action="{{ route('admin.branding.save') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
         @csrf
 
@@ -65,19 +73,18 @@
                         <p class="text-[11px] text-gray-400 mb-4">Tampil di Navbar, Header, Footer, &amp; Invoice</p>
                         
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
-                            @if(!empty($storeLogo))
-                                <img id="store_logo_preview" src="{{ $storeLogo }}" alt="Logo Toko" class="w-full h-full object-contain p-2">
-                            @else
-                                <img id="store_logo_preview" src="" alt="Preview Logo" class="w-full h-full object-contain p-2 hidden">
-                                <div id="store_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm">
-                                    NS
-                                </div>
-                            @endif
+                            <img id="store_logo_preview" src="{{ !empty($storeLogo) ? $storeLogo : '' }}" alt="Logo Toko" class="w-full h-full object-contain p-2 {{ !empty($storeLogo) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('store_logo_fallback').classList.remove('hidden');">
+                            <div id="store_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm {{ !empty($storeLogo) ? 'hidden' : '' }}">
+                                NS
+                            </div>
                         </div>
                     </div>
 
                     <div class="w-full space-y-2.5">
-                        <input type="file" name="store_logo" id="store_logo_input" accept="image/*" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200 dark:file:bg-orange-950/80 dark:file:text-orange-300 cursor-pointer" onchange="previewStoreLogo(this)">
+                        <input type="file" name="store_logo" id="store_logo_input" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/jpeg,image/png,image/webp,image/gif,image/svg+xml" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-orange-100 file:text-orange-700 hover:file:bg-orange-200 dark:file:bg-orange-950/80 dark:file:text-orange-300 cursor-pointer" onchange="previewStoreLogo(this)">
+                        <div class="p-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-[10px] font-bold text-orange-600 dark:text-orange-400">
+                            Ukuran Rekomendasi: <span class="font-mono font-black">512 x 512 px</span> (Rasio 1:1 • PNG/WEBP/SVG • Maks 5MB)
+                        </div>
                         
                         <input type="text" name="store_logo_url" value="{{ $storeLogo && !str_starts_with($storeLogo, '/storage/') ? $storeLogo : '' }}" placeholder="Atau URL gambar..." class="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
                     </div>
@@ -96,22 +103,22 @@
                         <label class="block text-xs font-black text-gray-800 dark:text-gray-200 uppercase tracking-wider mb-1">2. FAVICON TAB BROWSER</label>
                         <p class="text-[11px] text-gray-400 mb-4">Icon di tab browser untuk semua halaman website</p>
                         
+                        @php
+                            $initialFavicon = !empty($storeFavicon) ? $storeFavicon : (!empty($storeLogo) ? $storeLogo : '');
+                        @endphp
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
-                            @if(!empty($storeFavicon))
-                                <img id="store_favicon_preview" src="{{ $storeFavicon }}" alt="Favicon" class="w-14 h-14 object-contain p-1">
-                            @elseif(!empty($storeLogo))
-                                <img id="store_favicon_preview" src="{{ $storeLogo }}" alt="Favicon" class="w-14 h-14 object-contain p-1">
-                            @else
-                                <img id="store_favicon_preview" src="" alt="Preview Favicon" class="w-14 h-14 object-contain p-1 hidden">
-                                <div id="store_favicon_fallback" class="w-14 h-14 rounded-2xl gradient-orange text-white flex items-center justify-center font-black text-xl shadow-sm">
-                                    NS
-                                </div>
-                            @endif
+                            <img id="store_favicon_preview" src="{{ $initialFavicon }}" alt="Favicon" class="w-14 h-14 object-contain p-1 {{ !empty($initialFavicon) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('store_favicon_fallback').classList.remove('hidden');">
+                            <div id="store_favicon_fallback" class="w-14 h-14 rounded-2xl gradient-orange text-white flex items-center justify-center font-black text-xl shadow-sm {{ !empty($initialFavicon) ? 'hidden' : '' }}">
+                                NS
+                            </div>
                         </div>
                     </div>
 
                     <div class="w-full space-y-2.5">
-                        <input type="file" name="store_favicon" id="store_favicon_input" accept="image/*,.ico" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 dark:file:bg-blue-950/80 dark:file:text-blue-300 cursor-pointer" onchange="previewStoreFavicon(this)">
+                        <input type="file" name="store_favicon" id="store_favicon_input" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.ico,image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/x-icon" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 dark:file:bg-blue-950/80 dark:file:text-blue-300 cursor-pointer" onchange="previewStoreFavicon(this)">
+                        <div class="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                            Ukuran Rekomendasi: <span class="font-mono font-black">64 x 64 px</span> atau <span class="font-mono font-black">128 x 128 px</span> (Rasio 1:1 • ICO/PNG)
+                        </div>
                         
                         <input type="text" name="store_favicon_url" value="{{ $storeFavicon && !str_starts_with($storeFavicon, '/storage/') ? $storeFavicon : '' }}" placeholder="Atau URL favicon (.ico, .png)..." class="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
@@ -130,22 +137,22 @@
                         <label class="block text-xs font-black text-gray-800 dark:text-gray-200 uppercase tracking-wider mb-1">3. LOGO LOADING / PRELOADER</label>
                         <p class="text-[11px] text-gray-400 mb-4">Logo animasi saat website pertama kali dimuat</p>
                         
+                        @php
+                            $initialLoading = !empty($loadingLogo) ? $loadingLogo : (!empty($storeLogo) ? $storeLogo : '');
+                        @endphp
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
-                            @if(!empty($loadingLogo))
-                                <img id="loading_logo_preview" src="{{ $loadingLogo }}" alt="Logo Loading" class="w-full h-full object-contain p-2">
-                            @elseif(!empty($storeLogo))
-                                <img id="loading_logo_preview" src="{{ $storeLogo }}" alt="Logo Loading" class="w-full h-full object-contain p-2">
-                            @else
-                                <img id="loading_logo_preview" src="" alt="Preview Loading" class="w-full h-full object-contain p-2 hidden">
-                                <div id="loading_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm">
-                                    NS
-                                </div>
-                            @endif
+                            <img id="loading_logo_preview" src="{{ $initialLoading }}" alt="Logo Loading" class="w-full h-full object-contain p-2 {{ !empty($initialLoading) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('loading_logo_fallback').classList.remove('hidden');">
+                            <div id="loading_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm {{ !empty($initialLoading) ? 'hidden' : '' }}">
+                                NS
+                            </div>
                         </div>
                     </div>
 
                     <div class="w-full space-y-2.5">
-                        <input type="file" name="loading_logo" id="loading_logo_input" accept="image/*" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 dark:file:bg-amber-950/80 dark:file:text-amber-300 cursor-pointer" onchange="previewLoadingLogo(this)">
+                        <input type="file" name="loading_logo" id="loading_logo_input" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/jpeg,image/png,image/webp,image/gif,image/svg+xml" class="w-full text-[11px] text-gray-500 file:mr-2 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-[11px] file:font-black file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 dark:file:bg-amber-950/80 dark:file:text-amber-300 cursor-pointer" onchange="previewLoadingLogo(this)">
+                        <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            Ukuran Rekomendasi: <span class="font-mono font-black">512 x 512 px</span> (Rasio 1:1 • PNG/WEBP/SVG • Maks 5MB)
+                        </div>
                         
                         <input type="text" name="loading_logo_url" value="{{ $loadingLogo && !str_starts_with($loadingLogo, '/storage/') ? $loadingLogo : '' }}" placeholder="Atau URL logo preloader..." class="w-full px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-amber-500">
                     </div>
@@ -163,7 +170,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-gray-100 dark:border-white/5">
                 <div>
                     <label class="block text-xs font-black text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-2">Nama Toko / Brand Utama</label>
-                    <input type="text" name="store_name" value="{{ $storeName ?? 'NandarStore' }}" required class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: NandarStore">
+                    <input type="text" name="store_name" value="{{ $storeName ?? 'NandarStore' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: NandarStore">
                     <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
                         *Nama ini akan muncul di judul navbar, invoice, footer, dan seluruh halaman toko.
                     </p>
@@ -200,6 +207,7 @@
 
 <script>
 function previewStoreLogo(input) {
+    if (!window.validateAdminImageFile(input, { allowIco: false, maxMb: 5 })) return;
     if (input.files && input.files[0]) {
         var reader = new FileReader();
         reader.onload = function(e) {
@@ -218,6 +226,7 @@ function previewStoreLogo(input) {
 }
 
 function previewStoreFavicon(input) {
+    if (!window.validateAdminImageFile(input, { allowIco: true, maxMb: 5 })) return;
     if (input.files && input.files[0]) {
         var reader = new FileReader();
         reader.onload = function(e) {
@@ -236,6 +245,7 @@ function previewStoreFavicon(input) {
 }
 
 function previewLoadingLogo(input) {
+    if (!window.validateAdminImageFile(input, { allowIco: false, maxMb: 5 })) return;
     if (input.files && input.files[0]) {
         var reader = new FileReader();
         reader.onload = function(e) {
@@ -254,4 +264,3 @@ function previewLoadingLogo(input) {
 }
 </script>
 @endsection
-

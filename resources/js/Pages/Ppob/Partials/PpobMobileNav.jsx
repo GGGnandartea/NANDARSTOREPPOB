@@ -3,7 +3,7 @@ import { Link } from '@inertiajs/react';
 
 export default function PpobMobileNav({ user }) {
   return (
-    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-xl border-t border-gray-200/90 dark:border-white/10 px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+    <div className="store-bottom-nav sm:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-xl border-t border-gray-200/90 dark:border-white/10 px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
       <div className="grid grid-cols-5 items-center">
         {/* 1. Beranda */}
         <Link href="/" className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500">
@@ -25,10 +25,11 @@ export default function PpobMobileNav({ user }) {
         </Link>
 
         {/* 3. PPOB (ACTIVE) */}
-        <div className="flex flex-col items-center justify-center py-1 text-emerald-600 dark:text-emerald-400 relative">
+        <div aria-current="page" className="flex flex-col items-center justify-center py-1 text-orange-500 dark:text-orange-400 relative">
           <div className="relative">
-            <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="3" />
+              <path d="M12 18h.01" />
             </svg>
             <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-emerald-500 text-[6.5px] font-black text-white leading-none">
               HOT

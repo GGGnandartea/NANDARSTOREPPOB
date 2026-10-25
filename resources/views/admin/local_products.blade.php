@@ -1,5 +1,10 @@
 @extends('layouts.admin')
-@section('title', 'Produk Lokal Saya')
+
+@php
+    $activeSection = request('section', 'list');
+@endphp
+
+@section('title', $activeSection === 'create' ? 'Tambah Produk Lokal' : 'Produk Lokal')
 
 @section('content')
 <!-- DATALIST UNTUK SUGGESTI KATEGORI OTOMATIS -->
@@ -23,41 +28,40 @@
         </div>
     @endif
 
-    <!-- Header & Search Bar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>Katalog Produk Lokal & Stok Manual</span>
-                <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
-                    Produk Mandiri
-                </span>
-            </h1>
-            <p class="text-xs font-semibold text-gray-400 mt-1">Kelola barang digital, template, akun pribadi, serta isi stok akun otomatis pembeli.</p>
+    @if($errors->any())
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">✕</div>
+            <div>{{ $errors->first() }}</div>
+        </div>
+    @endif
+
+    @if($activeSection === 'create')
+        <!-- ======================================================== -->
+        <!-- HALAMAN KHUSUS: TAMBAH PRODUK LOKAL BARU (TERPISAH)      -->
+        <!-- ======================================================== -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>Tambah Produk Lokal Baru</span>
+                    <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
+                        Katalog Mandiri
+                    </span>
+                </h1>
+                <p class="text-xs font-semibold text-gray-400 mt-1">Buat produk digital, akun streaming, atau template baru ke etalase toko.</p>
+            </div>
+            <a href="{{ route('admin.products.local', ['section' => 'list']) }}" class="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 hover:text-orange-500 transition shadow-xs inline-flex items-center gap-2 self-start sm:self-auto">
+                <span>← Lihat Daftar Produk ({{ count($localProducts) }})</span>
+            </a>
         </div>
 
-        <form action="{{ route('admin.products.local') }}" method="GET" class="w-full md:w-80 relative">
-            <input 
-                type="text" 
-                name="search" 
-                value="{{ request('search') }}" 
-                placeholder="Cari nama produk..." 
-                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
-            >
-            <svg class="w-4 h-4 absolute left-4 top-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-        </form>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Form Tambah Produk Baru (Kiri) -->
-        <div class="lg:col-span-1 admin-card p-6 h-fit space-y-5">
+        <div class="max-w-2xl admin-card p-6 sm:p-8 space-y-5">
             <div class="flex items-center gap-2.5 pb-3 border-b border-gray-100 dark:border-white/5">
                 <div class="w-8 h-8 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-sm shadow-sm">
                     +
                 </div>
                 <div>
-                    <h3 class="font-black text-base text-gray-900 dark:text-white">Tambah Produk Baru</h3>
-                    <p class="text-[11px] font-semibold text-gray-400">Buat katalog lokal baru</p>
+                    <h3 class="font-black text-base text-gray-900 dark:text-white">Formulir Produk Lokal Baru</h3>
+                    <p class="text-[11px] font-semibold text-gray-400">Lengkapi detail produk di bawah ini</p>
                 </div>
             </div>
 
@@ -68,13 +72,13 @@
                     <input type="text" name="name" required placeholder="Contoh: Canva Pro 1 Tahun" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
                 </div>
                 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Harga Jual (Rp)</label>
                         <input type="number" name="price" required placeholder="25000" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-black text-amber-500 uppercase tracking-wider mb-1.5">👑 Reseller (Rp)</label>
+                        <label class="block text-xs font-black text-amber-500 uppercase tracking-wider mb-1.5">Harga Reseller VIP (Rp)</label>
                         <input type="number" name="reseller_price" placeholder="Opsional" class="w-full px-4 py-3 rounded-xl bg-amber-50/50 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-amber-500">
                     </div>
                 </div>
@@ -86,18 +90,18 @@
 
                 <div>
                     <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Metode Proses Akun</label>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-2 gap-3">
                         <label class="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
                             <input type="radio" name="process_type" value="auto" checked class="text-orange-500 focus:ring-orange-500">
                             <div>
-                                <span class="block text-xs font-black text-gray-900 dark:text-white">⚡ Otomatis</span>
+                                <span class="block text-xs font-black text-gray-900 dark:text-white">Otomatis</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Dari stok akun</span>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
                             <input type="radio" name="process_type" value="manual" class="text-orange-500 focus:ring-orange-500">
                             <div>
-                                <span class="block text-xs font-black text-gray-900 dark:text-white">✋ Manual Admin</span>
+                                <span class="block text-xs font-black text-gray-900 dark:text-white">Manual Admin</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Diproses admin</span>
                             </div>
                         </label>
@@ -105,13 +109,18 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Gambar / Logo Produk</label>
-                    <input type="file" name="image" accept="image/*" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-600 dark:text-gray-300 cursor-pointer file:cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-black file:bg-orange-100 file:text-orange-700">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">Gambar / Logo Produk</label>
+                        <span class="px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-[10px] font-black font-mono text-orange-600 dark:text-orange-400">
+                            Ukuran Ideal: 500 x 500 px / 800 x 800 px (1:1)
+                        </span>
+                    </div>
+                    <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/jpeg,image/png,image/webp,image/gif,image/svg+xml" onchange="window.validateAdminImageFile && window.validateAdminImageFile(this)" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-600 dark:text-gray-300 cursor-pointer file:cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-black file:bg-orange-100 file:text-orange-700">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Deskripsi & Catatan Garansi</label>
-                    <textarea name="description" rows="3" placeholder="Tuliskan detail spesifikasi dan garansi produk..." class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-medium dark:text-white outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                    <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Deskripsi &amp; Catatan Garansi</label>
+                    <textarea name="description" rows="4" placeholder="Tuliskan detail spesifikasi dan garansi produk..." class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-medium dark:text-white outline-none focus:ring-2 focus:ring-orange-500"></textarea>
                 </div>
 
                 <button type="submit" x-bind:disabled="isSubmitting" class="w-full gradient-orange text-white py-3.5 rounded-xl font-black text-xs transition-all shadow-lg shadow-orange-500/25 hover:opacity-90 cursor-pointer disabled:opacity-50">
@@ -120,17 +129,47 @@
                 </button>
             </form>
         </div>
+    @else
+        <!-- ======================================================== -->
+        <!-- HALAMAN KHUSUS: DAFTAR PRODUK LOKAL & STOK (TERPISAH)    -->
+        <!-- ======================================================== -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>Katalog Produk Lokal &amp; Stok Manual</span>
+                    <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
+                        {{ count($localProducts) }} Produk
+                    </span>
+                </h1>
+                <p class="text-xs font-semibold text-gray-400 mt-1">Kelola barang digital, template, akun pribadi, serta isi stok akun otomatis pembeli.</p>
+            </div>
 
-        <!-- Tabel Daftar Produk (Kanan) -->
-        <!-- Tabel Daftar Produk (Kanan) -->
-        <div class="lg:col-span-2 admin-card overflow-hidden">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <form action="{{ route('admin.products.local') }}" method="GET" class="w-full sm:w-72 relative">
+                    <input type="hidden" name="section" value="list">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        value="{{ request('search') }}" 
+                        placeholder="Cari nama produk..." 
+                        class="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
+                    >
+                    <svg class="w-4 h-4 absolute left-4 top-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </form>
+                <a href="{{ route('admin.products.local', ['section' => 'create']) }}" class="px-4 py-2.5 rounded-2xl gradient-orange text-white font-black text-xs shadow-md shadow-orange-500/20 hover:opacity-95 transition flex items-center justify-center gap-1.5 shrink-0">
+                    <span>+ Tambah Produk</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="admin-card overflow-hidden">
             <!-- Desktop Table -->
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-left admin-table whitespace-nowrap">
                     <thead>
                         <tr>
                             <th>Katalog Produk</th>
-                            <th>Stok & Status</th>
+                            <th>Stok &amp; Status</th>
                             <th class="text-right">Aksi</th>
                         </tr>
                     </thead>
@@ -153,7 +192,7 @@
                                             <span class="text-xs font-extrabold text-orange-500">Rp {{ number_format($p->price, 0, ',', '.') }}</span>
                                             @if($p->reseller_price)
                                                 <span class="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">
-                                                    👑 VIP: Rp {{ number_format($p->reseller_price, 0, ',', '.') }}
+                                                    VIP: Rp {{ number_format($p->reseller_price, 0, ',', '.') }}
                                                 </span>
                                             @endif
                                             @if($p->category)
@@ -171,11 +210,11 @@
                                 <div class="flex items-center gap-1.5 mb-1.5">
                                     @if(($p->process_type ?? 'auto') === 'manual')
                                         <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/50 px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1">
-                                            ✋ Manual Admin
+                                            Manual Admin
                                         </span>
                                     @else
                                         <span class="bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-800/50 px-2 py-0.5 rounded-full text-[10px] font-black inline-flex items-center gap-1">
-                                            ⚡ Stok Otomatis
+                                            Stok Otomatis
                                         </span>
                                     @endif
                                 </div>
@@ -201,7 +240,7 @@
                                 <div class="inline-flex items-center gap-1.5">
                                     <!-- Tombol Isi Stok -->
                                     <a href="{{ route('admin.products.local.accounts', $p->id) }}" class="gradient-blue text-white px-3 py-1.5 rounded-xl text-xs font-black transition shadow-sm hover:opacity-90 cursor-pointer">
-                                        ⚡ Isi Stok
+                                        Isi Stok
                                     </a>
 
                                     <!-- Tombol Edit -->
@@ -235,7 +274,7 @@
                         @empty
                         <tr>
                             <td colspan="3" class="p-12 text-center text-gray-400 font-semibold text-xs">
-                                @if(request('search')) Pencarian tidak ditemukan. @else Katalog lokal Anda masih kosong. Tambahkan produk pertama di sebelah kiri! @endif
+                                @if(request('search')) Pencarian tidak ditemukan. @else Katalog lokal Anda masih kosong. Klik tombol "+ Tambah Produk" untuk membuat produk baru. @endif
                             </td>
                         </tr>
                         @endforelse
@@ -272,7 +311,7 @@
                                     <span class="text-xs font-black text-orange-500">Rp {{ number_format($p->price, 0, ',', '.') }}</span>
                                     @if($p->reseller_price)
                                         <span class="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">
-                                            👑 Rp {{ number_format($p->reseller_price, 0, ',', '.') }}
+                                            VIP: Rp {{ number_format($p->reseller_price, 0, ',', '.') }}
                                         </span>
                                     @endif
                                 </div>
@@ -283,11 +322,11 @@
                             <div class="flex items-center gap-2">
                                 @if(($p->process_type ?? 'auto') === 'manual')
                                     <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-[9px] font-black">
-                                        ✋ Manual Admin
+                                        Manual Admin
                                     </span>
                                 @else
                                     <span class="bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-black">
-                                        ⚡ Otomatis
+                                        Otomatis
                                     </span>
                                 @endif
                                 <div class="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 dark:text-gray-400">
@@ -305,7 +344,7 @@
                         <!-- Action Buttons -->
                         <div class="flex items-center justify-end gap-2 pt-1 border-t border-gray-100 dark:border-white/5">
                             <a href="{{ route('admin.products.local.accounts', $p->id) }}" class="gradient-blue text-white px-3 py-1.5 rounded-xl text-xs font-black transition shadow-sm hover:opacity-90 cursor-pointer">
-                                ⚡ Isi Stok
+                                Isi Stok
                             </a>
                             <button 
                                 type="button"
@@ -331,21 +370,21 @@
                     </div>
                 @empty
                     <div class="p-12 text-center text-gray-400 font-semibold text-xs">
-                        @if(request('search')) Pencarian tidak ditemukan. @else Katalog lokal Anda masih kosong. Tambahkan produk pertama di atas! @endif
+                        @if(request('search')) Pencarian tidak ditemukan. @else Katalog lokal Anda masih kosong. Klik "+ Tambah Produk" di atas! @endif
                     </div>
                 @endforelse
             </div>
         </div>
-    </div>
+    @endif
 
     <!-- MODAL EDIT PRODUK LOKAL -->
-    <div x-show="openEdit" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" x-transition.opacity>
-        <div @click.away="openEdit = false" class="bg-white dark:bg-[#131b2e] rounded-3xl w-full max-w-lg border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" x-transition.scale>
+    <div x-show="openEdit" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" x-transition.opacity @keydown.escape.window="openEdit = false">
+        <div @click.stop class="bg-white dark:bg-[#131b2e] rounded-3xl w-full max-w-lg border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" x-transition.scale>
             <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50/50 dark:bg-black/20 shrink-0">
                 <h3 class="font-black text-base text-gray-900 dark:text-white">Edit Detail Produk Lokal</h3>
                 <button type="button" @click="openEdit = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">✕</button>
             </div>
-            <form :action="'/admin/products/local/' + editData.id + '/update'" method="POST" enctype="multipart/form-data" class="p-6 space-y-4 overflow-y-auto no-scrollbar flex-1" x-data="{ isUpdating: false }" @submit="isUpdating = true">
+            <form :action="'/admin/products/local/' + editData.id + '/update'" method="POST" enctype="multipart/form-data" class="p-6 space-y-4 overflow-y-auto overscroll-contain custom-scrollbar flex-1" x-data="{ isUpdating: false }" @submit="isUpdating = true">
                 @csrf
                 <div>
                     <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Nama Produk</label>
@@ -357,7 +396,7 @@
                         <input type="number" name="price" x-model="editData.price" required class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-black text-amber-500 uppercase tracking-wider mb-1">👑 Harga Reseller</label>
+                        <label class="block text-xs font-black text-amber-500 uppercase tracking-wider mb-1">Harga Reseller</label>
                         <input type="number" name="reseller_price" x-model="editData.reseller_price" placeholder="Kosongkan jika sama..." class="w-full px-4 py-2.5 bg-amber-50/30 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-amber-500">
                     </div>
                 </div>
@@ -371,22 +410,27 @@
                         <label class="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
                             <input type="radio" name="process_type" value="auto" x-model="editData.process_type" class="text-orange-500 focus:ring-orange-500">
                             <div>
-                                <span class="block text-xs font-black text-gray-900 dark:text-white">⚡ Otomatis</span>
+                                <span class="block text-xs font-black text-gray-900 dark:text-white">Otomatis</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Dari stok akun</span>
                             </div>
                         </label>
                         <label class="flex items-center gap-2 p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
                             <input type="radio" name="process_type" value="manual" x-model="editData.process_type" class="text-orange-500 focus:ring-orange-500">
                             <div>
-                                <span class="block text-xs font-black text-gray-900 dark:text-white">✋ Manual Admin</span>
+                                <span class="block text-xs font-black text-gray-900 dark:text-white">Manual Admin</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Diproses admin</span>
                             </div>
                         </label>
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Ganti Gambar Produk</label>
-                    <input type="file" name="image" accept="image/*" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Ganti Gambar Produk</label>
+                        <span class="px-2 py-0.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-[10px] font-black font-mono text-orange-600 dark:text-orange-400">
+                            500 x 500 px / 800 x 800 px (1:1)
+                        </span>
+                    </div>
+                    <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.gif,.svg,image/jpeg,image/png,image/webp,image/gif,image/svg+xml" onchange="window.validateAdminImageFile && window.validateAdminImageFile(this)" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
                 </div>
                 <div>
                     <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Deskripsi</label>

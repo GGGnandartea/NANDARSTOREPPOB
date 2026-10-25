@@ -28,7 +28,7 @@
                     @if($isFree)
                         <span>🔒 Kembalikan ke Mode Berbayar</span>
                     @else
-                        <span>⚡ 1-Klik Aktifkan Promo Gratis</span>
+                        <span>1-Klik Aktifkan Promo Gratis</span>
                     @endif
                 </button>
             </form>

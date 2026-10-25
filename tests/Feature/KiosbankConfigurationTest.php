@@ -125,6 +125,52 @@ class KiosbankConfigurationTest extends TestCase
         Http::assertSentCount(3);
     }
 
+    public function test_development_tls_compatibility_does_not_disable_production_verification(): void
+    {
+        config(['kiosbank.profiles.development.verify_tls' => false, 'kiosbank.profiles.production.verify_tls' => false]);
+        $verification = [];
+        Http::fake(function ($request, $options) use (&$verification) {
+            $verification[] = $options['verify'];
+            return Http::response(['rc' => '00']);
+        });
+        (new KiosbankService('development'))->makeDigestRequest('/Services/get-Active-Product');
+        (new KiosbankService('production'))->makeDigestRequest('/Services/get-Active-Product');
+        $this->assertSame([false, true], $verification);
+    }
+
+    public function test_sync_and_diagnostics_reuse_the_daily_session(): void
+    {
+        Http::fake([
+            '*/auth/Sign-On' => Http::response(['SessionID' => 'test-session']),
+            '*/Services/get-Active-Product' => Http::response(['rc' => '00', 'active' => '500521', 'maintenance' => '']),
+        ]);
+        $service = new KiosbankService('production');
+        $this->assertTrue($service->testSignOn()['ok']);
+        $this->assertTrue($service->testSignOn()['is_cached']);
+        $service->syncWithKiosbankApi();
+        $service->syncWithKiosbankApi();
+        $signOns = Http::recorded(fn ($request) => str_ends_with($request->url(), '/auth/Sign-On'));
+        $this->assertCount(1, $signOns);
+    }
+
+    public function test_sign_on_limit_and_session_expiry_follow_the_wib_calendar_day(): void
+    {
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-23 23:58:00', 'Asia/Jakarta'));
+        Http::fake(['*/auth/Sign-On' => Http::response(['SessionID' => 'test-session'])]);
+        $service = new KiosbankService('production');
+        for ($attempt = 0; $attempt < 99; $attempt++) {
+            $this->assertSame('test-session', $service->signOn(true));
+        }
+        $this->assertNull($service->signOn(true));
+        Http::assertSentCount(99);
+        $this->assertSame('test-session', $service->getSessionId());
+        Http::assertSentCount(99);
+        $this->travelTo(\Carbon\Carbon::parse('2026-10-24 00:16:00', 'Asia/Jakarta'));
+        $this->assertSame('test-session', $service->getSessionId());
+        Http::assertSentCount(100);
+        $this->travelBack();
+    }
+
     public function test_existing_ppob_order_keeps_its_original_mode_after_switching(): void
     {
         Setting::create(['key' => 'kiosbank_mode', 'value' => 'production']);

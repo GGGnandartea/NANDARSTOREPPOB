@@ -22,7 +22,15 @@ class PpobProduct extends Model
         'provider',
         'description',
         'image',
+        'price_synced_mode',
+        'price_synced_at',
     ];
+
+    public function isMobileProduct(): bool
+    {
+        return $this->provider === 'kiosbank'
+            && in_array($this->category, ['pulsa', 'data', 'masa_aktif', 'telepon'], true);
+    }
 
     /**
      * Scope untuk produk yang aktif

@@ -256,7 +256,7 @@
                 <div class="space-y-3">
                     <div class="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/30">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-bold text-blue-700 dark:text-blue-300">⚡ Sistem Otomatis</span>
+                            <span class="text-xs font-bold text-blue-700 dark:text-blue-300">Sistem Otomatis</span>
                             <span class="text-xs font-black text-blue-700 dark:text-blue-300">{{ $apiCount }} Pesanan</span>
                         </div>
                         <p class="text-xs font-black text-gray-900 dark:text-white">Rp {{ number_format($apiRevenue, 0, ',', '.') }}</p>
@@ -422,7 +422,7 @@
                                     {{ $o->product_name }}
                                 </p>
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full {{ $o->product_type === 'api' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400' : 'bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-400' }}">
-                                    {{ $o->product_type === 'api' ? '⚡ Otomatis' : '📦 Manual Lokal' }}
+                                    {{ $o->product_type === 'api' ? 'Otomatis' : 'Manual Lokal' }}
                                 </span>
                             </td>
 

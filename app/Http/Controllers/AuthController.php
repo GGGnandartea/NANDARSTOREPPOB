@@ -11,10 +11,16 @@ use App\Models\TransactionLog;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AuthController extends Controller
 {
+    public function session(Request $request) {
+        return response()->json(['token' => $request->session()->token()])
+            ->header('Cache-Control', 'private, no-store, max-age=0');
+    }
+
     public function showLoginForm() {
         return Inertia::render('Login');
     }
@@ -25,7 +31,7 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        if (Auth::attempt($credentials)) {
+        if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $user = Auth::user();
 
             // CEK APAKAH RESELLER BELUM LUNAS / BELUM AKTIF
@@ -36,6 +42,11 @@ class AuthController extends Controller
                 } else {
                     $fee = (int) (Setting::where('key', 'reseller_registration_fee')->value('value') ?: 20000);
                     Auth::logout();
+                    if ($request->wantsJson()) {
+                        throw ValidationException::withMessages([
+                            'email' => 'Akun Reseller Anda belum aktif karena belum menyelesaikan pembayaran pendaftaran Rp ' . number_format($fee, 0, ',', '.') . '.',
+                        ]);
+                    }
                     $pendingReg = ResellerRegistration::where('user_id', $user->id)->where('status', 'pending')->latest()->first();
                     return back()->withErrors([
                         'email' => 'Akun Reseller Anda belum aktif karena belum menyelesaikan pembayaran pendaftaran Rp ' . number_format($fee, 0, ',', '.') . '.',
@@ -44,16 +55,23 @@ class AuthController extends Controller
             }
 
             $request->session()->regenerate();
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'status' => 'success',
+                    'redirect' => route($user->role === 'admin' ? 'admin.dashboard' : 'home', [], false),
+                ]);
+            }
             
             if ($user->role === 'admin') {
-                return Inertia::location(route('admin.dashboard'));
+                return Inertia::location(route('admin.dashboard', [], false));
             }
 
             // Seluruh pengguna (user dan reseller) langsung diarahkan ke halaman katalog/dashboard produk
-            return redirect()->route('home');
+            return redirect(route('home', [], false));
         }
 
-        return back()->withErrors([
+        throw ValidationException::withMessages([
             'email' => 'Email atau password yang Anda masukkan salah.',
         ]);
     }
@@ -117,11 +135,12 @@ class AuthController extends Controller
                 ]);
 
                 Auth::login($user);
+                $request->session()->regenerate();
 
                 return response()->json([
                     'status'   => 'success',
                     'is_free'  => true,
-                    'redirect' => route('home'),
+                    'redirect' => route('home', [], false),
                     'message'  => 'Selamat! Akun Reseller VIP Anda berhasil terdaftar dan langsung aktif (Promo Gratis).',
                 ]);
             }
@@ -169,12 +188,13 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
+        $request->session()->regenerate();
 
         if ($request->wantsJson()) {
-            return response()->json(['status' => 'success', 'redirect' => route('home')]);
+            return response()->json(['status' => 'success', 'redirect' => route('home', [], false)]);
         }
 
-        return redirect()->route('home');
+        return redirect(route('home', [], false));
     }
 
     public function checkResellerPaymentStatus($orderId) {

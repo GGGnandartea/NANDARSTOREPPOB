@@ -38,7 +38,7 @@ class PpobController extends Controller
         $user = Auth::user();
 
         // Default initial items untuk pulsa Telkomsel agar saat pertama kali buka langsung tampil cepat
-        $initialPulsa = $this->kiosbank->getPulsaPrabayar('21');
+        $initialPulsa = []; // Load provider availability asynchronously through /ppob/products.
 
         return Inertia::render('Ppob', [
             'store' => [
@@ -69,10 +69,11 @@ class PpobController extends Controller
     {
         $category = $request->query('category', 'pulsa'); // pulsa, pln, game, ewallet, tagihan
         $prefix   = $request->query('prefix', '21'); // 21 (Telkomsel), 11 (Indosat), etc.
+        $type = $request->validate(['type' => 'sometimes|in:pulsa,data'])['type'] ?? 'pulsa';
 
         try {
             if ($category === 'pulsa') {
-                $products = $this->kiosbank->getPulsaPrabayar($prefix);
+                $products = $this->kiosbank->getPulsaPrabayar($prefix, $type);
             } else {
                 $products = $this->kiosbank->getHargaByPrefix($prefix);
             }
@@ -209,16 +210,32 @@ class PpobController extends Controller
 
         // Validasi integritas harga dari database PpobProduct jika produk terdaftar.
         // Produk tagihan tidak ada di katalog karena nominalnya dari inquiry biller.
-        $officialProduct = $isBillPayment ? null : \App\Models\PpobProduct::where('code', $productCode)->first();
+        $officialProduct = \App\Models\PpobProduct::where('code', $productCode)->first();
+        if ($isBillPayment && $officialProduct?->isMobileProduct()) {
+            return response()->json(['status' => 'error', 'message' => 'Pilih pulsa atau paket data dari katalog produk.'], 422);
+        }
+        if ($isBillPayment) $officialProduct = null;
         if (!$isBillPayment && (!$officialProduct || $officialProduct->status !== 'active')) {
             return response()->json(['status' => 'error', 'message' => 'Produk tidak tersedia. Pilih ulang produk PPOB.'], 422);
         }
+        $resolvedPricing = null;
         if ($officialProduct) {
-            $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($officialProduct->reseller_price);
-            $nominal = (int) ($isReseller ? $officialProduct->reseller_price : $officialProduct->price);
+            if ($officialProduct->isMobileProduct()) {
+                // Recheck before creating an invoice or debiting a balance.
+                $providerStatus = ($this->kiosbank->isDeveloperMode() && $officialProduct->price_synced_mode !== $this->kiosbank->getMode())
+                    ? []
+                    : $this->kiosbank->mobileProviderStatus(true);
+                $availability = $this->kiosbank->mobileAvailability($officialProduct, $providerStatus);
+                if (!$availability['can_purchase']) {
+                    return response()->json(['status' => 'error', 'message' => $availability['availability_message']], 422);
+                }
+            }
+            $resolvedPricing = $this->kiosbank->resolveProductPricing($officialProduct);
+            $isReseller = Auth::check() && Auth::user()->role === 'reseller' && !empty($resolvedPricing['reseller_price']);
+            $nominal = (int) ($isReseller ? $resolvedPricing['reseller_price'] : $resolvedPricing['price']);
             $productName = $officialProduct->name;
         }
-        $providerAmount = $isBillPayment ? $billTotal : (int) $officialProduct->base_price;
+        $providerAmount = $isBillPayment ? $billTotal : (int) ($resolvedPricing['base_price'] ?? $officialProduct->base_price);
         if ($nominal <= 0 || $providerAmount <= 0) {
             return response()->json(['status' => 'error', 'message' => 'Harga produk belum tersedia. Hubungi admin.'], 422);
         }
@@ -297,9 +314,11 @@ class PpobController extends Controller
             ]);
 
             // Eksekusi Fulfillment ke KIOSBANK
+            $fulfillResult = [];
             try {
                 $fulfillResult = OrderFulfillmentService::fulfillOrder($order);
                 $order->refresh();
+                $user->refresh();
             } catch (\Exception $e) {
                 Log::error('[PPOB-FULFILL-ERROR] ' . $e->getMessage());
             }
@@ -308,13 +327,23 @@ class PpobController extends Controller
                 Cache::forget('ppob_inquiry:' . $inquiryKey);
             }
 
+            $isFailed = in_array(strtolower((string) $order->order_status), ['failed', 'refunded'], true);
+            $isCompleted = in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas'], true);
+
             return response()->json([
                 'status'         => 'success',
                 'invoice_number' => $order->invoice_number,
-                'invoice_url' => $order->invoiceUrl(),
+                'invoice_url'    => $order->invoiceUrl(),
                 'order_status'   => $order->order_status,
+                'is_refunded'    => !empty($fulfillResult['is_refunded']) || $isFailed,
+                'user_balance'   => (int) $user->balance,
                 'sn_or_account'  => $order->sn_or_account,
-                'message'        => $order->order_status === 'completed' ? 'Layanan berhasil diproses.' : 'Pembayaran diterima. Status layanan: '.$order->order_status.'.',
+                'notes'          => $order->notes,
+                'message'        => $isCompleted
+                    ? 'Layanan PPOB berhasil diproses!'
+                    : ($isFailed
+                        ? ($fulfillResult['message'] ?? 'Transaksi gagal diproses oleh operator. Saldo telah dikembalikan 100% ke akun Anda.')
+                        : 'Transaksi sedang diproses (Pending) oleh operator.'),
                 'redirect_url'   => $order->invoiceUrl(),
             ]);
         }
@@ -409,14 +438,67 @@ class PpobController extends Controller
             $order->refresh();
         }
 
+        // Jika sudah dibayar tapi status masih processing/pending, cek berkala ke /Services/Check-Status Kiosbank
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement'], true)
+            && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
+            $throttleKey = 'ppob_poll_checkstatus_' . $order->id;
+            if (!Cache::has($throttleKey)) {
+                Cache::put($throttleKey, 1, 8);
+                try {
+                    OrderFulfillmentService::reconcilePendingPpobOrder($order);
+                    $order->refresh();
+                } catch (\Throwable $e) {
+                    Log::warning('[PPOB-POLL-CHECKSTATUS] ' . $e->getMessage());
+                }
+            }
+        }
+
+        $isFailed = in_array(strtolower((string) $order->order_status), ['failed', 'refunded'], true);
+
         return response()->json([
             'status'         => $order->order_status,
             'order_status'   => $order->order_status,
             'payment_status' => $order->payment_status,
+            'is_refunded'    => $isFailed && (bool) $order->user_id,
+            'user_balance'   => Auth::check() ? (int) Auth::user()->fresh()->balance : null,
             'invoice_number' => $order->invoice_number,
-            'invoice_url' => $order->invoiceUrl(),
+            'invoice_url'    => $order->invoiceUrl(),
+            'sn'             => $order->sn_or_account,
             'sn_or_account'  => $order->sn_or_account,
             'notes'          => $order->notes,
+        ]);
+    }
+
+    /**
+     * Tombol Manual "Cek Status Ulang" (/Services/Check-Status) untuk pesanan PPOB Pending
+     */
+    public function recheckStatus($orderId)
+    {
+        $order = request()->attributes->get('authorized_order');
+
+        if (!$order) {
+            return response()->json(['status' => 'error', 'message' => 'Pesanan tidak ditemukan.'], 404);
+        }
+
+        $res = OrderFulfillmentService::reconcilePendingPpobOrder($order);
+        $order->refresh();
+
+        $isFailed = in_array(strtolower((string) $order->order_status), ['failed', 'refunded'], true);
+        $isCompleted = in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas'], true);
+
+        return response()->json([
+            'status'         => 'success',
+            'order_status'   => $order->order_status,
+            'payment_status' => $order->payment_status,
+            'is_ready'       => $isCompleted,
+            'is_refunded'    => $isFailed && (bool) $order->user_id,
+            'user_balance'   => Auth::check() ? (int) Auth::user()->fresh()->balance : null,
+            'invoice_number' => $order->invoice_number,
+            'invoice_url'    => $order->invoiceUrl(),
+            'sn'             => $order->sn_or_account,
+            'sn_or_account'  => $order->sn_or_account,
+            'notes'          => $order->notes,
+            'message'        => $res['message'] ?? 'Status pesanan telah diperiksa ke server Kiosbank.',
         ]);
     }
 }

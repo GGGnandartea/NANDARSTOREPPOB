@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Services\OrderFulfillmentService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -180,11 +181,15 @@ class WebhookController extends Controller
             if (!empty($order->notes) && preg_match('/No Tujuan:\s*([^|]+)/i', $order->notes, $m)) {
                 $targetNumber = trim($m[1]);
             }
+            $prodCode = $order->provider_product_code ?: ($order->product_id ?: 'PPOB');
+            if (!empty($order->notes) && preg_match('/Kode:\s*([^\s|]+)/i', $order->notes, $m2)) {
+                $prodCode = trim($m2[1]);
+            }
 
             $snValue = !empty($sn) ? $sn : ($data['noReferensi'] ?? $referenceId);
             $order->sn_or_account   = "SN/Token: " . $snValue;
             $order->account_details = "Layanan PPOB: " . $order->product_name . "\nTujuan: " . $targetNumber . "\nSN/Token: " . $snValue;
-            $order->notes           = ($order->notes ? $order->notes . ' | ' : '') . "Callback Kiosbank: BERHASIL (Ref: {$referenceId})";
+            $order->notes           = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Callback Kiosbank: BERHASIL (Ref: {$referenceId})";
             $order->save();
 
             // Notifikasi WhatsApp jika akun pembeli terverifikasi WA
@@ -194,13 +199,17 @@ class WebhookController extends Controller
                 Log::error('[KIOSBANK-CALLBACK-WA-ERROR] ' . $e->getMessage());
             }
 
+            try {
+                (new \App\Services\KiosbankService($order->kiosbank_mode))->checkAndNotifyLowBalance();
+            } catch (\Throwable $e) {
+                Log::warning('[KIOSBANK-CALLBACK-LOW-BALANCE] ' . $e->getMessage());
+            }
+
             Log::info("[KIOSBANK-CALLBACK] Pesanan {$order->invoice_number} berhasil diperbarui ke completed.");
-        } elseif ($status === 'GAGAL' || ($rc !== null && $rc !== '00')) {
-            $desc = $payload['description'] ?? ($data['description'] ?? 'Transaksi gagal dari provider');
-            $order->order_status = 'failed';
-            $order->notes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Kiosbank GAGAL (RC {$rc}): {$desc}";
-            $order->save();
-            Log::warning("[KIOSBANK-CALLBACK] Pesanan {$order->invoice_number} gagal dari provider: {$desc}");
+        } elseif ($status === 'GAGAL' || $status === 'FAILED' || ($rc !== null && !in_array((string) $rc, ['00', '0000', '71'], true))) {
+            $desc = $payload['description'] ?? ($data['description'] ?? 'Transaksi gagal dari operator');
+            OrderFulfillmentService::handlePpobFailedAutoRefund($order, "RC {$rc} - {$desc}");
+            Log::warning("[KIOSBANK-CALLBACK] Pesanan {$order->invoice_number} gagal dari Kiosbank & saldo di-refund: {$desc}");
         }
 
         return response()->json(['rc' => '00', 'message' => 'Success'], 200);
@@ -535,7 +544,7 @@ class WebhookController extends Controller
         $waGroup = \App\Models\Setting::where('key', 'whatsapp_group_link')->value('value') ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H';
 
         if ($isPpob) {
-            $sectionHeader = "⚡ *SERIAL NUMBER (SN) / TOKEN / STRUK:*";
+            $sectionHeader = "🧾 *SERIAL NUMBER (SN) / TOKEN / STRUK:*";
             $sectionWarning = "⚠️ _Simpan nomor SN / Token ini sebagai bukti sah pengisian._";
         } else {
             $sectionHeader = "🔑 *DETAIL AKUN / LISENSI ANDA:*";

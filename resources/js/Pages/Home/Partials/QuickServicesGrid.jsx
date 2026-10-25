@@ -46,7 +46,7 @@ export default function QuickServicesGrid({
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-amber-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.75V17h8v-2.25A7 7 0 0 0 12 2z"/></svg>
                         <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[7px] font-black uppercase">PLN</span>
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-amber-600 dark:group-hover:text-amber-400">PLN</span>

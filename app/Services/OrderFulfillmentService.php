@@ -65,9 +65,9 @@ class OrderFulfillmentService
         return [
             'status' => $order->order_status,
             'is_ready' => in_array(strtolower($order->order_status), ['completed', 'success', 'lunas'], true),
-            'is_refunded' => $order->order_status === 'refunded',
+            'is_refunded' => in_array(strtolower((string) $order->order_status), ['refunded', 'failed'], true) && (bool) $order->user_id,
             'sn_or_account' => $order->sn_or_account,
-            'message' => 'Pesanan sudah pernah diproses. Gunakan pemeriksaan status provider untuk melanjutkan pemantauan.',
+            'message' => 'Pesanan sudah pernah diproses. Gunakan pemeriksaan status untuk melanjutkan pemantauan.',
         ];
     }
 
@@ -118,13 +118,19 @@ class OrderFulfillmentService
                     $sn = $res['sn'] ?? ($res['reference_id'] ?? 'BERHASIL');
                     $order->sn_or_account  = "No. Referensi: " . $sn;
                     $order->account_details= "Pembayaran Tagihan: " . $order->product_name . "\nNo. Pelanggan: " . $targetNumber . "\nTotal: Rp " . number_format((int) $order->bill_total, 0, ',', '.') . "\nNo. Referensi: " . $sn;
-                    $order->notes          = ($order->notes ? $order->notes . ' | ' : '') . "Pembayaran tagihan Kiosbank sukses. Ref: " . ($res['reference_id'] ?? $refId);
+                    $order->notes          = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Pembayaran tagihan Kiosbank Berhasil. Ref: " . ($res['reference_id'] ?? $refId);
                     $order->save();
 
                     try {
                         WebhookController::sendOrderNotification($order);
                     } catch (\Exception $e) {
                         Log::error('[PPOB-WA-NOTIF-ERROR] ' . $e->getMessage());
+                    }
+
+                    try {
+                        $kiosbank->checkAndNotifyLowBalance();
+                    } catch (\Throwable $e) {
+                        Log::warning('[PPOB-LOW-BALANCE-CHECK] ' . $e->getMessage());
                     }
 
                     return [
@@ -135,16 +141,23 @@ class OrderFulfillmentService
                     ];
                 }
 
+                if (($res['status'] ?? '') === 'failed') {
+                    $failReason = trim((string) ($res['message'] ?? 'Pembayaran tagihan gagal diproses oleh operator'));
+                    return self::handlePpobFailedAutoRefund($order, $failReason);
+                }
+
+                $pendingNote = str_ireplace(['provider', 'api'], ['operator', 'sistem'], trim((string) ($res['message'] ?? 'Sedang diproses oleh operator')));
                 $order->order_status   = 'processing';
                 $order->payment_status = 'paid';
                 $order->provider       = 'Kiosbank';
-                $order->notes          = 'Pembayaran tagihan sedang diproses Kiosbank: ' . ($res['message'] ?? 'Pending');
+                $order->sn_or_account  = null;
+                $order->notes          = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Status: Pending — {$pendingNote}";
                 $order->save();
 
                 return [
                     'status'   => 'processing',
                     'is_ready' => false,
-                    'message'  => 'Pembayaran tagihan sedang diproses oleh provider Kiosbank.',
+                    'message'  => 'Pembayaran tagihan sedang diproses (Pending) oleh operator.',
                 ];
             }
 
@@ -164,7 +177,7 @@ class OrderFulfillmentService
                 $sn = $res['sn'] ?? ($res['reference_id'] ?? 'BERHASIL');
                 $order->sn_or_account  = "SN/Token: " . $sn;
                 $order->account_details= "Layanan PPOB: " . $order->product_name . "\nTujuan: " . $targetNumber . "\nSN/Token: " . $sn;
-                $order->notes          = ($order->notes ? $order->notes . ' | ' : '') . "Transaksi PPOB Kiosbank Sukses. Ref: " . ($res['reference_id'] ?? $refId);
+                $order->notes          = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Transaksi PPOB Kiosbank Berhasil. Ref: " . ($res['reference_id'] ?? $refId);
                 $order->save();
 
                 // Notifikasi WhatsApp jika akun pembeli terverifikasi WA
@@ -180,25 +193,38 @@ class OrderFulfillmentService
                     Log::error('[PPOB-WA-NOTIF-ERROR] ' . $e->getMessage());
                 }
 
+                try {
+                    $kiosbank->checkAndNotifyLowBalance();
+                } catch (\Throwable $e) {
+                    Log::warning('[PPOB-LOW-BALANCE-CHECK] ' . $e->getMessage());
+                }
+
                 return [
                     'status'        => 'success',
                     'is_ready'      => true,
                     'sn_or_account' => $order->sn_or_account,
                     'message'       => 'Layanan PPOB berhasil diproses oleh Kiosbank!',
                 ];
-            } else {
-                $order->order_status   = 'processing';
-                $order->payment_status = 'paid';
-                $order->provider       = 'Kiosbank';
-                $order->notes          = 'Sedang diproses Kiosbank: ' . ($res['message'] ?? 'Pending');
-                $order->save();
-
-                return [
-                    'status'   => 'processing',
-                    'is_ready' => false,
-                    'message'  => 'Transaksi PPOB sedang diproses oleh provider Kiosbank.',
-                ];
             }
+
+            if (($res['status'] ?? '') === 'failed') {
+                $failReason = trim((string) ($res['message'] ?? 'Transaksi gagal diproses oleh operator'));
+                return self::handlePpobFailedAutoRefund($order, $failReason);
+            }
+
+            $pendingNote = str_ireplace(['provider', 'api'], ['operator', 'sistem'], trim((string) ($res['message'] ?? 'Sedang diproses oleh operator')));
+            $order->order_status   = 'processing';
+            $order->payment_status = 'paid';
+            $order->provider       = 'Kiosbank';
+            $order->sn_or_account  = null;
+            $order->notes          = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Status: Pending — {$pendingNote}";
+            $order->save();
+
+            return [
+                'status'   => 'processing',
+                'is_ready' => false,
+                'message'  => 'Transaksi PPOB sedang diproses (Pending) oleh operator.',
+            ];
         }
 
         $product = Product::find($order->product_id);
@@ -705,6 +731,243 @@ class OrderFulfillmentService
         }
 
         return false;
+    }
+
+    /**
+     * Sinkronisasi & Cek Status Ulang ke Kiosbank (/Services/Check-Status)
+     * untuk pesanan PPOB yang berstatus Pending / Processing.
+     */
+    public static function reconcilePendingPpobOrder(Order $order): array
+    {
+        $order->refresh();
+
+        $isPpob = ($order->product_type === 'ppob') || str_starts_with((string) $order->invoice_number, 'PPOB-');
+        if (!$isPpob) {
+            return [
+                'status'   => $order->order_status,
+                'is_ready' => in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas'], true),
+                'message'  => 'Bukan pesanan PPOB.',
+            ];
+        }
+
+        $statusLower = strtolower((string) $order->order_status);
+        if (in_array($statusLower, ['completed', 'success', 'lunas'], true)) {
+            return [
+                'status'        => 'completed',
+                'is_ready'      => true,
+                'sn_or_account' => $order->sn_or_account,
+                'message'       => 'Transaksi PPOB sudah berhasil.',
+            ];
+        }
+
+        if (in_array($statusLower, ['failed', 'refunded', 'canceled', 'cancelled'], true)) {
+            return [
+                'status'      => 'failed',
+                'is_ready'    => false,
+                'is_refunded' => (bool) $order->user_id,
+                'message'     => 'Transaksi PPOB sudah berstatus Gagal & Di-Refund.',
+            ];
+        }
+
+        if (!in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement'], true)) {
+            return [
+                'status'   => 'pending',
+                'is_ready' => false,
+                'message'  => 'Menunggu konfirmasi pembayaran selesai.',
+            ];
+        }
+
+        // Jika belum pernah dikirim ke Kiosbank, jalankan fulfillOrder terlebih dahulu
+        if (!$order->fulfillment_started_at && empty($order->api_trx_id)) {
+            return self::fulfillOrder($order);
+        }
+
+        $targetNumber = $order->provider_customer_id ?: ($order->target_id ?: ($order->whatsapp ?: '08123456789'));
+        if (!empty($order->notes) && preg_match('/No Tujuan:\s*([^|]+)/i', $order->notes, $m)) {
+            $targetNumber = trim($m[1]);
+        }
+        $prodCode = $order->provider_product_code ?: ($order->product_id ?: 'PPOB');
+        if (!empty($order->notes) && preg_match('/(?:Kode|ProductID):\s*([^\s|]+)/i', $order->notes, $m2)) {
+            $prodCode = trim($m2[1]);
+        }
+
+        $refId = $order->api_trx_id ?: ($order->bill_reference ?: '');
+        if (empty($refId)) {
+            return [
+                'status'   => 'processing',
+                'is_ready' => false,
+                'message'  => 'Nomor referensi transaksi Kiosbank belum tersedia.',
+            ];
+        }
+
+        $isBill = !empty($order->bill_total) && (int) $order->bill_total > 0;
+        $tagihan = $isBill ? (int) ($order->bill_amount ?: $order->bill_total) : (int) ($order->provider_amount ?: $order->total_amount);
+        $admin = $isBill ? (int) ($order->bill_admin_fee ?? 0) : 0;
+        $total = $isBill ? (int) $order->bill_total : $tagihan;
+        $tglTransaksi = $order->created_at
+            ? $order->created_at->timezone('Asia/Jakarta')->format('Y-m-d')
+            : now()->timezone('Asia/Jakarta')->format('Y-m-d');
+
+        $kiosbank = new KiosbankService($order->kiosbank_mode);
+        $res = $kiosbank->checkStatus(
+            (string) $prodCode,
+            (string) $targetNumber,
+            (string) $refId,
+            $tagihan,
+            $admin,
+            $total,
+            $tglTransaksi
+        );
+
+        Log::info("[KIOSBANK-CHECK-STATUS] Order {$order->invoice_number} (Ref: {$refId}): " . json_encode($res));
+
+        if (($res['status'] ?? '') === 'success') {
+            $sn = $res['sn'] ?? ($res['reference_id'] ?? $refId);
+            $order->order_status   = 'completed';
+            $order->payment_status = 'paid';
+            $order->provider       = 'Kiosbank';
+
+            if ($isBill) {
+                $order->sn_or_account   = "No. Referensi: " . $sn;
+                $order->account_details = "Pembayaran Tagihan: " . $order->product_name . "\nNo. Pelanggan: " . $targetNumber . "\nTotal: Rp " . number_format($total, 0, ',', '.') . "\nNo. Referensi: " . $sn;
+            } else {
+                $order->sn_or_account   = "SN/Token: " . $sn;
+                $order->account_details = "Layanan PPOB: " . $order->product_name . "\nTujuan: " . $targetNumber . "\nSN/Token: " . $sn;
+            }
+
+            $order->notes = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Cek Status (/Services/Check-Status): BERHASIL. Ref: " . ($res['reference_id'] ?? $refId);
+            $order->save();
+
+            try {
+                WebhookController::sendOrderNotification($order);
+            } catch (\Throwable $e) {
+                Log::warning('[PPOB-CHECKSTATUS-WA-ERR] ' . $e->getMessage());
+            }
+
+            try {
+                $kiosbank->checkAndNotifyLowBalance();
+            } catch (\Throwable $e) {
+                Log::warning('[PPOB-LOW-BALANCE-CHECK] ' . $e->getMessage());
+            }
+
+            return [
+                'status'        => 'completed',
+                'is_ready'      => true,
+                'sn_or_account' => $order->sn_or_account,
+                'rc'            => $res['rc'] ?? '00',
+                'message'       => 'Status diperbarui dari Kiosbank (/Services/Check-Status): Transaksi BERHASIL!',
+            ];
+        }
+
+        if (($res['status'] ?? '') === 'failed') {
+            $failReason = trim((string) ($res['message'] ?? 'Transaksi gagal berdasarkan pengecekan /Services/Check-Status'));
+            return self::handlePpobFailedAutoRefund($order, $failReason);
+        }
+
+        $order->touch();
+
+        return [
+            'status'   => 'processing',
+            'is_ready' => false,
+            'rc'       => $res['rc'] ?? '71',
+            'message'  => 'Hasil cek /Services/Check-Status Kiosbank: Transaksi masih berstatus Pending (Sedang Diproses Operator).',
+        ];
+    }
+
+    /**
+     * Menangani kondisi saat transaksi PPOB gagal diproses oleh operator / Kiosbank.
+     * Menandai order_status = 'failed' dan mengembalikan dana 100% secara otomatis
+     * ke Saldo Akun pembeli terdaftar beserta catatan mutasi TransactionLog.
+     */
+    public static function handlePpobFailedAutoRefund(Order $order, string $failReason = 'Transaksi gagal diproses oleh operator'): array
+    {
+        $cleanReason = str_ireplace(
+            ['provider', 'api', 'invalid'],
+            ['operator', 'sistem', 'tidak valid'],
+            trim($failReason)
+        ) ?: 'Transaksi gagal diproses oleh operator';
+
+        return DB::transaction(function () use ($order, $cleanReason) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            if (!in_array(strtolower((string) $locked->payment_status), ['paid', 'success', 'settlement'], true)
+                || in_array(strtolower((string) $locked->order_status), ['failed', 'refunded', 'completed', 'success', 'lunas'], true)) {
+                return self::existingResult($locked);
+            }
+
+            $targetNumber = $locked->provider_customer_id ?: ($locked->whatsapp ?: '-');
+            if (!empty($locked->notes) && preg_match('/No Tujuan:\s*([^|]+)/i', $locked->notes, $m)) {
+                $targetNumber = trim($m[1]);
+            }
+            $prodCode = $locked->provider_product_code ?: ($locked->product_id ?: 'PPOB');
+            if (!empty($locked->notes) && preg_match('/Kode:\s*([^\s|]+)/i', $locked->notes, $m2)) {
+                $prodCode = trim($m2[1]);
+            }
+
+            $refundAmount = (int) ($locked->total_amount ?: ($locked->price ?: 0));
+            $buyer = $locked->user_id ? User::whereKey($locked->user_id)->lockForUpdate()->first() : null;
+
+            if ($buyer && $refundAmount > 0) {
+                $alreadyLogged = TransactionLog::where('user_id', $buyer->id)
+                    ->where('type', 'refund')
+                    ->where('description', 'like', '%Invoice #' . $locked->invoice_number . '%')
+                    ->exists();
+
+                if (!$alreadyLogged) {
+                    $buyer->increment('balance', $refundAmount);
+
+                    TransactionLog::create([
+                        'user_id'     => $buyer->id,
+                        'type'        => 'refund',
+                        'amount'      => $refundAmount,
+                        'description' => 'Refund Otomatis PPOB Gagal: ' . $locked->product_name . ' (' . $targetNumber . ') - Invoice #' . $locked->invoice_number,
+                    ]);
+                }
+
+                $formattedAmount = number_format($refundAmount, 0, ',', '.');
+                $locked->order_status    = 'failed';
+                $locked->payment_status  = 'paid';
+                $locked->provider        = 'Kiosbank';
+                $locked->sn_or_account   = null;
+                $locked->account_details = "Transaksi Gagal: {$cleanReason}\nDana sebesar Rp {$formattedAmount} telah dikembalikan 100% ke Saldo Akun Anda.";
+                $locked->notes           = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Transaksi Gagal ({$cleanReason}). Saldo Rp {$formattedAmount} telah di-refund otomatis ke Saldo Akun.";
+                $locked->save();
+
+                Log::info("[PPOB-AUTO-REFUND-SUCCESS] Order {$locked->invoice_number}: Saldo Rp {$refundAmount} dikembalikan ke user {$buyer->email}. Alasan: {$cleanReason}");
+
+                return [
+                    'status'        => 'failed',
+                    'is_ready'      => false,
+                    'is_refunded'   => true,
+                    'refund_amount' => $refundAmount,
+                    'sn_or_account' => null,
+                    'message'       => "Transaksi gagal ({$cleanReason}). Saldo sebesar Rp {$formattedAmount} telah otomatis dikembalikan ke Saldo Akun Anda.",
+                ];
+            }
+
+            $formattedAmount = number_format($refundAmount, 0, ',', '.');
+            $locked->order_status    = 'failed';
+            $locked->payment_status  = 'paid';
+            $locked->provider        = 'Kiosbank';
+            $locked->sn_or_account   = null;
+            $locked->account_details = "Transaksi Gagal: {$cleanReason}\nHubungi CS Admin untuk proses pengembalian dana senilai Rp {$formattedAmount}.";
+            $locked->notes           = "No Tujuan: {$targetNumber} | Kode: {$prodCode} | Transaksi Gagal ({$cleanReason}). Hubungi CS Admin untuk pengembalian dana.";
+            $locked->save();
+
+            try {
+                self::sendAdminRefundAlert($locked, $refundAmount);
+            } catch (\Throwable $e) {
+                Log::error("[PPOB-ADMIN-REFUND-ALERT-ERROR] " . $e->getMessage());
+            }
+
+            return [
+                'status'        => 'failed',
+                'is_ready'      => false,
+                'is_refunded'   => false,
+                'refund_amount' => $refundAmount,
+                'sn_or_account' => null,
+                'message'       => "Transaksi gagal ({$cleanReason}). Hubungi CS Admin untuk pengembalian dana.",
+            ];
+        });
     }
 
     /**

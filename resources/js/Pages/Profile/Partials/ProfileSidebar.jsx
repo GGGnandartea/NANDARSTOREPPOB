@@ -176,7 +176,7 @@ export default function ProfileSidebar({
               onClick={() => setShowUpgradeModal(true)}
               className={`mt-2.5 w-full text-xs font-black py-2.5 rounded-xl transition shadow cursor-pointer ${isFree ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 text-white hover:brightness-110 shadow-emerald-500/20' : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 hover:brightness-110'}`}
             >
-              {isFree ? 'Klaim VIP Gratis Sekarang ⚡' : 'Upgrade Sekarang 👑'}
+              {isFree ? 'Klaim VIP Gratis Sekarang' : 'Upgrade Sekarang'}
             </button>
           </div>
         )}

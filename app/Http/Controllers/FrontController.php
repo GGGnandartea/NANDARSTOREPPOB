@@ -95,17 +95,19 @@ class FrontController extends Controller
 
         $products = $query->get();
 
-        $apiData = Cache::remember('api_full_data', 60, function() use ($premkuService, $preflixService) {
+        $apiData = Cache::remember('api_full_data', 60, function() use ($premkuService, $disabledPremku, $disabledPreflix) {
             $data = [];
             try {
-                $resPremku = $premkuService->getProducts();
+                $resPremku = $disabledPremku ? [] : $premkuService->getProducts(3);
                 if(isset($resPremku['products'])) { foreach($resPremku['products'] as $p) { $data['PREMKU-' . $p['id']] = ['stock' => $p['stock'] ?? 0]; } }
             } catch (\Exception $e) {}
 
             try {
                 $idUser = Setting::where('key', 'preflix_id_user')->value('value');
                 $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-                $resPreflix = Http::asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_all_product', 'id_user' => $idUser, 'key_user' => $keyUser])->json();
+                $resPreflix = (!$disabledPreflix && $idUser && $keyUser)
+                    ? Http::connectTimeout(2)->timeout(3)->asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_all_product', 'id_user' => $idUser, 'key_user' => $keyUser])->json()
+                    : [];
                 if(isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data'])) {
                     foreach($resPreflix['data'] as $kategori) {
                         foreach($kategori['produk'] as $p) { $data['PREFLIX-' . $p['id_produk']] = ['stock' => $p['stok'] ?? 0]; }
@@ -411,7 +413,7 @@ class FrontController extends Controller
         if ($product->type === 'api') {
             $apiData = Cache::get('api_full_data', []); $product->stock = $apiData[$product->api_product_id]['stock'] ?? 0;
             $manualDesc = trim(strip_tags($product->description));
-            if (empty($manualDesc)) { $product->description = "Layanan Premium: " . $product->name . "\n\n✨ Keunggulan Layanan:\n- ⚡ Proses Pengisian Instan (Otomatis).\n- 🛡️ 100% Legal, Aman, dan Bergaransi Resmi.\n- 🟢 Layanan Aktif 24 Jam Non-Stop tanpa hari libur.\n\n⚠️ Catatan Penting:\nPastikan Anda memasukkan data tujuan dengan benar."; }
+            if (empty($manualDesc)) { $product->description = "Layanan Premium: " . $product->name . "\n\nKeunggulan Layanan:\n- Proses Pengisian Instan (Otomatis).\n- 100% Legal, Aman, dan Bergaransi Resmi.\n- Layanan Aktif 24 Jam Non-Stop tanpa hari libur.\n\nCatatan Penting:\nPastikan Anda memasukkan data tujuan dengan benar."; }
         } else {
             $manualDesc = trim(strip_tags($product->description));
             if (empty($manualDesc)) { $product->description = "Layanan digital eksklusif dari NandarStore.\nProses dilakukan manual oleh Admin setelah pembayaran berhasil dikonfirmasi. Harap tunggu notifikasi via WhatsApp."; }
@@ -619,25 +621,6 @@ class FrontController extends Controller
         }
     }
 
-    public function guestOrderHistory(Request $request)
-    {
-        $grants = $request->session()->get('guest_orders', []);
-        $orders = Order::whereNull('user_id')->whereIn('id', array_keys(is_array($grants) ? $grants : []))
-            ->latest()->limit(100)->get()
-            ->filter(fn ($order) => is_string($grants[$order->id] ?? null)
-                && $order->guest_access_token
-                && hash_equals(hash('sha256', $order->guest_access_token), $grants[$order->id]))
-            ->map(fn ($order) => [
-                'order_id' => $order->invoice_number,
-                'product_name' => $order->product_name,
-                'invoice_url' => $order->invoiceUrl(),
-                'created_at' => $order->created_at?->toIso8601String(),
-            ])->values();
-
-        return response()->json(['orders' => $orders])
-            ->header('Cache-Control', 'private, no-store')->header('Referrer-Policy', 'no-referrer');
-    }
-
     public function checkStatus($orderId) {
         $order = request()->attributes->get('authorized_order');
         if (!$order) {
@@ -656,6 +639,16 @@ class FrontController extends Controller
         if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
             $order->refresh();
+        }
+
+        // Jika pesanan PPOB sudah dibayar dan masih processing/pending, cek status ke /Services/Check-Status Kiosbank
+        if ($order->payment_status === 'paid' && $order->product_type === 'ppob' && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
+            $throttleKey = 'ppob_poll_checkstatus_' . $order->id;
+            if (!Cache::has($throttleKey)) {
+                Cache::put($throttleKey, 1, 8);
+                \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
+                $order->refresh();
+            }
         }
 
         $snAkun = $order->sn_or_account ?: $order->account_details;
@@ -706,7 +699,87 @@ class FrontController extends Controller
             $order->refresh();
         }
 
+        // Otomatis cek status PPOB saat invoice dibuka jika masih processing/pending
+        if ($order->payment_status === 'paid' && $order->product_type === 'ppob' && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
+            \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
+            $order->refresh();
+        }
+
         return view('front.invoice', compact('order'));
+    }
+
+    /**
+     * Sinkronisasi & Cek Status Ulang pesanan Pending milik user (PPOB /Services/Check-Status & API)
+     */
+    public function syncPendingOrders(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Silakan login terlebih dahulu.'], 401);
+        }
+
+        $query = Order::where('user_id', $user->id)
+            ->whereIn('payment_status', ['paid', 'success', 'settlement'])
+            ->whereIn('order_status', ['processing', 'pending']);
+
+        if ($request->filled('order_id')) {
+            $target = $request->input('order_id');
+            $query->where(function ($q) use ($target) {
+                $q->where('invoice_number', $target)->orWhere('id', $target);
+            });
+        }
+
+        $pendingOrders = $query->orderBy('id', 'desc')->limit(15)->get();
+
+        if ($pendingOrders->isEmpty()) {
+            return response()->json([
+                'status'          => 'success',
+                'synced_count'    => 0,
+                'completed_count' => 0,
+                'failed_count'    => 0,
+                'pending_count'   => 0,
+                'user_balance'    => (int) $user->fresh()->balance,
+                'message'         => 'Semua pesanan sudah sinkron dengan status terbaru dari server.',
+            ]);
+        }
+
+        $completedCount = 0;
+        $failedCount = 0;
+        $stillPendingCount = 0;
+        $lastMessage = '';
+
+        foreach ($pendingOrders as $ord) {
+            if ($ord->product_type === 'ppob' || str_starts_with((string) $ord->invoice_number, 'PPOB-')) {
+                $res = \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($ord);
+                $lastMessage = $res['message'] ?? '';
+            } elseif ($ord->product_type === 'api') {
+                $res = \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($ord);
+                $lastMessage = $res['message'] ?? '';
+            }
+            $ord->refresh();
+            $st = strtolower((string) $ord->order_status);
+            if (in_array($st, ['completed', 'success', 'lunas'], true)) {
+                $completedCount++;
+            } elseif (in_array($st, ['failed', 'refunded'], true)) {
+                $failedCount++;
+            } else {
+                $stillPendingCount++;
+            }
+        }
+
+        $summaryMsg = $pendingOrders->count() === 1 && $lastMessage
+            ? $lastMessage
+            : "Sinkronisasi selesai ({$pendingOrders->count()} pesanan diperiksa: {$completedCount} Berhasil, {$failedCount} Gagal/Refund, {$stillPendingCount} Masih Diproses).";
+
+        return response()->json([
+            'status'          => 'success',
+            'synced_count'    => $pendingOrders->count(),
+            'completed_count' => $completedCount,
+            'failed_count'    => $failedCount,
+            'pending_count'   => $stillPendingCount,
+            'user_balance'    => (int) $user->fresh()->balance,
+            'message'         => $summaryMsg,
+        ]);
     }
 
     public function profile() {
@@ -778,15 +851,17 @@ class FrontController extends Controller
                 return $order;
             });
 
-        // 1. Ambil mutasi dana dari TransactionLog (Pemasukan & Pengeluaran)
+        // 1. Ambil mutasi dana dari TransactionLog (Pemasukan, Pengeluaran & Refund)
         $txLogs = \App\Models\TransactionLog::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function($log) {
-                $isIncome = in_array(strtolower($log->type), ['topup', 'credit', 'refund', 'bonus']);
+                $rawTypeLower = strtolower((string) $log->type);
+                $isRefund = $rawTypeLower === 'refund';
+                $isIncome = in_array($rawTypeLower, ['topup', 'credit', 'bonus', 'deposit'], true);
                 return [
                     'id'          => 'LOG-' . $log->id,
-                    'type'        => $isIncome ? 'income' : 'expense',
+                    'type'        => $isRefund ? 'refund' : ($isIncome ? 'income' : 'expense'),
                     'raw_type'    => $log->type,
                     'amount'      => (int) $log->amount,
                     'description' => $log->description,
@@ -820,22 +895,34 @@ class FrontController extends Controller
         // Gabungkan dan urutkan dari transaksi terbaru
         $mutations = $pendingTopups->concat($txLogs)->sortByDesc('created_at')->values();
 
-        // Hitung akumulasi total pemasukan & pengeluaran sejak user pertama kali mendaftar
+        // Hitung akumulasi total pemasukan murni (tanpa refund) & pengeluaran bersih (setelah dikurangi refund)
         $totalIncome = (int) \App\Models\TransactionLog::where('user_id', $user->id)
-            ->whereIn('type', ['topup', 'credit', 'refund', 'bonus', 'deposit'])
+            ->whereIn('type', ['topup', 'credit', 'bonus', 'deposit'])
             ->sum('amount');
 
-        $totalExpense = (int) \App\Models\TransactionLog::where('user_id', $user->id)
+        $totalRefund = (int) \App\Models\TransactionLog::where('user_id', $user->id)
+            ->where('type', 'refund')
+            ->sum('amount');
+
+        $grossExpense = (int) \App\Models\TransactionLog::where('user_id', $user->id)
             ->whereIn('type', ['debit', 'deduction', 'reseller_fee', 'expense'])
             ->sum('amount');
+
+        $totalExpense = max(0, $grossExpense - $totalRefund);
 
         $incomeCount = \App\Models\TransactionLog::where('user_id', $user->id)
-            ->whereIn('type', ['topup', 'credit', 'refund', 'bonus', 'deposit'])
+            ->whereIn('type', ['topup', 'credit', 'bonus', 'deposit'])
             ->count();
 
-        $expenseCount = \App\Models\TransactionLog::where('user_id', $user->id)
+        $refundCount = \App\Models\TransactionLog::where('user_id', $user->id)
+            ->where('type', 'refund')
+            ->count();
+
+        $grossExpenseCount = \App\Models\TransactionLog::where('user_id', $user->id)
             ->whereIn('type', ['debit', 'deduction', 'reseller_fee', 'expense'])
             ->count();
+
+        $expenseCount = max(0, $grossExpenseCount - $refundCount);
 
         return Inertia::render('Profile', [
             'favoriteProducts' => fn () => $user->favoriteProducts()->orderByPivot('created_at', 'desc')->get(['products.id', 'products.name', 'products.image', 'products.price', 'products.stock', 'products.status', 'products.type', 'products.process_type']),
@@ -852,8 +939,11 @@ class FrontController extends Controller
             'stats'     => [
                 'total_income'  => $totalIncome,
                 'total_expense' => $totalExpense,
+                'gross_expense' => $grossExpense,
+                'total_refund'  => $totalRefund,
                 'income_count'  => $incomeCount,
                 'expense_count' => $expenseCount,
+                'refund_count'  => $refundCount,
             ],
         ]);
     }

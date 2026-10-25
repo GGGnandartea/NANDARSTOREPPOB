@@ -36,7 +36,7 @@ export default function PpobBanner({ filters }) {
                             </span>
                             <span className="text-gray-300 dark:text-white/20">•</span>
                             <span className="flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
+                                <svg className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.75V17h8v-2.25A7 7 0 0 0 12 2z"/></svg>
                                 Token PLN
                             </span>
                             <span className="text-gray-300 dark:text-white/20">•</span>

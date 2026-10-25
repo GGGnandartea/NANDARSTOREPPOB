@@ -12,7 +12,6 @@ Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.det
 Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
 Route::post('/checkout/process', [FrontController::class, 'processCheckout'])->name('checkout.process')->middleware('throttle:payments');
 Route::get('/checkout/status/{orderId}', [FrontController::class, 'checkStatus'])->name('checkout.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
-Route::get('/orders/guest-history', [FrontController::class, 'guestOrderHistory'])->middleware('throttle:polling')->name('orders.guest_history');
 Route::get('/order/invoice/{orderId}', [FrontController::class, 'invoice'])->name('order.invoice')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 Route::get('/invoice/{orderId}', [FrontController::class, 'invoice'])->name('invoice.direct')->where('orderId', '[A-Za-z0-9\-_]+')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 Route::post('/order/{orderId}/resend-wa', [FrontController::class, 'resendOrderWa'])->name('order.resend_wa')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:resend_wa')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
@@ -23,6 +22,7 @@ Route::get('/ppob/products', [PpobController::class, 'getProducts'])->name('ppob
 Route::post('/ppob/inquiry', [PpobController::class, 'inquiry'])->name('ppob.inquiry')->middleware('throttle:ppob_inquiry');
 Route::post('/ppob/checkout', [PpobController::class, 'checkout'])->name('ppob.checkout')->middleware('throttle:payments');
 Route::get('/ppob/status/{orderId}', [PpobController::class, 'checkOrderStatus'])->name('ppob.status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
+Route::post('/ppob/check-status/{orderId}', [PpobController::class, 'recheckStatus'])->name('ppob.recheck_status')->where('orderId', '[A-Za-z0-9\-_]+')->middleware('throttle:polling')->middleware(\App\Http\Middleware\AuthorizeOrderAccess::class);
 // ----------------------------------
 
 
@@ -32,6 +32,7 @@ Route::get('/syarat-ketentuan', [FrontController::class, 'terms'])->name('terms'
 Route::get('/terms', [FrontController::class, 'terms'])->name('terms.alias');
 // -----------------------------------------------------------
 
+Route::get('/auth/session', [AuthController::class, 'session']);
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
@@ -54,6 +55,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/favorites/{product}', [\App\Http\Controllers\FavoriteController::class, 'store'])->name('favorites.store');
     Route::delete('/favorites/{product}', [\App\Http\Controllers\FavoriteController::class, 'destroy'])->name('favorites.destroy');
     Route::get('/profile', [FrontController::class, 'profile'])->name('profile');
+    Route::post('/profile/orders/sync-pending', [FrontController::class, 'syncPendingOrders'])->name('profile.orders.sync_pending')->middleware('throttle:polling');
     Route::post('/profile/buy-balance', [FrontController::class, 'buyWithBalance'])->name('buy.balance')->middleware('throttle:payments');
     Route::post('/topup/create', [FrontController::class, 'createTopup'])->name('topup.create')->middleware('throttle:payments');
     Route::get('/topup/status/{orderId}', [FrontController::class, 'checkTopupStatus'])->name('topup.status')->middleware('throttle:polling');
@@ -74,6 +76,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
     Route::post('/orders/{id}/status', [AdminController::class, 'updateOrderStatus'])->name('orders.update_status');
     Route::post('/orders/{id}/retry-api', [AdminController::class, 'retryApiOrder'])->name('orders.retry_api');
+    Route::post('/orders/sync-ppob-pending', [AdminController::class, 'syncAllPendingPpobOrders'])->name('orders.sync_ppob_pending');
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
     Route::get('/reports/export', [AdminController::class, 'exportReports'])->name('reports.export');
     
@@ -113,6 +116,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/ppob/deposit/create', [AdminController::class, 'kiosbankStoreDeposit'])->name('ppob.deposit.create');
     Route::post('/ppob/deposit/{id}/simulate', [AdminController::class, 'kiosbankSimulateDeposit'])->name('ppob.deposit.simulate');
     Route::post('/ppob/deposit/check-live', [AdminController::class, 'kiosbankCheckLiveDeposit'])->name('ppob.deposit.check_live');
+    Route::post('/ppob/deposit/low-balance-alert', [AdminController::class, 'kiosbankSaveLowBalanceAlert'])->name('ppob.deposit.low_balance_alert');
     // ----------------------------------------------------
     
     Route::get('/products/local', [AdminController::class, 'localProducts'])->name('products.local');

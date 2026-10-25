@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { submitAuth, authErrors } from '../lib/authRequest';
 
 export default function Login({ status }) {
     const { flash, store } = usePage().props;
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, errors, reset, setError, clearErrors } = useForm({
         email: '',
         password: '',
         remember: true,
     });
 
     const [showPassword, setShowPassword] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
         return () => {
@@ -17,9 +19,19 @@ export default function Login({ status }) {
         };
     }, []);
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        post('/login');
+        if (processing) return;
+        clearErrors();
+        setProcessing(true);
+        try {
+            const result = await submitAuth('/login', data);
+            window.location.assign(result.redirect);
+        } catch (error) {
+            setError(authErrors(error));
+        } finally {
+            setProcessing(false);
+        }
     };
 
     return (
@@ -109,6 +121,12 @@ export default function Login({ status }) {
                         {status && (
                             <div className="mb-5 font-bold text-xs text-emerald-400 bg-emerald-500/10 p-3.5 rounded-xl border border-emerald-500/30">
                                 {status}
+                            </div>
+                        )}
+
+                        {(errors.general || flash?.error) && (
+                            <div role="alert" className="mb-5 font-bold text-xs text-red-400 bg-red-500/10 p-3.5 rounded-xl border border-red-500/30">
+                                {errors.general || flash.error}
                             </div>
                         )}
 

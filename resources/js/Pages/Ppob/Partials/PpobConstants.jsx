@@ -11,8 +11,8 @@ export const Icons = {
     </svg>
   ),
   Pln: ({ className = "w-6 h-6" }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.75V17h8v-2.25A7 7 0 0 0 12 2z" />
     </svg>
   ),
   Game: ({ className = "w-6 h-6" }) => (
@@ -53,8 +53,9 @@ export const Icons = {
     </svg>
   ),
   Lightning: ({ className = "w-4 h-4" }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z" />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="9 12 11 14 15 10" />
     </svg>
   ),
   Shield: ({ className = "w-4 h-4" }) => (
@@ -80,6 +81,12 @@ export const Icons = {
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
+  X: ({ className = "w-4 h-4" }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
 };
 
 export const OPERATORS = [
@@ -89,6 +96,8 @@ export const OPERATORS = [
   { id: '41', name: 'Tri (3)', code: 'tri', prefixes: ['0895', '0896', '0897', '0898', '0899'] },
   { id: '51', name: 'Axis', code: 'axis', prefixes: ['0831', '0832', '0833', '0838'] },
   { id: '81', name: 'Smartfren', code: 'smartfren', prefixes: ['0881', '0882', '0883', '0884', '0885', '0886', '0887', '0888', '0889'] },
+  { id: 'byu', name: 'by.U', code: 'byu', prefixes: [] },
+  { id: 'wifi', name: 'WiFi ID', code: 'wifi', prefixes: [] },
 ];
 
 export const GAMES = [

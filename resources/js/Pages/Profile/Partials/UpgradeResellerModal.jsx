@@ -139,7 +139,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
                       'Memproses Aktivasi...'
                     ) : (
                       <>
-                        <span>⚡</span> Klaim Upgrade VIP Gratis Sekarang
+                        <span>✓</span> Klaim Upgrade VIP Gratis Sekarang
                       </>
                     )}
                   </button>

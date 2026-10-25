@@ -152,7 +152,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
 
                     <div className="bg-white dark:bg-[#131b2e] p-5 rounded-2xl border border-gray-200/80 dark:border-white/5 shadow-md flex items-center gap-3.5">
                         <div className="w-11 h-11 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center text-xl shrink-0">
-                            ⚡
+                            ✓
                         </div>
                         <div>
                             <h3 className="text-xs font-black uppercase text-gray-900 dark:text-white">Proses Instan</h3>

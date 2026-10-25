@@ -1,5 +1,10 @@
 @extends('layouts.admin')
-@section('title', 'Manajemen Voucher Diskon')
+
+@php
+    $activeSection = request('section', 'list');
+@endphp
+
+@section('title', $activeSection === 'create' ? 'Buat Voucher' : 'Data Voucher')
 
 @section('content')
 <div class="max-w-7xl mx-auto space-y-6">
@@ -19,52 +24,46 @@
         </div>
     @endif
 
-    <!-- Header & Pencarian -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
-                <span>Kupon & Voucher Diskon</span>
-                <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
-                    Promo Toko
-                </span>
-            </h1>
-            <p class="text-xs font-semibold text-gray-400 mt-1">Buat kode diskon spesial berupa nominal Rupiah atau persentase potongan harga.</p>
+    @if($activeSection === 'create')
+        <!-- ======================================================== -->
+        <!-- SECTION: BUAT VOUCHER BARU                               -->
+        <!-- ======================================================== -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>Buat Voucher Diskon Baru</span>
+                    <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
+                        Promo Toko
+                    </span>
+                </h1>
+                <p class="text-xs font-semibold text-gray-400 mt-1">Buat kode kupon diskon baru berupa potongan nominal Rupiah maupun persentase.</p>
+            </div>
+
+            <a href="{{ route('admin.vouchers', ['section' => 'list']) }}" class="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-300 hover:border-orange-500 transition flex items-center gap-2 self-start md:self-auto">
+                <span>Lihat Data Voucher ({{ count($vouchers) }})</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </a>
         </div>
 
-        <form action="{{ route('admin.vouchers') }}" method="GET" class="w-full md:w-80 relative">
-            <input 
-                type="text" 
-                name="search" 
-                value="{{ request('search') }}" 
-                placeholder="Cari kode kupon..." 
-                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
-            >
-            <svg class="w-4 h-4 absolute left-4 top-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-        </form>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Form Buat Voucher Baru (Kiri) -->
-        <div class="lg:col-span-1 admin-card p-6 h-fit space-y-4">
+        <div class="admin-card p-6 sm:p-8 max-w-xl space-y-5">
             <div class="flex items-center gap-2.5 pb-3 border-b border-gray-100 dark:border-white/5">
                 <div class="w-8 h-8 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-xs shadow-sm">
-                    🎟️
+                    %
                 </div>
                 <div>
-                    <h3 class="font-black text-base text-gray-900 dark:text-white">Buat Voucher Baru</h3>
-                    <p class="text-[10px] text-gray-400">Atur kode promo & kuota</p>
+                    <h3 class="font-black text-base text-gray-900 dark:text-white">Formulir Pembuatan Kupon</h3>
+                    <p class="text-[10px] text-gray-400">Atur kode promo, nilai potongan, dan batas kuota penggunaan</p>
                 </div>
             </div>
 
-            <form action="{{ route('admin.vouchers.store') }}" method="POST" class="space-y-3.5" x-data="{ isSubmitting: false }" @submit="isSubmitting = true">
+            <form action="{{ route('admin.vouchers.store') }}" method="POST" class="space-y-4" x-data="{ isSubmitting: false }" @submit="isSubmitting = true">
                 @csrf
                 <div>
                     <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Kode Voucher</label>
                     <input type="text" name="code" placeholder="Misal: PROMONANDAR" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-mono font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 uppercase tracking-wider">
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Tipe Diskon</label>
                         <select name="type" class="w-full px-3 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer">
@@ -95,8 +94,41 @@
             </form>
         </div>
 
-        <!-- Tabel Daftar Voucher (Kanan) -->
-        <div class="lg:col-span-2 admin-card overflow-hidden">
+    @else
+        <!-- ======================================================== -->
+        <!-- SECTION: DATA VOUCHER AKTIF                              -->
+        <!-- ======================================================== -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>Data Voucher Diskon</span>
+                    <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-orange text-white shadow-sm shadow-orange-500/20">
+                        {{ count($vouchers) }} Kupon
+                    </span>
+                </h1>
+                <p class="text-xs font-semibold text-gray-400 mt-1">Kelola daftar kupon diskon aktif, pantau pemakaian kuota, atau nonaktifkan voucher.</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <form action="{{ route('admin.vouchers') }}" method="GET" class="w-full sm:w-72 relative">
+                    <input type="hidden" name="section" value="list">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        value="{{ request('search') }}" 
+                        placeholder="Cari kode kupon..." 
+                        class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
+                    >
+                    <svg class="w-4 h-4 absolute left-3.5 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </form>
+
+                <a href="{{ route('admin.vouchers', ['section' => 'create']) }}" class="px-4 py-2.5 rounded-xl gradient-orange text-white text-xs font-black shadow-md shadow-orange-500/20 hover:opacity-95 transition flex items-center justify-center gap-1.5 shrink-0">
+                    <span>+ Buat Voucher</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="admin-card overflow-hidden">
             <div class="p-5 border-b border-gray-100 dark:border-white/5 flex items-center justify-between bg-gray-50/50 dark:bg-black/20">
                 <h3 class="font-black text-sm text-gray-900 dark:text-white">Daftar Kode Promo Aktif</h3>
                 <span class="text-xs font-bold text-gray-400">Total: {{ count($vouchers) }} Kupon</span>
@@ -107,16 +139,15 @@
                 <table class="w-full text-left admin-table whitespace-nowrap">
                     <thead>
                         <tr>
-                            <th>Kupon & Diskon</th>
+                            <th>Kupon &amp; Diskon</th>
                             <th>Penggunaan / Kuota</th>
-                            <th>Status & Masa Berlaku</th>
+                            <th>Status &amp; Masa Berlaku</th>
                             <th class="text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($vouchers as $v)
                         <tr>
-                            <!-- Kolom 1: Kode Kupon & Potongan -->
                             <td>
                                 <div class="inline-flex items-center gap-2">
                                     <span class="px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/50 border border-orange-200 dark:border-orange-800/40 font-mono font-black text-xs text-orange-600 dark:text-orange-400 tracking-wider">
@@ -128,7 +159,6 @@
                                 </p>
                             </td>
 
-                            <!-- Kolom 2: Penggunaan / Kuota -->
                             <td>
                                 <div class="text-xs font-bold text-blue-600 dark:text-blue-400 mb-0.5">
                                     Dipakai: {{ $v->used ?? 0 }} / {{ $v->max_uses ?: '∞' }} kali
@@ -140,7 +170,6 @@
                                 @endif
                             </td>
 
-                            <!-- Kolom 3: Status & Masa Berlaku -->
                             <td>
                                 <div>
                                     @if($v->is_active)
@@ -158,10 +187,8 @@
                                 </p>
                             </td>
 
-                            <!-- Kolom 4: Aksi -->
                             <td class="text-right">
                                 <div class="inline-flex items-center gap-1.5">
-                                    <!-- Toggle Aktif/Nonaktif -->
                                     <form action="{{ route('admin.vouchers.toggle', $v->id) }}" method="POST" class="inline">
                                         @csrf
                                         <button type="submit" class="px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer {{ $v->is_active ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200 hover:bg-emerald-100' }}">
@@ -169,7 +196,6 @@
                                         </button>
                                     </form>
 
-                                    <!-- Hapus -->
                                     <form action="{{ route('admin.vouchers.delete', $v->id) }}" method="POST" onsubmit="return confirm('Hapus voucher ini?');" class="inline">
                                         @csrf
                                         <button type="submit" class="p-1 rounded-lg text-gray-400 hover:text-red-500 transition cursor-pointer" title="Hapus Voucher">
@@ -241,7 +267,7 @@
                 @endforelse
             </div>
         </div>
-    </div>
+    @endif
 
 </div>
 @endsection

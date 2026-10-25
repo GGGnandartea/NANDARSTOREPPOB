@@ -19,7 +19,13 @@ import PpobMobileNav from './Partials/PpobMobileNav';
 export default function PpobIndex({ store, initialPulsa }) {
   const { auth } = usePage().props;
   const user = auth?.user;
-  const userBalance = user?.balance ?? 0;
+  const [userBalance, setUserBalance] = useState(user?.balance ?? 0);
+
+  useEffect(() => {
+    if (user?.balance !== undefined) {
+      setUserBalance(user.balance);
+    }
+  }, [user?.balance]);
 
   // Pascabayar is a PLN sub-option; keep existing deep links working.
   const VALID_TABS = [...PPOB_TABS.map((t) => t.id), 'pln_postpaid'];
@@ -64,6 +70,7 @@ export default function PpobIndex({ store, initialPulsa }) {
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedOperator, setSelectedOperator] = useState(OPERATORS[0]);
+  const [operatorSelectedManually, setOperatorSelectedManually] = useState(false);
   const [pulsaType, setPulsaType] = useState('pulsa'); // 'pulsa' | 'data'
 
   // PLN Token (prabayar) state
@@ -89,7 +96,7 @@ export default function PpobIndex({ store, initialPulsa }) {
   const [tagihanCustomerId, setTagihanCustomerId] = useState('');
   const [tagihanInquiryResult, setTagihanInquiryResult] = useState(null);
   const [isTagihanInquiring, setIsTagihanInquiring] = useState(false);
-  const [tagihanPdamRegion, setTagihanPdamRegion] = useState('400191'); // Default PDAM productID
+  const [tagihanPdamRegion, setTagihanPdamRegion] = useState('');
   const [tagihanPeriod, setTagihanPeriod] = useState('01'); // BPJS: jumlah bulan yang dibayar
   const [tagihanPdamSearch, setTagihanPdamSearch] = useState('');
 
@@ -106,6 +113,60 @@ export default function PpobIndex({ store, initialPulsa }) {
   const [qrisTimer, setQrisTimer] = useState(300);
   const [successOrder, setSuccessOrder] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [pendingRepeatCode, setPendingRepeatCode] = useState('');
+
+  // Inisialisasi Fitur "Beli Lagi" (Repeat Order 1-Klik) dari Query URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('repeat') && !params.get('target') && !params.get('code')) return;
+
+    const tabP = params.get('tab') || activeTab;
+    const typeP = params.get('type');
+    const targetP = (params.get('target') || params.get('customer_id') || '').trim();
+    const codeP = (params.get('code') || params.get('product_code') || '').trim();
+
+    if (typeP === 'data' || typeP === 'pulsa') {
+      setPulsaType(typeP);
+    }
+
+    if (targetP) {
+      if (tabP === 'pulsa') {
+        setPhoneNumber(targetP);
+        if (targetP.length >= 4) {
+          const pref = targetP.substring(0, 4);
+          const matchedOp = OPERATORS.find((op) => op.prefixes.includes(pref));
+          if (matchedOp) setSelectedOperator(matchedOp);
+        }
+      } else if (tabP === 'pln') {
+        setPlnCustomerId(targetP);
+      } else if (tabP === 'ewallet') {
+        setEwalletPhone(targetP);
+      } else if (tabP === 'game') {
+        setGameUserId(targetP);
+      } else if (tabP === 'streaming') {
+        setStreamingAccount(targetP);
+      } else if (BILL_TABS.includes(tabP)) {
+        setTagihanCustomerId(targetP);
+      }
+    }
+
+    if (codeP) {
+      setPendingRepeatCode(codeP);
+      if (tabP === 'ewallet') {
+        const matchedEw = EWALLETS.find((ew) => codeP.startsWith(ew.id));
+        if (matchedEw) setSelectedEwallet(matchedEw);
+      } else if (tabP === 'game') {
+        const matchedGm = GAMES.find((gm) => codeP.startsWith(gm.id));
+        if (matchedGm) setSelectedGame(matchedGm);
+      } else if (tabP === 'streaming') {
+        const matchedSt = STREAMING_SERVICES.find((st) => codeP.startsWith(st.id));
+        if (matchedSt) setSelectedStreaming(matchedSt);
+      } else if (tabP === 'pdam' && codeP.startsWith('400')) {
+        setTagihanPdamRegion(codeP);
+      }
+    }
+  }, []);
 
   // Dark Mode Detection
   const [isDark, setIsDark] = useState(false);
@@ -135,14 +196,14 @@ export default function PpobIndex({ store, initialPulsa }) {
 
   // Auto detect operator from phone number
   useEffect(() => {
-    if (phoneNumber.length >= 4) {
+    if (!operatorSelectedManually && phoneNumber.length >= 4) {
       const prefix = phoneNumber.substring(0, 4);
       const matched = OPERATORS.find((op) => op.prefixes.includes(prefix));
       if (matched && matched.id !== selectedOperator.id) {
         setSelectedOperator(matched);
       }
     }
-  }, [phoneNumber]);
+  }, [phoneNumber, operatorSelectedManually]);
 
   // Sinkronkan jenis layanan tagihan dengan tab aktif (menu terpisah per layanan).
   // Tab "Tagihan PLN" punya dua sub-layanan: pascabayar dan non-taglis.
@@ -191,16 +252,16 @@ export default function PpobIndex({ store, initialPulsa }) {
       prefix = selectedStreaming.id;
     }
 
-    fetchProducts(category, prefix, controller.signal);
+    fetchProducts(category, prefix, controller.signal, pulsaType);
     return () => controller.abort();
-  }, [activeTab, selectedOperator, selectedGame, selectedEwallet, selectedStreaming]);
+  }, [activeTab, selectedOperator, selectedGame, selectedEwallet, selectedStreaming, pulsaType]);
 
-  const fetchProducts = async (cat, pref, signal) => {
+  const fetchProducts = async (cat, pref, signal, type) => {
     setIsLoadingProducts(true);
     setSelectedProduct(null);
     try {
       setProducts([]);
-      const res = await fetch(`/ppob/products?category=${encodeURIComponent(cat)}&prefix=${encodeURIComponent(pref)}`, { signal, headers: { Accept: 'application/json' } });
+      const res = await fetch(`/ppob/products?category=${encodeURIComponent(cat)}&prefix=${encodeURIComponent(pref)}&type=${encodeURIComponent(type)}`, { signal, headers: { Accept: 'application/json' } });
       const data = await res.json();
       if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Gagal memuat produk.');
       if (!signal.aborted) setProducts(data.data || []);
@@ -216,6 +277,10 @@ export default function PpobIndex({ store, initialPulsa }) {
 
   // Tagihan Inquiry (PDAM, PLN Pascabayar / Non-Taglis / Prabayar, BPJS)
   const handleTagihanInquiry = async () => {
+    if (activeBillService.id === 'pdam' && !tagihanPdamRegion) {
+      Swal.fire({ icon: 'warning', title: 'Pilih Wilayah', text: 'Pilih wilayah PDAM Anda terlebih dahulu.', confirmButtonColor: '#10b981' });
+      return;
+    }
     const minLength = activeBillService.minLength || 4;
     if (!tagihanCustomerId || tagihanCustomerId.length < minLength) {
       Swal.fire({
@@ -289,8 +354,25 @@ export default function PpobIndex({ store, initialPulsa }) {
     return phoneNumber;
   }, [activeTab, phoneNumber, plnCustomerId, gameUserId, gameZoneId, ewalletPhone, streamingAccount, tagihanCustomerId]);
 
+  // Pilih produk otomatis setelah katalog dimuat saat mode Repeat Order 1-Klik
+  useEffect(() => {
+    if (!pendingRepeatCode || isLoadingProducts || !products || products.length === 0) return;
+    const matched = products.find((p) => String(p.code).toLowerCase() === String(pendingRepeatCode).toLowerCase());
+    if (matched) {
+      setSelectedProduct(matched);
+      setPendingRepeatCode('');
+      if (matched.status === 'active' && matched.can_purchase !== false && currentTargetNumber.length >= 4) {
+        setCheckoutModal(true);
+      }
+    }
+  }, [products, isLoadingProducts, pendingRepeatCode, currentTargetNumber]);
+
   // Validation before opening checkout
   const handleOpenCheckout = (product) => {
+    if (product.can_purchase === false || (!BILL_TABS.includes(activeTab) && (product.status !== 'active' || Number(product.price) <= 0))) {
+      Swal.fire({ icon: 'info', title: 'Produk Belum Tersedia', text: product.availability_message || 'Produk ini belum dapat dibeli. Pilih produk lain.', confirmButtonColor: '#10b981' });
+      return;
+    }
     if (product.status === 'maintenance') {
       Swal.fire({
         icon: 'warning',
@@ -457,6 +539,9 @@ export default function PpobIndex({ store, initialPulsa }) {
 
       if (res.ok && data.status === 'success') {
         if (!user) rememberGuestOrder({ ...data, product_name: selectedProduct.name });
+        if (typeof data.user_balance === 'number') {
+          setUserBalance(data.user_balance);
+        }
         if (paymentMethod === 'balance') {
           setCheckoutModal(false);
           setSuccessOrder(data);
@@ -577,9 +662,20 @@ export default function PpobIndex({ store, initialPulsa }) {
             <PpobInputSection
               activeTab={activeTab}
               phoneNumber={phoneNumber}
-              setPhoneNumber={setPhoneNumber}
+              setPhoneNumber={(number) => {
+                if (number.slice(0, 4) !== phoneNumber.slice(0, 4)) setOperatorSelectedManually(false);
+                setPhoneNumber(number);
+              }}
               selectedOperator={selectedOperator}
-              setSelectedOperator={setSelectedOperator}
+              setSelectedOperator={(operator) => { setOperatorSelectedManually(true); setSelectedOperator(operator); setSelectedProduct(null); setCheckoutModal(false); }}
+              pulsaType={pulsaType}
+              setPulsaType={(type) => {
+                if (type === pulsaType) return;
+                setSelectedProduct(null);
+                setCheckoutModal(false);
+                setProducts([]);
+                setPulsaType(type);
+              }}
               plnCustomerId={plnCustomerId}
               setPlnCustomerId={setPlnCustomerId}
               setSelectedProduct={setSelectedProduct}
@@ -627,6 +723,7 @@ export default function PpobIndex({ store, initialPulsa }) {
             />
           ) : (
             <PpobProductGrid
+              title={activeTab === 'pulsa' ? (pulsaType === 'data' ? 'Pilih Paket Data' : 'Pilih Nominal Pulsa') : undefined}
               products={products}
               isLoadingProducts={isLoadingProducts}
               selectedProduct={selectedProduct}
@@ -676,8 +773,16 @@ export default function PpobIndex({ store, initialPulsa }) {
       <PpobSuccessModal
         successOrder={successOrder}
         onClose={() => setSuccessOrder(null)}
+        onOrderUpdated={(updatedOrder) => {
+          setSuccessOrder(updatedOrder);
+          if (typeof updatedOrder?.user_balance === 'number') {
+            setUserBalance(updatedOrder.user_balance);
+          }
+        }}
         copyToClipboard={copyToClipboard}
         isCopied={isCopied}
+        user={user}
+        adminWhatsapp={store?.admin_whatsapp || '6282317458496'}
       />
 
       {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) */}

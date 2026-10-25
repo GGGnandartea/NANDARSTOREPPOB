@@ -50,7 +50,7 @@ export default function HeroBanner({
                                 <div 
                                     key={banner.id || idx} 
                                     onClick={() => handleBannerClick(banner)}
-                                    className={`w-full h-full flex-shrink-0 relative overflow-hidden flex flex-col justify-center transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ${banner.link_url ? 'cursor-pointer' : ''} ${!hasImage ? bgGrad : 'bg-gray-950'} ${currentBanner === idx ? 'scale-100 opacity-100' : 'scale-[0.985] opacity-75'}`}
+                                    className={`w-full h-full flex-shrink-0 relative overflow-hidden flex flex-col justify-center ${banner.link_url ? 'cursor-pointer' : ''} ${!hasImage ? bgGrad : 'bg-gray-950'}`}
                                 >
                                     {/* Custom Banner Image (Responsive Desktop & Mobile) */}
                                     {hasImage && (
@@ -61,7 +61,7 @@ export default function HeroBanner({
                                             <img 
                                                 src={banner.image} 
                                                 alt={banner.title || 'Promo Banner'} 
-                                                className={`w-full h-full object-cover select-none pointer-events-none transition-transform duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.02] ${currentBanner === idx ? 'scale-100' : 'scale-105'}`}
+                                                className="w-full h-full object-cover object-center select-none pointer-events-none"
                                                 loading={idx === 0 ? "eager" : "lazy"}
                                             />
                                         </picture>
@@ -100,7 +100,7 @@ export default function HeroBanner({
                                     {/* Decorative Icon fallback jika tanpa gambar */}
                                     {!hasImage && (
                                         <div className="absolute right-[-4%] bottom-[-15%] opacity-20 transform -rotate-12 scale-125 blur-[1px] pointer-events-none select-none">
-                                            {idx % 3 === 0 && <span className="text-[120px] sm:text-[160px] md:text-[200px]">⚡</span>}
+                                            {idx % 3 === 0 && <span className="text-[120px] sm:text-[160px] md:text-[200px]">✨</span>}
                                             {idx % 3 === 1 && <span className="text-[120px] sm:text-[160px] md:text-[200px]">💎</span>}
                                             {idx % 3 === 2 && <span className="text-[120px] sm:text-[160px] md:text-[200px]">🔥</span>}
                                         </div>

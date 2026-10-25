@@ -15,7 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(\App\Http\Middleware\SecurityFirewallMiddleware::class);
 
-        $middleware->web(append: [
+        $middleware->web(prepend: [
+            \App\Http\Middleware\PreventSessionCaching::class,
+        ], append: [
             HandleInertiaRequests::class,
         ]);
         $middleware->validateCsrfTokens(except: [
@@ -55,6 +57,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // Tangani CSRF Token Mismatch (419 Page Expired) dengan pesan jelas
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpException $e, $request) {
             if ($e->getStatusCode() === 419) {
+                // Record configuration clues, never passwords, tokens or cookie values.
+                \Illuminate\Support\Facades\Log::warning('Authentication CSRF mismatch', [
+                    'path' => $request->path(),
+                    'host' => $request->getHost(),
+                    'secure_request' => $request->isSecure(),
+                    'session_driver' => config('session.driver'),
+                    'session_cookie_present' => $request->cookies->has(config('session.cookie')),
+                    'session_domain' => config('session.domain'),
+                    'session_secure' => config('session.secure'),
+                    'csrf_body_present' => $request->filled('_token'),
+                    'csrf_header_present' => $request->hasHeader('X-CSRF-TOKEN'),
+                ]);
                 $msg = 'Sesi keamanan Anda telah berakhir. Silakan muat ulang (refresh) halaman untuk melanjutkan.';
 
                 if ($request->header('X-Inertia')) {

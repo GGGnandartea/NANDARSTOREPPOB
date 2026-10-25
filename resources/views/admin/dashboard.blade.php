@@ -17,7 +17,7 @@
                     <span>Monitoring Real-Time Toko</span>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-                    Selamat Datang, {{ Auth::user()->name ?? 'Administrator' }}! 👑
+                    Selamat Datang, {{ Auth::user()->name ?? 'Administrator' }}!
                 </h1>
                 <p class="text-orange-100 text-xs sm:text-sm font-medium mt-1 max-w-xl leading-relaxed">
                     Ringkasan performa penjualan, aktivitas reseller, dan status verifikasi sistem NANDARSTORE 2.0 hari ini.
@@ -85,7 +85,7 @@
             </h3>
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
                 <span class="inline-flex items-center text-[9px] sm:text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 sm:px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40">
-                    ⚡ Realtime
+                    Realtime
                 </span>
                 <span class="text-[10px] sm:text-[11px] font-medium text-gray-400">Hari ini</span>
             </div>
@@ -105,7 +105,7 @@
             </h3>
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
                 <span class="inline-flex items-center text-[9px] sm:text-[10px] font-black text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 sm:px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800/40">
-                    👑 VIP Tier
+                    VIP Tier
                 </span>
                 <span class="text-[10px] sm:text-[11px] font-medium text-gray-400">Aktif</span>
             </div>
@@ -117,7 +117,7 @@
             <div class="flex items-center justify-between mb-2 sm:mb-3">
                 <span class="text-[11px] sm:text-xs font-bold text-gray-500 dark:text-gray-400">Verifikasi WA</span>
                 <div class="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl gradient-orange text-white flex items-center justify-center shadow-md shadow-orange-500/25 shrink-0">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                 </div>
             </div>
             <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
@@ -338,7 +338,7 @@
                         <p class="text-xs font-black text-purple-600 dark:text-purple-400 mt-1">Daftar Reseller</p>
                     </a>
                     <a href="{{ route('admin.products.api') }}" class="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 text-center hover:scale-[1.02] transition-transform">
-                        <span class="text-xl">⚡</span>
+                        <span class="text-xl">📈</span>
                         <p class="text-xs font-black text-blue-600 dark:text-blue-400 mt-1">Markup API</p>
                     </a>
                     <a href="{{ route('admin.wa_verifications') }}" class="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-center hover:scale-[1.02] transition-transform">

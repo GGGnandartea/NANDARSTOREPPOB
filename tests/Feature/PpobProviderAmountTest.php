@@ -30,8 +30,54 @@ class PpobProviderAmountTest extends TestCase
                 'data' => ['orderId' => 'PPOB-PRIVATE', 'total_nominal' => 7123, 'url_qris' => 'https://example.test/qr.png'],
             ]),
             '*/auth/Sign-On' => Http::response(['SessionID' => 'test-session']),
-            '*/Services/SinglePayment' => Http::response(['rc' => '00', 'data' => ['status' => 'BERHASIL', 'sn' => 'test-token']]),
+            '*/Services/SinglePayment' => function ($request) {
+                if (($request['customerID'] ?? '') === '081280982287') {
+                    return Http::response([
+                        'rc' => '67',
+                        'description' => 'Terjadi kegagalan saat proses transaksi',
+                    ]);
+                }
+                if (($request['customerID'] ?? '') === '081280982297') {
+                    return Http::response([
+                        'rc' => '00',
+                        'data' => [
+                            'status' => 'SEDANG DIPROSES',
+                            'noReferensi' => '261024123456',
+                        ],
+                    ]);
+                }
+
+                return Http::response(['rc' => '00', 'data' => ['status' => 'BERHASIL', 'sn' => 'test-token']]);
+            },
             '*/Services/Payment' => Http::response(['rc' => '00', 'data' => ['status' => 'BERHASIL', 'sn' => 'bill-token']]),
+            '*/Services/get-Active-Product' => Http::response(['rc' => '00', 'active' => 'TEST-PULSA', 'maintenance' => '']),
+            '*/Services/Check-Status' => function ($request) {
+                if (($request['customerID'] ?? '') === '081280982297') {
+                    return Http::response([
+                        'rc' => '00',
+                        'data' => [
+                            'status' => 'BERHASIL',
+                            'sn' => 'SN-RECHECK-999',
+                            'noReferensi' => '261024123456',
+                            'saldo' => 450000,
+                        ],
+                    ]);
+                }
+                if (($request['customerID'] ?? '') === '081280982298') {
+                    return Http::response([
+                        'rc' => '67',
+                        'description' => 'Transaksi Gagal saat Check-Status',
+                        'data' => [
+                            'status' => 'GAGAL',
+                        ],
+                    ]);
+                }
+
+                return Http::response([
+                    'rc' => '71',
+                    'description' => 'Transaksi masih dalam proses',
+                ]);
+            },
         ]);
     }
 
@@ -40,6 +86,7 @@ class PpobProviderAmountTest extends TestCase
         return PpobProduct::create([
             'code' => 'TEST-PULSA', 'name' => 'Pulsa', 'category' => 'pulsa', 'operator' => 'Test',
             'base_price' => 5650, 'margin' => 2350, 'price' => 8000, 'reseller_price' => 7500, 'status' => 'active',
+            'price_synced_mode' => 'production', 'price_synced_at' => now(),
         ]);
     }
 
@@ -135,5 +182,197 @@ class PpobProviderAmountTest extends TestCase
             ->assertViewHas('totalProfit', -650.0)
             ->assertViewHas('chartProfit', fn ($profits) => array_sum($profits) === -650)
             ->assertViewHas('monthlyProfitData', fn ($profits) => array_sum($profits) === -650);
+    }
+
+    public function test_failed_ppob_transaction_marks_order_failed_and_auto_refunds_user_balance(): void
+    {
+        $this->product();
+
+        $user = User::factory()->create(['balance' => 20000]);
+        $response = $this->actingAs($user)->postJson('/ppob/checkout', $this->checkoutPayload([
+            'customer_id' => '081280982287',
+            'payment_method' => 'balance',
+        ]))->assertOk();
+
+        $response->assertJsonPath('order_status', 'failed')
+            ->assertJsonPath('is_refunded', true)
+            ->assertJsonPath('user_balance', 20000);
+
+        $order = Order::firstOrFail();
+        $this->assertSame('failed', $order->order_status);
+        $this->assertNull($order->sn_or_account);
+        $this->assertSame(20000, (int) $user->fresh()->balance);
+        $this->assertDatabaseHas('transaction_logs', [
+            'user_id' => $user->id,
+            'type' => 'refund',
+            'amount' => 8000,
+        ]);
+    }
+
+    public function test_pending_ppob_transaction_stays_processing_and_refunds_on_failed_kiosbank_webhook(): void
+    {
+        $this->product();
+
+        $user = User::factory()->create(['balance' => 20000]);
+        $this->actingAs($user)->postJson('/ppob/checkout', $this->checkoutPayload([
+            'customer_id' => '081280982297',
+            'payment_method' => 'balance',
+        ]))->assertOk()
+            ->assertJsonPath('order_status', 'processing')
+            ->assertJsonPath('is_refunded', false)
+            ->assertJsonPath('user_balance', 12000);
+
+        $order = Order::firstOrFail();
+        $this->assertSame('processing', $order->order_status);
+        $this->assertNull($order->sn_or_account);
+        $this->assertStringContainsString('Status: Pending', (string) $order->notes);
+
+        // Simulate async Kiosbank webhook reporting GAGAL
+        $this->postJson('/api/webhook/kiosbank', [
+            'rc' => '67',
+            'referenceID' => $order->api_trx_id,
+            'description' => 'Transaksi gagal di operator',
+            'data' => [
+                'noReferensi' => $order->api_trx_id,
+                'status' => 'GAGAL',
+            ],
+        ])->assertOk();
+
+        $this->assertSame('failed', $order->fresh()->order_status);
+        $this->assertSame(20000, (int) $user->fresh()->balance);
+        $this->assertDatabaseHas('transaction_logs', [
+            'user_id' => $user->id,
+            'type' => 'refund',
+            'amount' => 8000,
+        ]);
+    }
+
+    public function test_pending_ppob_order_can_be_reconciled_via_check_status_endpoint_for_success_and_failure(): void
+    {
+        $this->product();
+        $user = User::factory()->create(['balance' => 25000]);
+
+        // 1. Order that starts pending and resolves to BERHASIL on /ppob/check-status/{orderId}
+        $this->actingAs($user)->postJson('/ppob/checkout', $this->checkoutPayload([
+            'customer_id' => '081280982297',
+            'payment_method' => 'balance',
+        ]))->assertOk()->assertJsonPath('order_status', 'processing');
+
+        $orderSuccess = Order::latest('id')->firstOrFail();
+
+        $this->actingAs($user)->postJson('/ppob/check-status/'.$orderSuccess->invoice_number)
+            ->assertOk()
+            ->assertJsonPath('order_status', 'completed')
+            ->assertJsonPath('sn', 'SN/Token: SN-RECHECK-999');
+
+        $this->assertSame('completed', $orderSuccess->fresh()->order_status);
+        $this->assertSame('SN/Token: SN-RECHECK-999', $orderSuccess->fresh()->sn_or_account);
+
+        // 2. Order that is pending and resolves to GAGAL on /ppob/check-status/{orderId} -> auto-refunds
+        $orderFail = Order::create([
+            'user_id' => $user->id,
+            'invoice_number' => 'PPOB-PENDING-FAIL',
+            'product_type' => 'ppob',
+            'product_name' => '[PULSA] Pulsa (TEST-PULSA)',
+            'provider_customer_id' => '081280982298',
+            'provider_product_code' => 'TEST-PULSA',
+            'price' => 8000,
+            'total_amount' => 8000,
+            'provider_amount' => 5650,
+            'payment_method' => 'balance',
+            'payment_status' => 'paid',
+            'order_status' => 'processing',
+            'api_trx_id' => '123456789099',
+            'notes' => 'Status: Pending | Ref: 123456789099 | ProductID: TEST-PULSA',
+        ]);
+
+        $balanceBefore = (int) $user->fresh()->balance;
+
+        $this->actingAs($user)->postJson('/ppob/check-status/'.$orderFail->invoice_number)
+            ->assertOk()
+            ->assertJsonPath('order_status', 'failed')
+            ->assertJsonPath('is_refunded', true);
+
+        $this->assertSame('failed', $orderFail->fresh()->order_status);
+        $this->assertSame($balanceBefore + 8000, (int) $user->fresh()->balance);
+    }
+
+    public function test_low_balance_alert_sends_whatsapp_notification_when_below_threshold_with_cooldown(): void
+    {
+        Setting::updateOrCreate(['key' => 'kiosbank_low_balance_alert_enabled'], ['value' => '1']);
+        Setting::updateOrCreate(['key' => 'kiosbank_low_balance_threshold'], ['value' => '200000']);
+        Setting::updateOrCreate(['key' => 'admin_whatsapp'], ['value' => '081299998888']);
+        Setting::updateOrCreate(['key' => 'wa_gateway_url'], ['value' => 'http://127.0.0.1:3000']);
+
+        Http::fake([
+            '127.0.0.1:3000/*' => Http::response(['status' => true]),
+        ]);
+
+        $kiosbank = new \App\Services\KiosbankService;
+
+        // Balance is 150,000 <= 200,000 -> should send WA alert
+        $res1 = $kiosbank->checkAndNotifyLowBalance(150000);
+        $this->assertTrue($res1['ok']);
+        $this->assertTrue($res1['sent']);
+        $this->assertTrue($res1['is_low']);
+
+        // Second immediate call without forceSend -> should be skipped due to 4h cooldown
+        $res2 = $kiosbank->checkAndNotifyLowBalance(150000);
+        $this->assertFalse($res2['sent']);
+        $this->assertSame('cooldown', $res2['reason']);
+    }
+
+    public function test_profile_stats_exclude_refund_from_topup_income_and_guest_failed_invoice_shows_wa_refund_claim(): void
+    {
+        config(['inertia.ssr.enabled' => false]);
+        $this->product();
+
+        $user = User::factory()->create(['balance' => 20000]);
+        \App\Models\TransactionLog::create([
+            'user_id' => $user->id,
+            'type' => 'topup',
+            'amount' => 20000,
+            'description' => 'Top Up Saldo via QRIS',
+        ]);
+
+        // Failed purchase of Rp 8,000 -> debited 8,000 then auto-refunded 8,000
+        $this->actingAs($user)->postJson('/ppob/checkout', $this->checkoutPayload([
+            'customer_id' => '081280982287',
+            'payment_method' => 'balance',
+        ]))->assertOk()->assertJsonPath('order_status', 'failed');
+
+        $this->actingAs($user)->get('/profile')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total_income', 20000)
+                ->where('stats.total_expense', 0)
+                ->where('stats.total_refund', 8000)
+                ->where('stats.income_count', 1)
+                ->where('stats.expense_count', 0)
+                ->where('stats.refund_count', 1)
+            );
+
+        // Guest QRIS order that failed -> invoice shows WhatsApp Admin refund claim & Beli Lagi button
+        $guestOrder = Order::create([
+            'user_id' => null,
+            'invoice_number' => 'PPOB-GUEST-FAIL',
+            'product_type' => 'ppob',
+            'product_name' => '[PULSA] Pulsa (TEST-PULSA)',
+            'provider_customer_id' => '081280982287',
+            'provider_product_code' => 'TEST-PULSA',
+            'price' => 8000,
+            'total_amount' => 8123,
+            'provider_amount' => 5650,
+            'payment_method' => 'qris',
+            'payment_status' => 'paid',
+            'order_status' => 'failed',
+            'guest_access_token' => 'guest-secret-token-123',
+        ]);
+
+        $this->get($guestOrder->invoiceUrl())
+            ->assertOk()
+            ->assertSee('Panduan Klaim Refund Pembeli Publik (QRIS)')
+            ->assertSee('Bawa Bukti Pembelian')
+            ->assertSee('Beli Lagi');
     }
 }

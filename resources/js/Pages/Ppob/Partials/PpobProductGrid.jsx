@@ -6,13 +6,14 @@ export default function PpobProductGrid({
   isLoadingProducts,
   selectedProduct,
   onOpenCheckout,
+  title = 'Pilih Nominal & Produk',
 }) {
   return (
     <div className="lg:col-span-7 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <span>Pilih Nominal &amp; Produk</span>
+            <span>{title}</span>
             <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
               {products.length} Pilihan
             </span>
@@ -34,7 +35,7 @@ export default function PpobProductGrid({
           <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-white/5 flex items-center justify-center mx-auto text-gray-400">
             <Icons.Search className="w-6 h-6" />
           </div>
-          <h4 className="font-black text-sm text-gray-800 dark:text-gray-200">Katalog Sedang Dimuat</h4>
+          <h4 className="font-black text-sm text-gray-800 dark:text-gray-200">Belum Ada Produk</h4>
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
             Tidak ada produk yang tersedia untuk pilihan ini saat ini. Silakan pilih nominal atau operator lain.
           </p>
@@ -45,15 +46,16 @@ export default function PpobProductGrid({
             const isSelected = selectedProduct?.code === item.code;
             const isMaintenance = item.status === 'maintenance';
             const isInactive = item.status === 'inactive';
+            const canBuy = item.can_purchase !== false && item.status === 'active' && Number(item.price) > 0;
 
             return (
               <div
                 key={item.code}
-                onClick={() => onOpenCheckout(item)}
+                onClick={() => { if (canBuy) onOpenCheckout(item); }}
                 className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
                   isMaintenance
                     ? 'bg-amber-500/5 border-amber-500/30 opacity-75'
-                    : isInactive
+                    : !canBuy
                     ? 'bg-gray-100 dark:bg-white/5 opacity-50 cursor-not-allowed'
                     : isSelected
                     ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
@@ -73,35 +75,41 @@ export default function PpobProductGrid({
                       <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 shrink-0">
                         NONAKTIF
                       </span>
+                    ) : !canBuy ? (
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 shrink-0">Belum tersedia</span>
                     ) : (
                       <span className="text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                        INSTAN
+                        TERSEDIA
                       </span>
                     )}
                   </div>
                 </div>
 
+                {!canBuy && <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">{item.availability_message || 'Produk ini belum dapat dibeli.'}</p>}
+
                 <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-white/5 mt-2 gap-2">
                   <div>
                     <p className="text-[9px] sm:text-[10px] font-black uppercase text-gray-400">Harga Layanan</p>
                     <span className="text-sm sm:text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
-                      {fmt.rp(item.price)}
+                      {Number(item.price) > 0 ? fmt.rp(item.price) : 'Belum tersedia'}
                     </span>
                   </div>
                   <button
                     type="button"
+                    disabled={!canBuy}
+                    onClick={(event) => { event.stopPropagation(); if (canBuy) onOpenCheckout(item); }}
                     className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black shadow-md transition-all flex items-center gap-1.5 shrink-0 ${
                       isMaintenance
                         ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-not-allowed'
-                        : isInactive
+                        : !canBuy
                         ? 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed'
                         : 'bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white border border-emerald-500/40 shadow-sm shadow-emerald-950/30 group-hover:scale-105 active:scale-95 cursor-pointer'
                     }`}
                   >
                     {isMaintenance ? (
                       <span>Gangguan</span>
-                    ) : isInactive ? (
-                      <span>Tutup</span>
+                    ) : !canBuy ? (
+                      <span>Tidak tersedia</span>
                     ) : (
                       <>
                         <span className="sm:hidden">Beli</span>

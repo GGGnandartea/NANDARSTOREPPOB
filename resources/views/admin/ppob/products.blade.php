@@ -31,7 +31,7 @@
         <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-medium text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div class="flex items-center gap-3">
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500 text-black shadow-sm">
-                    ⚡ DEVELOPER MODE (SANDBOX)
+                    DEVELOPER MODE (SANDBOX)
                 </span>
                 <span>Mode pengembangan aktif. Transaksi, inquiry, dan saldo berjalan secara sandbox (aman untuk testing).</span>
             </div>
@@ -78,6 +78,13 @@
 
                 <form action="{{ route('admin.ppob.products.sync') }}" method="POST" onsubmit="return confirm('Sinkronkan status produk & katalog dari API Kiosbank sekarang?');">
                     @csrf
+                    <label for="sync-prefix" class="sr-only">Operator yang akan disinkronkan</label>
+                    <select id="sync-prefix" name="prefix" class="rounded-lg bg-slate-800 text-white text-xs p-2 max-w-40">
+                        <option value="">Semua produk</option>
+                        @foreach(\App\Services\KiosbankPulsaCatalog::OPERATORS as $prefix => $operatorName)
+                            <option value="{{ $prefix }}">{{ $operatorName }}</option>
+                        @endforeach
+                    </select>
                     <button type="submit" class="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-bold" title="Sinkronkan dari API Kiosbank">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
@@ -98,9 +105,9 @@
             <span class="text-[11px] font-bold text-emerald-500 uppercase tracking-wider block mb-1">Produk Aktif</span>
             <div class="text-2xl font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                 <span>{{ $activeCount }}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">Siap Jual</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">Diaktifkan Admin</span>
             </div>
-            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Tampil di dashboard pembeli</p>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Pembelian mengikuti harga dan status provider</p>
         </div>
 
         <div class="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/5 shadow-sm">
@@ -126,7 +133,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
             <div>
                 <h3 class="text-base font-black text-gray-900 dark:text-white flex items-center gap-2">
-                    <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
                     <span>Penetapan Margin / Untung Massal</span>
                 </h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Terapkan keuntungan toko secara serentak ke seluruh produk atau kategori tertentu dengan satu klik.</p>
@@ -279,6 +286,9 @@
                             <!-- Harga Modal Asli API Kiosbank (Base Price) -->
                             <td class="py-3.5 px-4 font-mono font-black text-rose-600 dark:text-rose-400 text-xs">
                                 Rp {{ number_format($p->base_price, 0, ',', '.') }}
+                                @if($p->isMobileProduct() && $kiosbankMode === 'production' && ($p->base_price <= 0 || $p->price_synced_mode !== $kiosbankMode || !$p->price_synced_at))
+                                    <p class="mt-1 text-[10px] font-sans font-medium text-amber-600 dark:text-amber-400">Perlu sinkron harga {{ $kiosbankMode }}</p>
+                                @endif
                             </td>
 
                             <!-- Margin / Untung -->

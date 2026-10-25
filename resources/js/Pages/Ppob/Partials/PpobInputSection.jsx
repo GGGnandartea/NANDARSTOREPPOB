@@ -10,6 +10,8 @@ export default function PpobInputSection({
   setPhoneNumber,
   selectedOperator,
   setSelectedOperator,
+  pulsaType = 'pulsa',
+  setPulsaType,
   // PLN state
   plnCustomerId,
   setPlnCustomerId,
@@ -52,6 +54,8 @@ export default function PpobInputSection({
 }) {
   const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
   const isBillTab = ['pdam', 'pln_postpaid', 'bpjs'].includes(activeTab);
+  const selectedPdam = PDAM_PRODUCTS.find((product) => product.id === tagihanPdamRegion);
+  const filteredPdam = PDAM_PRODUCTS.filter((product) => product.name.toLowerCase().includes(tagihanPdamSearch.trim().toLowerCase()));
   return (
     <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
       {/* TAB 1: PULSA & DATA */}
@@ -105,16 +109,31 @@ export default function PpobInputSection({
                     key={op.id}
                     type="button"
                     onClick={() => setSelectedOperator(op)}
+                    aria-pressed={isSelected}
                     className={`p-2.5 rounded-xl border text-center transition cursor-pointer text-xs font-black ${
                       isSelected
                         ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60 dark:shadow-xs'
                         : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
                     }`}
                   >
-                    {op.name.split(' ')[0]}
+                    {op.id === 'wifi' ? op.name : op.name.split(' ')[0]}
                   </button>
                 );
               })}
+            </div>
+          </div>
+          <div>
+            <p id="pulsa-type-label" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-2">Mau Beli Apa?</p>
+            <div role="group" aria-labelledby="pulsa-type-label" className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 dark:bg-gray-950/40 p-1.5">
+              {[{ id: 'pulsa', label: 'Pulsa' }, { id: 'data', label: 'Paket Data' }].map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  aria-pressed={pulsaType === type.id}
+                  onClick={() => { if (pulsaType !== type.id) setPulsaType(type.id); }}
+                  className={`min-h-11 rounded-xl px-3 py-3 text-xs font-black transition-colors ${pulsaType === type.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-white/5'}`}
+                >{type.label}</button>
+              ))}
             </div>
           </div>
         </>
@@ -450,7 +469,7 @@ export default function PpobInputSection({
             {tagihanType === 'pdam' && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                  <label htmlFor="pdam-search" id="pdam-region-label" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider">
                     Wilayah PDAM ({PDAM_PRODUCTS.length})
                   </label>
                   {tagihanPdamSearch && (
@@ -464,28 +483,40 @@ export default function PpobInputSection({
                   )}
                 </div>
                 <input
+                  id="pdam-search"
                   type="text"
                   value={tagihanPdamSearch}
                   onChange={(e) => setTagihanPdamSearch(e.target.value)}
                   placeholder="Cari kota / kabupaten..."
                   className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition mb-2"
                 />
-                <select
-                  value={tagihanPdamRegion}
-                  onChange={(e) => {
-                    setTagihanPdamRegion(e.target.value);
-                    setTagihanInquiryResult(null);
-                    setSelectedProduct(null);
-                  }}
-                  size={6}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-[11px] font-semibold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
-                >
-                  {PDAM_PRODUCTS
-                    .filter((p) => p.name.toLowerCase().includes(tagihanPdamSearch.toLowerCase()))
-                    .map((p) => (
-                      <option key={p.id} value={p.id} className="py-1">{p.name}</option>
-                    ))}
-                </select>
+                <div role="group" aria-labelledby="pdam-region-label" className="max-h-52 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 p-1 space-y-1">
+                  {filteredPdam.map((product) => {
+                    const selected = product.id === tagihanPdamRegion;
+                    return (
+                      <label key={product.id} className={`min-h-11 flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-semibold cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-emerald-500 ${selected ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
+                        <input
+                          type="radio"
+                          name="pdam-region"
+                          value={product.id}
+                          checked={selected}
+                          onChange={() => {
+                            setTagihanPdamRegion(product.id);
+                            setTagihanInquiryResult(null);
+                            setSelectedProduct(null);
+                          }}
+                          className="h-4 w-4 shrink-0 accent-emerald-600"
+                        />
+                        <span>{product.name}</span>
+                        {selected && <span aria-hidden="true" className="ml-auto text-emerald-600 dark:text-emerald-400">✓</span>}
+                      </label>
+                    );
+                  })}
+                  {filteredPdam.length === 0 && <p className="px-3 py-4 text-xs text-gray-500 dark:text-gray-400">Wilayah tidak ditemukan. Coba nama kota atau kabupaten lain.</p>}
+                </div>
+                <p role="status" className={`mt-2 text-xs font-semibold ${selectedPdam ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {selectedPdam ? `Terpilih: ${selectedPdam.name}` : 'Pilih wilayah PDAM sebelum cek tagihan.'}
+                </p>
               </div>
             )}
 
@@ -514,10 +545,12 @@ export default function PpobInputSection({
             )}
 
             <div>
-              <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
+              <label htmlFor="bill-customer-id" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
                 Nomor Pelanggan
               </label>
               <input
+                id="bill-customer-id"
+                inputMode="numeric"
                 type="text"
                 value={tagihanCustomerId}
                 onChange={(e) => {
@@ -533,7 +566,7 @@ export default function PpobInputSection({
             <button
               type="button"
               onClick={handleTagihanInquiry}
-              disabled={isTagihanInquiring || !tagihanCustomerId || tagihanCustomerId.length < (activeBillService.minLength || 4)}
+              disabled={isTagihanInquiring || (tagihanType === 'pdam' && !selectedPdam) || !tagihanCustomerId || tagihanCustomerId.length < (activeBillService.minLength || 4)}
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isTagihanInquiring ? (

@@ -3,6 +3,32 @@
 /* Baris ini memaksa Tailwind untuk HANYA mengaktifkan mode gelap jika ada class 'dark' */
 @variant dark (&:where(.dark, .dark *));
 
+/* Keep the drawer mounted so both opening and closing can animate. */
+.profile-drawer {
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 420ms;
+}
+.profile-drawer.is-open {
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+.profile-drawer-backdrop {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.profile-drawer-panel {
+  transform: translate3d(-105%, 0, 0);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.profile-drawer.is-open .profile-drawer-backdrop { opacity: 1; }
+.profile-drawer.is-open .profile-drawer-panel { transform: translate3d(0, 0, 0); }
+@media (prefers-reduced-motion: reduce) {
+  .profile-drawer, .profile-drawer-backdrop, .profile-drawer-panel { transition: none; }
+}
+
 @keyframes progress-slide {
   0% { transform: translateX(-100%); }
   50% { transform: translateX(50%); }

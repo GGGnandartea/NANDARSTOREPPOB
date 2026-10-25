@@ -331,6 +331,21 @@ class AdminController extends Controller
 
     public function retryApiOrder($id) {
         $order = Order::findOrFail($id);
+        $isPpob = ($order->product_type === 'ppob') || str_starts_with((string) $order->invoice_number, 'PPOB-');
+
+        if ($isPpob) {
+            $result = \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
+            $order->refresh();
+
+            if (in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas'], true)) {
+                return back()->with('success', 'Pesanan PPOB #' . $order->invoice_number . ' berhasil disinkronkan (/Services/Check-Status): Transaksi BERHASIL!');
+            }
+            if (in_array(strtolower((string) $order->order_status), ['failed', 'refunded'], true)) {
+                return back()->with('error', 'Pesanan PPOB #' . $order->invoice_number . ' dinyatakan GAGAL oleh operator & saldo pembeli telah di-refund otomatis 100%.');
+            }
+            return back()->with('info', 'Pesanan PPOB #' . $order->invoice_number . ': ' . ($result['message'] ?? 'Masih berstatus Pending di operator.'));
+        }
+
         $result = ($order->fulfillment_started_at && $order->product_type === 'api')
             ? \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order)
             : \App\Services\OrderFulfillmentService::fulfillOrder($order);
@@ -345,6 +360,45 @@ class AdminController extends Controller
             }
             return back()->with('info', 'Status pesanan: ' . $msg);
         }
+    }
+
+    /**
+     * Sinkronisasi Massal Semua Pesanan PPOB Pending ke /Services/Check-Status Kiosbank
+     */
+    public function syncAllPendingPpobOrders()
+    {
+        $pendingOrders = Order::where('product_type', 'ppob')
+            ->whereIn('payment_status', ['paid', 'success', 'settlement'])
+            ->whereIn('order_status', ['processing', 'pending'])
+            ->orderBy('id', 'asc')
+            ->limit(30)
+            ->get();
+
+        if ($pendingOrders->isEmpty()) {
+            return back()->with('info', 'Tidak ada transaksi PPOB berstatus Pending yang perlu disinkronkan.');
+        }
+
+        $completed = 0;
+        $failed = 0;
+        $stillPending = 0;
+
+        foreach ($pendingOrders as $order) {
+            \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
+            $order->refresh();
+            $st = strtolower((string) $order->order_status);
+            if (in_array($st, ['completed', 'success', 'lunas'], true)) {
+                $completed++;
+            } elseif (in_array($st, ['failed', 'refunded'], true)) {
+                $failed++;
+            } else {
+                $stillPending++;
+            }
+        }
+
+        return back()->with(
+            'success',
+            "Sinkronisasi /Services/Check-Status selesai ({$pendingOrders->count()} pesanan diperiksa): {$completed} Berhasil, {$failed} Gagal (Auto-Refund), {$stillPending} Masih Pending."
+        );
     }
 
     public function saveSettings(Request $request) {
@@ -407,14 +461,14 @@ class AdminController extends Controller
             Setting::updateOrCreate(['key' => 'loading_logo'], ['value' => null]);
         }
 
-        Setting::updateOrCreate(['key' => 'premku_api_key'], ['value' => $request->premku_api_key]);
+        if ($request->has('premku_api_key')) { Setting::updateOrCreate(['key' => 'premku_api_key'], ['value' => $request->premku_api_key]); }
         if ($request->has('premku_api_secret')) {
             Setting::updateOrCreate(['key' => 'premku_api_secret'], ['value' => trim($request->premku_api_secret)]);
         }
-        Setting::updateOrCreate(['key' => 'preflix_id_user'], ['value' => $request->preflix_id_user]);
-        Setting::updateOrCreate(['key' => 'preflix_key_user'], ['value' => $request->preflix_key_user]);
-        Setting::updateOrCreate(['key' => 'promo_markup_percent'], ['value' => $request->promo_markup_percent]);
-        Setting::updateOrCreate(['key' => 'promo_badge_text'], ['value' => $request->promo_badge_text]);
+        if ($request->has('preflix_id_user')) { Setting::updateOrCreate(['key' => 'preflix_id_user'], ['value' => $request->preflix_id_user]); }
+        if ($request->has('preflix_key_user')) { Setting::updateOrCreate(['key' => 'preflix_key_user'], ['value' => $request->preflix_key_user]); }
+        if ($request->has('promo_markup_percent')) { Setting::updateOrCreate(['key' => 'promo_markup_percent'], ['value' => $request->promo_markup_percent]); }
+        if ($request->has('promo_badge_text')) { Setting::updateOrCreate(['key' => 'promo_badge_text'], ['value' => $request->promo_badge_text]); }
         if ($request->has('admin_whatsapp')) {
             Setting::updateOrCreate(['key' => 'admin_whatsapp'], ['value' => $request->admin_whatsapp]);
         }
@@ -485,9 +539,15 @@ class AdminController extends Controller
         $request->validate([
             'store_name'    => 'nullable|string|max:100',
             'store_tagline' => 'nullable|string|max:200',
-            'store_logo'    => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:3072',
-            'store_favicon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,webp,ico|max:1024',
-            'loading_logo'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:3072',
+            'store_logo'    => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+            'store_favicon' => 'nullable|file|mimes:jpeg,png,jpg,gif,svg,webp,ico|max:5120',
+            'loading_logo'  => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+        ], [
+            'store_logo.image'    => 'Logo Toko Utama wajib berupa file gambar (JPG, PNG, WEBP, GIF, SVG).',
+            'store_logo.mimes'    => 'Format Logo Toko Utama harus JPG, PNG, WEBP, GIF, atau SVG.',
+            'store_favicon.mimes' => 'Format Favicon harus ICO, PNG, JPG, WEBP, GIF, atau SVG.',
+            'loading_logo.image'  => 'Logo Loading wajib berupa file gambar (JPG, PNG, WEBP, GIF, SVG).',
+            'loading_logo.mimes'  => 'Format Logo Loading harus JPG, PNG, WEBP, GIF, atau SVG.',
         ]);
 
         // Nama Brand & Slogan
@@ -737,7 +797,12 @@ class AdminController extends Controller
                 $product->status = isset($data['is_active']) ? 'available' : 'unavailable';
                 
                 $product->description = $data['description'] ?? null;
-                $product->image = !empty($data['image']) ? $data['image'] : ($product->image ?? null);
+                $rawImg = !empty($data['image']) ? trim($data['image']) : null;
+                if ($rawImg && (!str_starts_with($rawImg, 'data:') || str_starts_with($rawImg, 'data:image/'))) {
+                    $product->image = $rawImg;
+                } else {
+                    $product->image = $product->image ?? null;
+                }
                 
                 $product->is_promo = isset($data['is_promo']) ? 1 : 0;
                 
@@ -920,9 +985,73 @@ class AdminController extends Controller
     }
     public function orders(Request $request) {
         $query = Order::with(['user', 'product'])->orderBy('id', 'desc');
-        if ($request->search) { $query->where('invoice_number', 'like', '%' . $request->search . '%')->orWhere('product_name', 'like', '%' . $request->search . '%'); }
-        if ($request->status) $query->where('order_status', $request->status);
-        $orders = $query->paginate(20); return view('admin.orders', compact('orders'));
+
+        if ($request->filled('search')) {
+            $s = trim($request->search);
+            $query->where(function ($q) use ($s) {
+                $q->where('invoice_number', 'like', '%' . $s . '%')
+                  ->orWhere('product_name', 'like', '%' . $s . '%')
+                  ->orWhere('buyer_name', 'like', '%' . $s . '%')
+                  ->orWhere('email', 'like', '%' . $s . '%')
+                  ->orWhere('whatsapp', 'like', '%' . $s . '%')
+                  ->orWhere('sn_or_account', 'like', '%' . $s . '%')
+                  ->orWhere('notes', 'like', '%' . $s . '%');
+            });
+        }
+
+        if ($request->filled('status')) {
+            $st = strtolower($request->status);
+            if ($st === 'failed') {
+                $query->whereIn('order_status', ['failed', 'refunded', 'canceled', 'cancelled']);
+            } else {
+                $query->where('order_status', $request->status);
+            }
+        }
+
+        if ($request->filled('product_type') && $request->product_type !== 'all') {
+            if ($request->product_type === 'ppob') {
+                $query->where('product_type', 'ppob');
+            } elseif ($request->product_type === 'app') {
+                $query->where('product_type', '!=', 'ppob');
+            }
+        }
+
+        // Filter berdasarkan Hari / Minggu / Bulan / Tahun / Rentang Tanggal
+        $period = $request->input('period');
+        if ($period === 'today') {
+            $query->whereDate('created_at', today());
+        } elseif ($period === 'yesterday') {
+            $query->whereDate('created_at', today()->subDay());
+        } elseif ($period === '7_days') {
+            $query->where('created_at', '>=', now()->subDays(6)->startOfDay());
+        } elseif ($period === '30_days') {
+            $query->where('created_at', '>=', now()->subDays(29)->startOfDay());
+        } elseif ($period === 'this_month') {
+            $query->whereYear('created_at', now()->year)->whereMonth('created_at', now()->month);
+        } elseif ($period === 'this_year') {
+            $query->whereYear('created_at', now()->year);
+        }
+
+        if ($request->filled('month') && is_numeric($request->month)) {
+            $query->whereMonth('created_at', (int) $request->month);
+        }
+        if ($request->filled('year') && is_numeric($request->year)) {
+            $query->whereYear('created_at', (int) $request->year);
+        }
+        if ($request->filled('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
+        $pendingPpobCount = Order::where('product_type', 'ppob')
+            ->whereIn('payment_status', ['paid', 'success', 'settlement'])
+            ->whereIn('order_status', ['processing', 'pending'])
+            ->count();
+
+        $orders = $query->paginate(20)->withQueryString();
+        return view('admin.orders', compact('orders', 'pendingPpobCount'));
     }
     public function updateOrderStatus(Request $request, $id) {
         $order = Order::findOrFail($id);
@@ -1730,6 +1859,19 @@ class AdminController extends Controller
         $depositStatus = $kiosbankService->checkDeposit();
         $kiosbankMode  = $kiosbankService->getMode();
 
+        if ($kiosbankService->isDeveloperMode()) {
+            $products->getCollection()->transform(function ($p) use ($kiosbankService) {
+                if ((int) $p->base_price <= 0 || (int) $p->price <= 0) {
+                    $resolved = $kiosbankService->resolveProductPricing($p);
+                    $p->base_price = $resolved['base_price'];
+                    $p->margin = $resolved['margin'];
+                    $p->price = $resolved['price'];
+                    $p->reseller_price = $resolved['reseller_price'];
+                }
+                return $p;
+            });
+        }
+
         return view('admin.ppob.products', compact(
             'products',
             'category',
@@ -1828,12 +1970,13 @@ class AdminController extends Controller
      */
     public function syncPpobProducts(Request $request, KiosbankService $kiosbankService)
     {
+        $request->validate(['prefix' => ['nullable', \Illuminate\Validation\Rule::in(array_map('strval', array_keys(\App\Services\KiosbankPulsaCatalog::OPERATORS)))]]);
         try {
             $res = $kiosbankService->syncWithKiosbankApi();
             $priceRes = ['updated_count' => 0];
             // Sinkronisasi harga resmi hanya saat API Kiosbank terjangkau.
             try {
-                $priceRes = $kiosbankService->syncPricesFromKiosbank();
+                $priceRes = $kiosbankService->syncPricesFromKiosbank($request->input('prefix') ?: null);
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning('[PPOB-SYNC-PRICE] ' . $e->getMessage());
                 return back()->with('error', 'Status produk diperbarui, tetapi harga belum berhasil disinkronkan. Silakan coba lagi.');
@@ -1842,7 +1985,9 @@ class AdminController extends Controller
             $created = $priceRes['created_count'] ?? 0;
             $message = "Status produk diperiksa: {$res['total_products']}. Harga diperbarui: {$priceRes['updated_count']}. Produk baru: {$created}.";
             if ($failedCount > 0) {
-                return back()->with('error', $message." Harga untuk {$failedCount} kelompok produk belum berhasil diambil. Coba sinkronkan kembali setelah koneksi tersedia.");
+                $failedNames = implode(', ', array_map(fn ($prefix) => \App\Services\KiosbankPulsaCatalog::OPERATORS[$prefix] ?? $prefix, $priceRes['failed_prefixes']));
+                $reason = implode(' ', array_unique($priceRes['failed_reasons'] ?? []));
+                return back()->with('error', $message." Harga belum berhasil diambil: {$failedNames}. ".$reason);
             }
             return back()->with('success', $message);
         } catch (\Exception $e) {
@@ -1861,7 +2006,61 @@ class AdminController extends Controller
 
         $deposits = KiosbankDeposit::orderBy('created_at', 'desc')->paginate(20);
 
-        return view('admin.ppob.deposit', compact('depositStatus', 'kiosbankMode', 'isDev', 'deposits'));
+        $ppobStats = [
+            'total_topup_success'   => (int) KiosbankDeposit::where('status', 'success')->sum('amount'),
+            'success_tickets_count' => (int) KiosbankDeposit::where('status', 'success')->count(),
+            'pending_tickets_count' => (int) KiosbankDeposit::where('status', 'pending')->count(),
+            'total_ppob_tx'         => (int) Order::where('product_type', 'ppob')->whereIn('order_status', ['completed', 'success', 'lunas'])->count(),
+            'total_ppob_modal_used' => (int) Order::where('product_type', 'ppob')->whereIn('order_status', ['completed', 'success', 'lunas'])->sum('provider_amount'),
+            'pending_ppob_orders'   => (int) Order::where('product_type', 'ppob')->whereIn('payment_status', ['paid', 'success', 'settlement'])->whereIn('order_status', ['processing', 'pending'])->count(),
+        ];
+
+        $thresholdVal = (int) (Setting::where('key', 'kiosbank_low_balance_threshold')->value('value') ?? 200000);
+        $lowBalanceSettings = [
+            'enabled'        => (string) (Setting::where('key', 'kiosbank_low_balance_alert_enabled')->value('value') ?? '1') === '1',
+            'threshold'      => $thresholdVal,
+            'admin_whatsapp' => Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496',
+            'last_alert_at'  => Setting::where('key', 'kiosbank_low_balance_last_alert_at')->value('value'),
+            'is_low'         => ($depositStatus['ok'] ?? false) && ((int) ($depositStatus['saldo'] ?? 0) <= $thresholdVal),
+        ];
+
+        return view('admin.ppob.deposit', compact('depositStatus', 'kiosbankMode', 'isDev', 'deposits', 'ppobStats', 'lowBalanceSettings'));
+    }
+
+    /**
+     * Simpan Pengaturan & Tes Peringatan WhatsApp Saldo Deposit Menipis (Low Balance Alert)
+     */
+    public function kiosbankSaveLowBalanceAlert(Request $request, KiosbankService $kiosbankService)
+    {
+        $request->validate([
+            'threshold'      => 'required|numeric|min:10000',
+            'admin_whatsapp' => 'required|string|min:8|max:25',
+        ]);
+
+        $enabled = $request->boolean('enabled') ? '1' : '0';
+        $threshold = (int) $request->input('threshold', 200000);
+        $adminWa = trim((string) $request->input('admin_whatsapp'));
+
+        Setting::updateOrCreate(['key' => 'kiosbank_low_balance_alert_enabled'], ['value' => $enabled]);
+        Setting::updateOrCreate(['key' => 'kiosbank_low_balance_threshold'], ['value' => (string) $threshold]);
+        Setting::updateOrCreate(['key' => 'admin_whatsapp'], ['value' => $adminWa]);
+
+        Cache::forget('kiosbank_low_balance_alert_sent_' . $kiosbankService->getMode());
+
+        if ($request->input('action') === 'test') {
+            $res = $kiosbankService->checkAndNotifyLowBalance(null, true);
+            if ($res['sent'] ?? false) {
+                return back()->with('success', 'Pengaturan tersimpan & ' . $res['message']);
+            }
+            return back()->with('error', 'Pengaturan tersimpan, namun pengiriman WA gagal: ' . ($res['message'] ?? 'Periksa koneksi Bot WhatsApp.'));
+        }
+
+        // Evaluasi langsung apakah saldo saat ini berada di bawah threshold baru
+        if ($enabled === '1') {
+            $kiosbankService->checkAndNotifyLowBalance();
+        }
+
+        return back()->with('success', 'Pengaturan Notifikasi WhatsApp Saldo Menipis (Rp ' . number_format($threshold, 0, ',', '.') . ') berhasil disimpan!');
     }
 
     /**
@@ -1875,21 +2074,41 @@ class AdminController extends Controller
         $request->validate([
             'amount'         => 'required|numeric|min:10000',
             'payment_method' => 'required|in:developer_mode',
+            'bank_channel'   => 'nullable|string|max:60',
+            'notes'          => 'nullable|string|max:255',
         ]);
 
         $amount = (int) $request->amount;
-        $invoiceNumber = 'DEV-KB-'.now()->format('YmdHis').'-'.bin2hex(random_bytes(3));
-        KiosbankDeposit::create([
-            'invoice_number' => $invoiceNumber,
-            'amount' => $amount,
-            'payment_method' => 'developer_mode',
-            'status' => 'pending',
-            'unique_code' => 0,
-            'total_payment' => $amount,
-            'notes' => 'Simulasi Development. Tidak ada transfer uang nyata.',
+        $channelMap = [
+            'bca'     => 'BCA Corporate Kiosbank',
+            'mandiri' => 'Mandiri Corporate Kiosbank',
+            'bri'     => 'BRI Corporate Kiosbank',
+            'bni'     => 'BNI Corporate Kiosbank',
+            'instant' => 'Virtual Instant Deposit (Dev)',
+        ];
+        $bankChannel = strtolower((string) $request->input('bank_channel', 'bca'));
+        $bankLabel = $channelMap[$bankChannel] ?? 'Virtual Deposit Kiosbank (Dev)';
+        $uniqueCode = ($request->filled('bank_channel') && $bankChannel !== 'instant') ? mt_rand(101, 899) : 0;
+        $totalPayment = $amount + $uniqueCode;
+
+        $invoiceNumber = 'DEV-KB-'.now()->format('YmdHis').'-'.strtoupper(bin2hex(random_bytes(3)));
+        $deposit = KiosbankDeposit::create([
+            'invoice_number'      => $invoiceNumber,
+            'amount'              => $amount,
+            'payment_method'      => 'developer_mode',
+            'bank_account_name'   => $bankLabel,
+            'bank_account_number' => null,
+            'status'              => 'pending',
+            'unique_code'         => $uniqueCode,
+            'total_payment'       => $totalPayment,
+            'notes'               => $request->filled('notes') ? trim($request->notes) : ('Tiket Deposit ' . $bankLabel . ($uniqueCode > 0 ? " (Kode Unik +{$uniqueCode})" : '')),
         ]);
 
-        return back()->with('success', 'Tiket simulasi dibuat. Gunakan tombol Simulasikan Berhasil untuk menambah saldo virtual.');
+        if ($request->boolean('auto_approve')) {
+            return $this->kiosbankSimulateDeposit($request, $deposit->id);
+        }
+
+        return back()->with('success', "Tiket deposit #{$invoiceNumber} senilai Rp " . number_format($amount, 0, ',', '.') . " berhasil dibuat. Klik tombol 'Simulasikan Berhasil' pada tabel di bawah untuk mencairkan dana ke saldo aktif.");
     }
 
     /**
@@ -1907,6 +2126,7 @@ class AdminController extends Controller
             Setting::firstOrCreate(['key' => 'kiosbank_sandbox_deposit'], ['value' => '11251850']);
             $balance = Setting::where('key', 'kiosbank_sandbox_deposit')->lockForUpdate()->firstOrFail();
             $balance->update(['value' => (string) ((int) $balance->value + (int) $deposit->amount)]);
+            Cache::forget('kiosbank_low_balance_alert_sent_development');
 
             return back()->with('success', 'Simulasi berhasil. Saldo virtual bertambah Rp '.number_format($deposit->amount, 0, ',', '.').'.');
         });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from '@inertiajs/react';
-import { Icon, fmt } from './ProfileIcons';
+import { Icon, fmt, buildRepeatOrderUrl } from './ProfileIcons';
 import StatusBadge from './StatusBadge';
 
 export default function DashboardTab({
@@ -10,8 +10,10 @@ export default function DashboardTab({
   allMutations,
   totalIncomeCalc,
   totalExpenseCalc,
+  totalRefundCalc = 0,
   totalIncomeCount,
   totalExpenseCount,
+  totalRefundCount = 0,
   setShowTopup,
   handleMenuClick,
   setWaModalPhone,
@@ -86,7 +88,7 @@ export default function DashboardTab({
           </button>
         </div>
 
-        {/* Total Pengeluaran */}
+        {/* Total Pengeluaran Bersih */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/60 min-w-0 p-3 sm:p-4 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Pengeluaran</span>
@@ -98,11 +100,11 @@ export default function DashboardTab({
             -{fmt.rp(totalExpenseCalc)}
           </p>
           <p className="mt-2 text-[11px] font-medium text-gray-400 truncate">
-            {totalExpenseCount}x belanja
+            {totalExpenseCount}x belanja bersih{totalRefundCount > 0 ? ` (${totalRefundCount}x refund)` : ''}
           </p>
         </div>
 
-        {/* Total Pemasukan */}
+        {/* Total Pemasukan Murni (Top Up) */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/60 min-w-0 p-3 sm:p-4 shadow-sm hover:shadow-md transition">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Pemasukan</span>
@@ -114,7 +116,7 @@ export default function DashboardTab({
             +{fmt.rp(totalIncomeCalc)}
           </p>
           <p className="mt-2 text-[11px] font-medium text-gray-400 truncate">
-            {totalIncomeCount}x top up
+            {totalIncomeCount}x top up murni
           </p>
         </div>
 
@@ -183,7 +185,7 @@ export default function DashboardTab({
                         <span className="text-[11px] font-mono font-medium text-gray-500 dark:text-gray-300 truncate max-w-[130px]">
                           #{o.invoice_number || o.id}
                         </span>
-                        <StatusBadge status={o.order_status || o.payment_status} />
+                        <StatusBadge status={o.order_status || o.payment_status} isPpob={o.product_type === 'ppob'} />
                       </div>
                       <p className="text-xs font-black text-gray-800 dark:text-white mt-1">
                         {o.product_name || 'Produk Digital'}
@@ -196,14 +198,24 @@ export default function DashboardTab({
                       <p className="text-xs sm:text-sm font-black text-orange-500">
                         {fmt.rp(o.total_amount || o.price)}
                       </p>
-                      <a
-                        href={`/order/invoice/${o.invoice_number || o.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-gray-500 hover:text-orange-500 dark:text-gray-300 mt-0.5 inline-flex items-center gap-0.5"
-                      >
-                        Invoice ↗
-                      </a>
+                      <div className="mt-1 flex items-center justify-end gap-2">
+                        <a
+                          href={buildRepeatOrderUrl(o)}
+                          className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-0.5"
+                          title="Beli Lagi Produk & Nomor Ini"
+                        >
+                          🔄 Beli Lagi
+                        </a>
+                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                        <a
+                          href={`/order/invoice/${o.invoice_number || o.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-bold text-gray-500 hover:text-orange-500 dark:text-gray-300 inline-flex items-center gap-0.5"
+                        >
+                          Invoice ↗
+                        </a>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -234,7 +246,7 @@ export default function DashboardTab({
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-gray-900 dark:text-white">Aktivitas Saldo</h3>
-                  <p className="text-[11px] text-gray-400">Mutasi top up dan pengeluaran dana</p>
+                  <p className="text-[11px] text-gray-400">Mutasi top up, refund, dan pengeluaran dana</p>
                 </div>
               </div>
               <button
@@ -261,7 +273,9 @@ export default function DashboardTab({
             ) : (
               <div className="space-y-2.5">
                 {allMutations.slice(0, 4).map((m, idx) => {
-                  const isInc = m.type === 'income';
+                  const isRef = m.type === 'refund' || String(m.raw_type || '').toLowerCase() === 'refund';
+                  const isInc = m.type === 'income' && !isRef;
+                  const isPlus = isInc || isRef;
                   return (
                     <div
                       key={m.id || idx}
@@ -269,15 +283,17 @@ export default function DashboardTab({
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-black text-xs ${
-                          isInc
-                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'
+                          isRef
+                            ? 'bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400'
+                            : isInc
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'
                         }`}>
-                          {isInc ? '↓' : '↑'}
+                          {isRef ? '↩' : isInc ? '↓' : '↑'}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-black text-gray-800 dark:text-white">
-                            {m.title || (isInc ? 'Top Up Saldo' : 'Pengeluaran')}
+                          <p className="text-xs font-black text-gray-800 dark:text-white truncate">
+                            {m.title || m.description || (isRef ? 'Pengembalian Dana (Refund)' : isInc ? 'Top Up Saldo' : 'Pengeluaran')}
                           </p>
                           <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mt-0.5">
                             <span>{fmt.date(m.created_at)}</span>
@@ -287,18 +303,22 @@ export default function DashboardTab({
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`text-xs sm:text-sm font-black ${
-                          isInc
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-600 dark:text-rose-400'
+                          isRef
+                            ? 'text-sky-600 dark:text-sky-400'
+                            : isInc
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-rose-600 dark:text-rose-400'
                         }`}>
-                          {isInc ? '+' : '-'}{fmt.rp(m.amount)}
+                          {isPlus ? '+' : '-'}{fmt.rp(m.amount)}
                         </p>
                         <span className={`text-[11px] font-black uppercase px-1.5 py-0.2 rounded ${
-                          m.status === 'success' || m.status === 'paid'
-                            ? 'text-emerald-500'
-                            : 'text-amber-500'
+                          isRef
+                            ? 'text-sky-500'
+                            : m.status === 'success' || m.status === 'paid'
+                              ? 'text-emerald-500'
+                              : 'text-amber-500'
                         }`}>
-                          {m.status === 'success' || m.status === 'paid' ? 'Sukses' : m.status}
+                          {isRef ? 'Refund' : m.status === 'success' || m.status === 'paid' ? 'Sukses' : m.status}
                         </span>
                       </div>
                     </div>
@@ -348,4 +368,3 @@ export default function DashboardTab({
     </div>
   );
 }
-

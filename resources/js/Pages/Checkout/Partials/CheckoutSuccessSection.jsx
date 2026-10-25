@@ -38,7 +38,7 @@ export default function CheckoutSuccessSection({
             <div className="absolute inset-0 rounded-full border-4 border-orange-500/20"></div>
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-orange-500 border-r-amber-400 animate-spin"></div>
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-orange-500/40">
-              ⚡
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
           </div>
 
@@ -62,7 +62,7 @@ export default function CheckoutSuccessSection({
               <div className="h-full w-1/2 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 rounded-full animate-progress-slide"></div>
             </div>
             <p className="text-[11px] text-gray-400 dark:text-gray-300 font-medium">
-              ⚡ Sedang memproses dan menyiapkan lisensi Anda secara otomatis...
+              Sedang memproses dan menyiapkan lisensi Anda secara otomatis...
             </p>
           </div>
         </div>

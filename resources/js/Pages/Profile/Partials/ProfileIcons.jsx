@@ -6,8 +6,8 @@ export const Icon = {
   User: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
   History: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
   App: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2" strokeWidth={2} /><rect x="14" y="3" width="7" height="7" rx="2" strokeWidth={2} /><rect x="14" y="14" width="7" height="7" rx="2" strokeWidth={2} /><rect x="3" y="14" width="7" height="7" rx="2" strokeWidth={2} /></svg>,
-  Ppob: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
-  Zap: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+  Ppob: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="3" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01" /></svg>,
+  Zap: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" /></svg>,
   Package: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
   Wallet: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
   Lock: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
@@ -30,9 +30,77 @@ export const Icon = {
   Search: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
   ArrowDownLeft: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 5L5 19M5 19h10M5 19V9" /></svg>,
   ArrowUpRight: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 19L19 5M19 5H9M19 5v10" /></svg>,
+  Refresh: (p) => <svg {...p} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
 };
 
 export const fmt = {
   rp: (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(n || 0),
   date: (d) => d ? new Date(d).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
 };
+
+export function buildRepeatOrderUrl(order) {
+  if (!order) return '/';
+  const isPpob = order.product_type === 'ppob' || String(order.invoice_number || '').startsWith('PPOB-');
+  if (!isPpob) {
+    if (order.product_id && !Number.isNaN(Number(order.product_id))) {
+      return `/checkout/${Number(order.product_id)}`;
+    }
+    if (order.product_name) {
+      return `/?search=${encodeURIComponent(order.product_name)}`;
+    }
+    return '/';
+  }
+
+  let target = order.provider_customer_id || order.target_id || '';
+  if (!target && order.notes) {
+    const m = String(order.notes).match(/No Tujuan:\s*([^|\n]+)/i);
+    if (m && m[1]) target = m[1].trim();
+  }
+  if (!target && order.whatsapp) target = String(order.whatsapp).trim();
+
+  let code = order.provider_product_code || '';
+  if (!code && order.notes) {
+    const m2 = String(order.notes).match(/(?:Kode|ProductID):\s*([^\s|\n]+)/i);
+    if (m2 && m2[1]) code = m2[1].trim();
+  }
+  if (!code && order.product_name) {
+    const m3 = String(order.product_name).match(/\(([A-Za-z0-9\-_]+)\)\s*$/);
+    if (m3 && m3[1]) code = m3[1].trim();
+  }
+
+  const nameLower = String(order.product_name || '').toLowerCase();
+  const codeStr = String(code || '');
+
+  let tab = 'pulsa';
+  let type = 'pulsa';
+
+  if (codeStr === '100302' || nameLower.includes('token') || nameLower.includes('prabayar')) {
+    tab = 'pln';
+  } else if (codeStr === '100301' || codeStr === '100303' || nameLower.includes('pascabayar') || nameLower.includes('tagihan pln') || nameLower.includes('non-taglis')) {
+    tab = 'pln_postpaid';
+  } else if (codeStr.startsWith('400') || nameLower.includes('pdam')) {
+    tab = 'pdam';
+  } else if (codeStr === '900001' || nameLower.includes('bpjs')) {
+    tab = 'bpjs';
+  } else if (codeStr.startsWith('75') || /dana|ovo|gopay|shopeepay|linkaja|e-wallet|ewallet/i.test(nameLower)) {
+    tab = 'ewallet';
+  } else if (/game|diamond|mobile legends|free fire|pubg|genshin|valorant/i.test(nameLower)) {
+    tab = 'game';
+  } else if (/streaming|spotify|vidio|wetv|viu/i.test(nameLower)) {
+    tab = 'streaming';
+  } else {
+    tab = 'pulsa';
+    if (/paket\s*data|kuota|internet|\d+\s*gb\b/i.test(nameLower)) {
+      type = 'data';
+    }
+  }
+
+  const params = new URLSearchParams();
+  params.set('repeat', '1');
+  params.set('tab', tab);
+  if (tab === 'pulsa') params.set('type', type);
+  if (target) params.set('target', target);
+  if (code) params.set('code', code);
+
+  return `/ppob?${params.toString()}`;
+}

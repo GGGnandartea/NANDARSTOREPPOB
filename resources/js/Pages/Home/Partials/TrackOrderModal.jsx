@@ -1,41 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import OrderProgress from '../../../Components/OrderProgress';
 import { orderProgress } from '../../../utils/orderProgress';
-import { savedGuestOrders, rememberGuestOrder } from '../../../utils/guestOrders';
 
 export default function TrackOrderModal({
     showTrackModal, setShowTrackModal, trackOrderId, setTrackOrderId,
     handleTrackOrder, trackLoading, trackResult, setTrackResult,
 }) {
-    const [history, setHistory] = useState([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [historyError, setHistoryError] = useState(false);
     const [showAccount, setShowAccount] = useState(false);
     const [copyMessage, setCopyMessage] = useState('');
     const progress = trackResult?.order_id ? orderProgress(trackResult) : null;
     const canShowAccount = trackResult?.is_ready && progress?.step === 2 && !progress?.exception && trackResult?.sn_or_account;
 
     useEffect(() => { setShowAccount(false); setCopyMessage(''); }, [showTrackModal, trackResult?.order_id]);
-
-    useEffect(() => {
-        if (!showTrackModal) return;
-        const controller = new AbortController();
-        setHistory(savedGuestOrders());
-        setHistoryLoading(true);
-        setHistoryError(false);
-        fetch('/orders/guest-history', { signal: controller.signal, headers: { Accept: 'application/json' } })
-            .then(response => { if (!response.ok) throw new Error(); return response.json(); })
-            .then(data => {
-                if (controller.signal.aborted) return;
-                const orders = Array.isArray(data.orders) ? data.orders : [];
-                [...orders].reverse().forEach(rememberGuestOrder);
-                const combined = [...orders, ...savedGuestOrders()];
-                setHistory(combined.filter((order, index) => combined.findIndex(item => item.order_id === order.order_id) === index));
-            })
-            .catch(() => { if (!controller.signal.aborted) setHistoryError(true); })
-            .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false); });
-        return () => controller.abort();
-    }, [showTrackModal, trackResult?.order_id]);
 
     useEffect(() => {
         if (!showTrackModal || !trackResult?.order_id || orderProgress(trackResult).terminal) return;
@@ -67,17 +43,17 @@ export default function TrackOrderModal({
     return <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
         <div role="dialog" aria-modal="true" aria-labelledby="track-order-title" className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-700">
             <div className="sticky top-0 z-10 p-4 sm:p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-                <h2 id="track-order-title" className="text-lg font-bold text-gray-900 dark:text-white">Riwayat & Detail Pesanan</h2>
+                <h2 id="track-order-title" className="text-lg font-bold text-gray-900 dark:text-white">Cek Pesanan</h2>
                 <button type="button" onClick={() => { setShowTrackModal(false); setTrackResult(null); setTrackOrderId(''); }} className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-700" aria-label="Tutup Riwayat Pesanan">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
             <div className="p-4 sm:p-6 space-y-5">
-                <p className="text-sm text-gray-600 dark:text-gray-300">Belanja tanpa login? Pilih riwayat di browser ini atau masukkan nomor invoice. Jika berpindah browser, gunakan tautan invoice pribadi yang disimpan saat pembelian.</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Masukkan ID pesanan untuk melihat status dan detailnya. Untuk pesanan tanpa login di perangkat lain, gunakan tautan invoice pribadi.</p>
                 <form onSubmit={handleTrackOrder} className="space-y-3">
                     <div>
-                        <label htmlFor="track-order-input" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">Nomor Invoice atau Tautan Invoice Pribadi</label>
-                        <input id="track-order-input" type="text" required value={trackOrderId} onChange={e => setTrackOrderId(e.target.value)} placeholder="Nomor invoice atau tempel tautan pribadi" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
+                        <label htmlFor="track-order-input" className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">ID Pesanan atau Tautan Invoice Pribadi</label>
+                        <input id="track-order-input" type="text" required value={trackOrderId} onChange={e => setTrackOrderId(e.target.value)} placeholder="Masukkan ID pesanan atau tautan invoice" className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white" />
                     </div>
                     <button type="submit" disabled={trackLoading} className="min-h-11 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold px-4 py-3 rounded-xl disabled:opacity-60">{trackLoading ? 'Memuat pesanan...' : 'Lihat Detail Pesanan'}</button>
                 </form>
@@ -87,6 +63,22 @@ export default function TrackOrderModal({
                         <p className="text-xs text-gray-500 dark:text-gray-300 break-all">{trackResult.order_id}</p>
                         <h3 className="mt-1 text-sm font-bold text-gray-900 dark:text-white">{trackResult.product_name}</h3>
                         <OrderProgress order={trackResult} />
+                        {trackResult.is_guest && ['failed', 'refunded'].includes(String(trackResult.order_status || trackResult.status || '').toLowerCase()) && (
+                            <section className="mb-3 p-4 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 space-y-2">
+                                <h4 className="text-sm font-bold text-rose-800 dark:text-rose-200">Transaksi Gagal — Klaim Refund Pembeli Publik (QRIS)</h4>
+                                <p className="text-xs text-rose-700 dark:text-rose-300 leading-relaxed">
+                                    Karena Anda membeli tanpa login menggunakan QRIS, silakan hubungi WhatsApp Admin dengan membawa <strong>bukti pembayaran QRIS</strong> &amp; <strong>tautan invoice (#{trackResult.order_id})</strong> untuk proses pengembalian dana (Refund) 100%.
+                                </p>
+                                <a
+                                    href={`https://wa.me/6282317458496?text=${encodeURIComponent(`Halo Admin NandarStore, saya Pembeli Publik (Tanpa Akun) ingin klaim Refund pesanan QRIS yang gagal.\n• No. Invoice: #${trackResult.order_id}\n• Produk: ${trackResult.product_name || '-'}\n• Link Invoice: ${trackResult.invoice_url || ''}\nBersama pesan ini saya lampirkan bukti pembayaran QRIS.`)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center min-h-10 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+                                >
+                                    💬 Chat Admin &amp; Klaim Refund (Bawa Bukti Pembelian)
+                                </a>
+                            </section>
+                        )}
                         {canShowAccount && <section className="mb-3 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30">
                             <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Detail Akun / Serial Number</h4>
                             <div className="flex flex-wrap gap-2 mt-2">
@@ -104,21 +96,6 @@ export default function TrackOrderModal({
                         {copyMessage && <p role="status" className="mt-2 text-xs text-gray-700 dark:text-gray-200">{copyMessage}</p>}
                     </> : <p role="alert" className="text-sm text-red-600 dark:text-red-300">{trackResult.status === 'ERROR' ? 'Gagal memuat pesanan. Periksa nomor invoice, tautan, atau koneksi lalu coba lagi.' : 'Pesanan tidak dapat diakses. Gunakan browser saat membeli atau tempel tautan invoice pribadi Anda.'}</p>}
                 </div>}
-
-                <section className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <h3 className="font-semibold text-sm text-gray-900 dark:text-white">Riwayat Pembelian Tamu</h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 mb-3">Pesanan yang tersimpan di browser ini, termasuk yang belum selesai.</p>
-                    {historyLoading && <p className="text-xs text-gray-500 dark:text-gray-300">Memuat riwayat...</p>}
-                    {historyError && <p className="text-xs text-amber-700 dark:text-amber-300">Riwayat sesi belum dapat dimuat. Anda tetap bisa membuka tautan yang tersimpan.</p>}
-                    {!historyLoading && !history.length && <p className="text-sm text-gray-600 dark:text-gray-300">Belum ada riwayat di browser ini. Tempel tautan invoice pribadi untuk membuka pesanan lama.</p>}
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {history.map(order => <button type="button" key={order.order_id} disabled={trackLoading} onClick={() => handleTrackOrder(null, order.invoice_url)} className="min-h-14 w-full text-left p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 disabled:opacity-50">
-                            <span className="block text-sm font-semibold text-gray-900 dark:text-white break-words">{order.product_name}</span>
-                            <span className="block text-xs text-gray-600 dark:text-gray-300 break-all mt-1">{order.order_id}</span>
-                            <span className="block text-xs text-orange-600 dark:text-orange-400 mt-1">Lihat status & detail akun</span>
-                        </button>)}
-                    </div>
-                </section>
             </div>
         </div>
     </div>;

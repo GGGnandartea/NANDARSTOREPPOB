@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { submitAuth, authErrors } from '../lib/authRequest';
 
 export default function Register() {
     const { store, resellerSettings } = usePage().props;
@@ -27,13 +28,6 @@ export default function Register() {
     const [paymentStatus, setPaymentStatus] = useState('pending'); // pending | paid | failed
     const pollingRef = useRef(null);
 
-    const getCsrf = () => {
-        const meta = document.querySelector('meta[name="csrf-token"]');
-        if (meta && meta.content) return meta.content;
-        const cookieMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        return cookieMatch ? decodeURIComponent(cookieMatch[1]) : '';
-    };
-
     // Polling status pembayaran reseller
     useEffect(() => {
         if (showQrisModal && qrisData?.order_id && paymentStatus === 'pending') {
@@ -59,6 +53,7 @@ export default function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (processing) return;
         setErrors({});
         setProcessing(true);
 
@@ -71,46 +66,19 @@ export default function Register() {
             role,
         };
 
-        if (role === 'reseller') {
-            try {
-                const res = await fetch('/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': getCsrf(),
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    if (data.errors) {
-                        setErrors(data.errors);
-                    } else {
-                        setErrors({ general: data.message || 'Pendaftaran gagal.' });
-                    }
-                } else if (data.status === 'reseller_payment_required') {
-                    setQrisData(data);
-                    setPaymentStatus('pending');
-                    setShowQrisModal(true);
-                } else if (data.redirect) {
-                    window.location.href = data.redirect;
-                }
-            } catch (err) {
-                setErrors({ general: 'Gagal terhubung ke server.' });
+        try {
+            const data = await submitAuth('/register', payload);
+            if (data.status === 'reseller_payment_required') {
+                setQrisData(data);
+                setPaymentStatus('pending');
+                setShowQrisModal(true);
+            } else {
+                window.location.assign(data.redirect);
             }
+        } catch (error) {
+            setErrors(authErrors(error));
+        } finally {
             setProcessing(false);
-        } else {
-            // Pelanggan biasa via Inertia router post
-            router.post('/register', payload, {
-                onError: (errs) => {
-                    setErrors(errs);
-                    setProcessing(false);
-                },
-                onFinish: () => setProcessing(false),
-            });
         }
     };
 
@@ -197,7 +165,7 @@ export default function Register() {
                                     {isFreeReseller ? promoMessage : 'Nikmati Harga Modal Termurah untuk semua produk aplikasi premium & digital, margin cuan maksimal seumur hidup.'}
                                 </p>
                                 <div className={`px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 ${isFreeReseller ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-black/30 text-amber-200/90'}`}>
-                                    <span className="text-sm">⚡</span>
+                                    <span className="text-sm">✓</span>
                                     {isFreeReseller ? (
                                         <span><strong>Promo Aktif:</strong> Akun Reseller VIP Anda akan <strong>langsung aktif otomatis</strong> saat tombol daftar diklik!</span>
                                     ) : (

@@ -23,9 +23,13 @@ class PremkuApiService
         ])->json();
     }
 
-    public function getProducts()
+    public function getProducts(int $timeout = 30)
     {
-        return Http::post($this->baseUrl . 'products', [
+        if (!$this->apiKey) {
+            return [];
+        }
+
+        return Http::connectTimeout(min(3, $timeout))->timeout($timeout)->post($this->baseUrl . 'products', [
             'api_key' => $this->apiKey
         ])->json();
     }

@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 
 // Subcomponents & Helpers
 import { Icon } from './Partials/ProfileIcons';
 import ProfileNavbar from './Partials/ProfileNavbar';
 import ProfileSidebar from './Partials/ProfileSidebar';
+import ProfileDrawer from './Partials/ProfileDrawer';
 import FavoritesTab from './Partials/FavoritesTab';
 import DashboardTab from './Partials/DashboardTab';
 import OrdersTab from './Partials/OrdersTab';
@@ -28,25 +29,40 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
   const appOrders = useMemo(() => orders.filter((o) => o.product_type !== 'ppob'), [orders]);
   const ppobOrders = useMemo(() => orders.filter((o) => o.product_type === 'ppob'), [orders]);
 
-  // Akumulasi Total Pemasukan & Pengeluaran Sejak Pertama Kali Daftar
+  // Akumulasi Total Pemasukan Murni (Tanpa Refund), Refund, & Pengeluaran Bersih Sejak Daftar
+  const totalRefundCalc = useMemo(() => {
+    if (stats?.total_refund !== undefined && stats?.total_refund !== null) return Number(stats.total_refund);
+    return allMutations
+      .filter((m) => (m.type === 'refund' || String(m.raw_type || '').toLowerCase() === 'refund') && m.status === 'success')
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  }, [allMutations, stats]);
+
   const totalIncomeCalc = useMemo(() => {
     if (stats?.total_income !== undefined && stats?.total_income !== null) return Number(stats.total_income);
     return allMutations
-      .filter((m) => m.type === 'income' && m.status === 'success')
+      .filter((m) => m.type === 'income' && String(m.raw_type || '').toLowerCase() !== 'refund' && m.status === 'success')
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   }, [allMutations, stats]);
 
   const totalExpenseCalc = useMemo(() => {
     if (stats?.total_expense !== undefined && stats?.total_expense !== null) return Number(stats.total_expense);
-    return allMutations
+    const gross = allMutations
       .filter((m) => m.type === 'expense' && m.status === 'success')
       .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  }, [allMutations, stats]);
+    return Math.max(0, gross - totalRefundCalc);
+  }, [allMutations, stats, totalRefundCalc]);
+
+  const totalRefundCount =
+    stats?.refund_count ??
+    allMutations.filter((m) => (m.type === 'refund' || String(m.raw_type || '').toLowerCase() === 'refund') && m.status === 'success').length;
 
   const totalIncomeCount =
-    stats?.income_count ?? allMutations.filter((m) => m.type === 'income' && m.status === 'success').length;
+    stats?.income_count ??
+    allMutations.filter((m) => m.type === 'income' && String(m.raw_type || '').toLowerCase() !== 'refund' && m.status === 'success').length;
+
   const totalExpenseCount =
-    stats?.expense_count ?? allMutations.filter((m) => m.type === 'expense' && m.status === 'success').length;
+    stats?.expense_count ??
+    Math.max(0, allMutations.filter((m) => m.type === 'expense' && m.status === 'success').length - totalRefundCount);
 
   const [activeMenu, setActiveMenu] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -64,6 +80,7 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const [showTopup, setShowTopup] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showWaModal, setShowWaModal] = useState(false);
@@ -137,7 +154,9 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
   const paginatedOrders = filteredOrders.slice((orderPage - 1) * 10, orderPage * 10);
 
   const filteredMutations = allMutations.filter((m) => {
-    if (mutationFilter === 'income') return m.type === 'income';
+    const isRef = m.type === 'refund' || String(m.raw_type || '').toLowerCase() === 'refund';
+    if (mutationFilter === 'refund') return isRef;
+    if (mutationFilter === 'income') return m.type === 'income' && !isRef;
     if (mutationFilter === 'expense') return m.type === 'expense';
     return true;
   });
@@ -261,43 +280,28 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
       </Head>
 
       {/* NAVBAR */}
-      <ProfileNavbar setSidebarOpen={setSidebarOpen} toggleDark={toggleDark} isDark={isDark} />
+      <ProfileNavbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} toggleDark={toggleDark} isDark={isDark} />
 
       {/* MOBILE SIDEBAR OVERLAY */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <div className="relative w-72 bg-white dark:bg-gray-900 h-full shadow-2xl overflow-y-auto">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-              <span className="font-black text-gray-900 dark:text-white">Menu</span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
-                aria-label="Tutup Sidebar"
-              >
-                <Icon.X className="w-5 h-5" />
-              </button>
-            </div>
-            <ProfileSidebar
-              user={user}
-              isReseller={isReseller}
-              orders={orders}
-              allMutations={allMutations}
-              totalIncomeCalc={totalIncomeCalc}
-              totalExpenseCalc={totalExpenseCalc}
-              menus={menus}
-              activeMenu={activeMenu}
-              handleMenuClick={handleMenuClick}
-              setShowTopup={setShowTopup}
-              setShowUpgradeModal={setShowUpgradeModal}
-              resellerSettings={resellerSettings}
-              setShowWaModal={setShowWaModal}
-              setWaModalPhone={setWaModalPhone}
-              setShowChangeWaModal={setShowChangeWaModal}
-            />
-          </div>
-        </div>
-      )}
+      <ProfileDrawer open={sidebarOpen} onClose={closeSidebar}>
+        <ProfileSidebar
+          user={user}
+          isReseller={isReseller}
+          orders={orders}
+          allMutations={allMutations}
+          totalIncomeCalc={totalIncomeCalc}
+          totalExpenseCalc={totalExpenseCalc}
+          menus={menus}
+          activeMenu={activeMenu}
+          handleMenuClick={handleMenuClick}
+          setShowTopup={(open) => { closeSidebar(); setShowTopup(open); }}
+          setShowUpgradeModal={(open) => { closeSidebar(); setShowUpgradeModal(open); }}
+          resellerSettings={resellerSettings}
+          setShowWaModal={(open) => { closeSidebar(); setShowWaModal(open); }}
+          setWaModalPhone={setWaModalPhone}
+          setShowChangeWaModal={(open) => { closeSidebar(); setShowChangeWaModal(open); }}
+        />
+      </ProfileDrawer>
 
       {/* MAIN LAYOUT */}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8">
@@ -343,8 +347,10 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
                 allMutations={allMutations}
                 totalIncomeCalc={totalIncomeCalc}
                 totalExpenseCalc={totalExpenseCalc}
+                totalRefundCalc={totalRefundCalc}
                 totalIncomeCount={totalIncomeCount}
                 totalExpenseCount={totalExpenseCount}
+                totalRefundCount={totalRefundCount}
                 setShowTopup={setShowTopup}
                 handleMenuClick={handleMenuClick}
                 setWaModalPhone={setWaModalPhone}
@@ -404,8 +410,10 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
                 mutationTotalPages={mutationTotalPages}
                 totalIncomeCalc={totalIncomeCalc}
                 totalExpenseCalc={totalExpenseCalc}
+                totalRefundCalc={totalRefundCalc}
                 totalIncomeCount={totalIncomeCount}
                 totalExpenseCount={totalExpenseCount}
+                totalRefundCount={totalRefundCount}
                 user={user}
                 isReseller={isReseller}
                 setShowTopup={setShowTopup}

@@ -11,11 +11,23 @@
     viewAccountContent: ''
 }">
 
-    <!-- Alert Sukses -->
+    <!-- Alert Sukses / Info / Error -->
     @if(session('success'))
         <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-bold text-sm flex items-center gap-3 shadow-sm">
             <div class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black shrink-0">✓</div>
             <div>{{ session('success') }}</div>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">✕</div>
+            <div>{{ session('error') }}</div>
+        </div>
+    @endif
+    @if(session('info'))
+        <div class="p-4 rounded-2xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/40 text-cyan-800 dark:text-cyan-300 font-bold text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-cyan-500 text-white flex items-center justify-center font-black shrink-0">ℹ</div>
+            <div>{{ session('info') }}</div>
         </div>
     @endif
 
@@ -28,49 +40,114 @@
                     Semua Pesanan
                 </span>
             </h1>
-            <p class="text-xs font-semibold text-gray-400 mt-1">Pantau pembayaran, ubah status pesanan, dan input akun manual langsung dari sini.</p>
+            <p class="text-xs font-semibold text-gray-400 mt-1">Pantau pembayaran, filter berdasarkan hari/bulan/tahun, dan cek status transaksi PPOB pending.</p>
         </div>
 
-        <!-- Filter Status Buttons -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar w-full md:w-auto shrink-0">
-            <a href="{{ route('admin.orders') }}" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ !request('status') ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 border border-gray-200 dark:border-white/5' }}">
-                Semua
-            </a>
-            <a href="{{ route('admin.orders', ['status' => 'completed']) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'completed' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'bg-white dark:bg-gray-800 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 dark:border-emerald-900/40' }}">
-                ✓ Selesai
-            </a>
-            <a href="{{ route('admin.orders', ['status' => 'processing']) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'processing' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'bg-white dark:bg-gray-800 text-amber-600 hover:bg-amber-50 border border-amber-200 dark:border-amber-900/40' }}">
-                ⏳ Diproses
-            </a>
-            <a href="{{ route('admin.orders', ['status' => 'canceled']) }}" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'canceled' ? 'bg-red-500 text-white shadow-md shadow-red-500/20' : 'bg-white dark:bg-gray-800 text-red-600 hover:bg-red-50 border border-red-200 dark:border-red-900/40' }}">
-                ✕ Dibatalkan
-            </a>
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Tombol Cek Status Ulang Semua Pending PPOB -->
+            <form action="{{ route('admin.orders.sync_ppob_pending') }}" method="POST" class="inline">
+                @csrf
+                <button type="submit" class="px-3.5 py-2 rounded-xl text-xs font-black bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20 transition cursor-pointer inline-flex items-center gap-1.5" title="Cek status seluruh transaksi PPOB Pending ke /Services/Check-Status Kiosbank">
+                    <span>🔄 Cek Status Pending PPOB</span>
+                    @if(($pendingPpobCount ?? 0) > 0)
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-black">{{ $pendingPpobCount }}</span>
+                    @endif
+                </button>
+            </form>
+
+            <!-- Filter Status Buttons -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <a href="{{ route('admin.orders', array_merge(request()->except('page', 'status'))) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ !request('status') ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 border border-gray-200 dark:border-white/5' }}">
+                    Semua
+                </a>
+                <a href="{{ route('admin.orders', array_merge(request()->except('page'), ['status' => 'completed'])) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'completed' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'bg-white dark:bg-gray-800 text-emerald-600 hover:bg-emerald-50 border border-emerald-200 dark:border-emerald-900/40' }}">
+                    ✓ Selesai
+                </a>
+                <a href="{{ route('admin.orders', array_merge(request()->except('page'), ['status' => 'processing'])) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'processing' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'bg-white dark:bg-gray-800 text-amber-600 hover:bg-amber-50 border border-amber-200 dark:border-amber-900/40' }}">
+                    ⏳ Pending
+                </a>
+                <a href="{{ route('admin.orders', array_merge(request()->except('page'), ['status' => 'failed'])) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ in_array(request('status'), ['failed', 'canceled']) ? 'bg-red-500 text-white shadow-md shadow-red-500/20' : 'bg-white dark:bg-gray-800 text-red-600 hover:bg-red-50 border border-red-200 dark:border-red-900/40' }}">
+                    ✕ Gagal / Batal
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- Search & Filter Bar Card -->
+    <!-- Search & Filter Lengkap (Hari, Bulan, Tahun, Tanggal & Kategori) -->
     <div class="admin-card p-4 sm:p-5">
-        <form action="{{ route('admin.orders') }}" method="GET" class="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div class="relative w-full sm:max-w-md">
-                <input 
-                    type="text" 
-                    name="search" 
-                    value="{{ request('search') }}" 
-                    placeholder="Cari no. invoice, nama pembeli, atau produk..." 
-                    class="w-full pl-11 pr-4 py-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                <svg class="w-4 h-4 absolute left-4 top-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <form action="{{ route('admin.orders') }}" method="GET" class="space-y-3">
+            @if(request('status'))
+                <input type="hidden" name="status" value="{{ request('status') }}">
+            @endif
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+                <div class="relative lg:col-span-2">
+                    <input 
+                        type="text" 
+                        name="search" 
+                        value="{{ request('search') }}" 
+                        placeholder="Cari invoice, produk, pembeli, WA, SN..." 
+                        class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                    <svg class="w-4 h-4 absolute left-3.5 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+
+                <div>
+                    <select name="product_type" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none">
+                        <option value="all" {{ request('product_type') === 'all' ? 'selected' : '' }}>Semua Layanan</option>
+                        <option value="app" {{ request('product_type') === 'app' ? 'selected' : '' }}>💎 Aplikasi Premium</option>
+                        <option value="ppob" {{ request('product_type') === 'ppob' ? 'selected' : '' }}>PPOB Kiosbank</option>
+                    </select>
+                </div>
+
+                <div>
+                    <select name="period" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none">
+                        <option value="">Rentang Waktu Cepat</option>
+                        <option value="today" {{ request('period') === 'today' ? 'selected' : '' }}>Hari Ini</option>
+                        <option value="yesterday" {{ request('period') === 'yesterday' ? 'selected' : '' }}>Kemarin</option>
+                        <option value="7_days" {{ request('period') === '7_days' ? 'selected' : '' }}>7 Hari Terakhir</option>
+                        <option value="30_days" {{ request('period') === '30_days' ? 'selected' : '' }}>30 Hari Terakhir</option>
+                        <option value="this_month" {{ request('period') === 'this_month' ? 'selected' : '' }}>Bulan Ini</option>
+                        <option value="this_year" {{ request('period') === 'this_year' ? 'selected' : '' }}>Tahun Ini</option>
+                    </select>
+                </div>
+
+                <div>
+                    <select name="month" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none">
+                        <option value="">Semua Bulan</option>
+                        @foreach([1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'] as $mNum => $mName)
+                            <option value="{{ $mNum }}" {{ (string) request('month') === (string) $mNum ? 'selected' : '' }}>{{ $mName }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <select name="year" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none">
+                        <option value="">Semua Tahun</option>
+                        @for($y = (int) date('Y'); $y >= 2024; $y--)
+                            <option value="{{ $y }}" {{ (string) request('year') === (string) $y ? 'selected' : '' }}>Tahun {{ $y }}</option>
+                        @endfor
+                    </select>
+                </div>
             </div>
 
-            <div class="flex items-center gap-2.5 w-full sm:w-auto">
-                <button type="submit" class="w-full sm:w-auto px-5 py-3 rounded-2xl gradient-orange text-white text-xs font-black shadow-md shadow-orange-500/20 hover:opacity-90 transition cursor-pointer">
-                    Cari Pesanan
-                </button>
-                @if(request('search') || request('status'))
-                    <a href="{{ route('admin.orders') }}" class="px-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-200 transition cursor-pointer">
-                        Reset
-                    </a>
-                @endif
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[11px] font-bold text-gray-400">Filter Tanggal:</span>
+                    <input type="date" name="start_date" value="{{ request('start_date') }}" class="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white">
+                    <span class="text-xs text-gray-400">s/d</span>
+                    <input type="date" name="end_date" value="{{ request('end_date') }}" class="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white">
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="submit" class="px-5 py-2.5 rounded-xl gradient-orange text-white text-xs font-black shadow-md shadow-orange-500/20 hover:opacity-90 transition cursor-pointer">
+                        Terapkan Filter
+                    </button>
+                    @if(request()->anyFilled(['search', 'status', 'product_type', 'period', 'month', 'year', 'start_date', 'end_date']))
+                        <a href="{{ route('admin.orders') }}" class="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-200 transition cursor-pointer">
+                            Reset
+                        </a>
+                    @endif
+                </div>
             </div>
         </form>
     </div>
@@ -135,11 +212,11 @@
                                 @endphp
                                 @if($prov === 'Preflix')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
-                                        ⚡ Preflix API
+                                        Preflix API
                                     </span>
                                 @elseif($prov === 'Premku')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
-                                        ⚡ Premku API
+                                        Premku API
                                     </span>
                                 @elseif($prov === 'Manual Admin')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
@@ -147,11 +224,11 @@
                                     </span>
                                 @elseif($prov === 'Otomatis')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                        ⚡ Otomatis Lokal
+                                        Otomatis Lokal
                                     </span>
                                 @elseif($order->product_type === 'api')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border border-sky-200 dark:border-sky-800/40">
-                                        ⚡ Instan API
+                                        Instan API
                                     </span>
                                 @else
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-400 border border-orange-200 dark:border-orange-800/40">
@@ -238,15 +315,15 @@
                                             <span class="text-xs font-bold text-gray-400 dark:text-gray-500 mr-2">-</span>
                                         @endif
                                     @else
-                                        @if($order->product_type === 'api' && empty($order->sn_or_account))
+                                        @if(in_array($order->product_type, ['api', 'ppob']) && empty($order->sn_or_account))
                                             <form action="{{ route('admin.orders.retry_api', $order->id) }}" method="POST" class="inline">
                                                 @csrf
                                                 <button 
                                                     type="submit"
-                                                    class="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] transition cursor-pointer shadow-sm flex items-center gap-1"
-                                                    title="Kirim / Cek Ulang ke Provider API (Premku/Preflix)"
+                                                    class="px-2 py-1 rounded-lg {{ $order->product_type === 'ppob' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-indigo-600 hover:bg-indigo-700' }} text-white font-bold text-[11px] transition cursor-pointer shadow-sm flex items-center gap-1"
+                                                    title="{{ $order->product_type === 'ppob' ? 'Cek Status Ulang ke /Services/Check-Status Kiosbank' : 'Kirim / Cek Ulang ke Provider API (Premku/Preflix)' }}"
                                                 >
-                                                    ⚡ Kirim API
+                                                    {{ $order->product_type === 'ppob' ? 'Cek Status' : 'Kirim API' }}
                                                 </button>
                                             </form>
                                         @endif
@@ -329,11 +406,11 @@
                         <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                             @if($prov === 'Preflix')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">
-                                    ⚡ Preflix API
+                                    Preflix API
                                 </span>
                             @elseif($prov === 'Premku')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
-                                    ⚡ Premku API
+                                    Premku API
                                 </span>
                             @elseif($prov === 'Manual Admin')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
@@ -341,11 +418,11 @@
                                 </span>
                             @elseif($prov === 'Otomatis')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                    ⚡ Otomatis Lokal
+                                    Otomatis Lokal
                                 </span>
                             @elseif($order->product_type === 'api')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border border-sky-200 dark:border-sky-800/40">
-                                    ⚡ Instan API
+                                    Instan API
                                 </span>
                             @else
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-400 border border-orange-200 dark:border-orange-800/40">
@@ -421,7 +498,7 @@
                                             type="submit"
                                             class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-1"
                                         >
-                                            ⚡ Kirim API
+                                            Kirim API
                                         </button>
                                     </form>
                                 @endif

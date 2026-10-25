@@ -163,7 +163,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
     const categories = [
         { id: 'all', label: 'Semua Pertanyaan', icon: '✨' },
         { id: 'order', label: 'Akun & Order', icon: '🛒' },
-        { id: 'ppob', label: 'PPOB & Pulsa', icon: '⚡' },
+        { id: 'ppob', label: 'PPOB & Pulsa', icon: '📱' },
         { id: 'payment', label: 'Pembayaran & Saldo', icon: '💳' },
         { id: 'warranty', label: 'Garansi & Kendala', icon: '🛡️' },
         { id: 'reseller', label: 'Reseller VIP', icon: '👑' },
@@ -240,7 +240,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
                             href="/ppob"
                             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white border border-emerald-500/20 text-xs font-bold transition-all"
                         >
-                            <span>⚡ Layanan PPOB</span>
+                            <span>Layanan PPOB</span>
                         </Link>
                         <Link
                             href="/syarat-ketentuan"

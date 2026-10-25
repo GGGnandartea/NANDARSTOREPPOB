@@ -25,7 +25,7 @@ export default function TopSellingSection({
                 <div className="flex items-center justify-between w-full lg:w-auto shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                            <span className="text-2xl animate-bounce">🔥</span>
+                            <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
                         </div>
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -110,7 +110,7 @@ export default function TopSellingSection({
                                         ) : product.is_ppob ? (
                                             <div className="w-full h-full rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center p-2 shadow-xs">
                                                 {product.ppob_icon_type === 'pln' ? (
-                                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/></svg>
+                                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.75V17h8v-2.25A7 7 0 0 0 12 2z"/></svg>
                                                 ) : product.ppob_icon_type === 'game' ? (
                                                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="6"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15.5" cy="12" r="1" fill="currentColor"/><circle cx="18.5" cy="12" r="1" fill="currentColor"/></svg>
                                                 ) : product.ppob_icon_type === 'ewallet' ? (
@@ -142,11 +142,11 @@ export default function TopSellingSection({
                                             {isHotToday ? (
                                                 <span className="text-[11px] font-black text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-900/40 inline-flex items-center gap-1">
                                                     <span className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></span>
-                                                    🔥 {product.sales_label || `${product.today_sales} dibeli hari ini`}
+                                                    {product.sales_label || `${product.today_sales} dibeli hari ini`}
                                                 </span>
                                             ) : product.total_sales > 0 ? (
                                                 <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 inline-flex items-center gap-0.5">
-                                                    ⚡ {product.sales_label || `${product.total_sales} terjual`}
+                                                    {product.sales_label || `${product.total_sales} terjual`}
                                                 </span>
                                             ) : (
                                                 <span className="text-[11px] font-medium text-gray-500 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">
