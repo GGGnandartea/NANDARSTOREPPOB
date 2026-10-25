@@ -31,7 +31,56 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        $emailInput = trim($credentials['email']);
+        $plainPassword = (string) $credentials['password'];
+
+        $user = User::where('email', $emailInput)->first();
+        if (!$user && in_array(strtolower($emailInput), ['admin@nandarstore.com', 'admin@premiumkita.com'], true)) {
+            $altEmail = strtolower($emailInput) === 'admin@nandarstore.com' ? 'admin@premiumkita.com' : 'admin@nandarstore.com';
+            $user = User::where('email', $altEmail)->first()
+                ?: User::where('role', 'admin')->first();
+        }
+
+        if ($user) {
+            $storedPassword = (string) $user->getAuthPassword();
+            $algoName = password_get_info($storedPassword)['algoName'] ?? 'unknown';
+
+            // Otomatis perbaiki jika password di database diubah lewat phpMyAdmin (plain text / MD5 / SHA1 / non-bcrypt)
+            if ($algoName !== 'bcrypt') {
+                $isLegacyMatch = false;
+                if ($storedPassword !== '' && hash_equals($storedPassword, $plainPassword)) {
+                    $isLegacyMatch = true;
+                } elseif (strlen($storedPassword) === 32 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), md5($plainPassword))) {
+                    $isLegacyMatch = true;
+                } elseif (strlen($storedPassword) === 40 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), sha1($plainPassword))) {
+                    $isLegacyMatch = true;
+                } elseif ($algoName !== 'unknown' && password_verify($plainPassword, $storedPassword)) {
+                    $isLegacyMatch = true;
+                }
+
+                if ($isLegacyMatch) {
+                    $newHash = Hash::make($plainPassword);
+                    \Illuminate\Support\Facades\DB::table('users')
+                        ->where('id', $user->id)
+                        ->update(['password' => $newHash]);
+                    $user->password = $newHash;
+                } else {
+                    throw ValidationException::withMessages([
+                        'email' => 'Email atau password yang Anda masukkan salah.',
+                    ]);
+                }
+            }
+
+            $credentials['email'] = $user->email;
+        }
+
+        try {
+            $authenticated = Auth::attempt($credentials, $request->boolean('remember'));
+        } catch (\RuntimeException $e) {
+            $authenticated = false;
+        }
+
+        if ($authenticated) {
             $user = Auth::user();
 
             // CEK APAKAH RESELLER BELUM LUNAS / BELUM AKTIF

@@ -25,8 +25,24 @@ class ResetPasswordController extends Controller
         ]);
 
         $user = $request->user();
+        $storedPassword = (string) $user->getAuthPassword();
+        $plainCurrent = (string) $request->current_password;
+        $algoName = password_get_info($storedPassword)['algoName'] ?? 'unknown';
 
-        if (!Hash::check($request->current_password, $user->password)) {
+        $isValidCurrent = false;
+        if ($algoName === 'bcrypt') {
+            try {
+                $isValidCurrent = Hash::check($plainCurrent, $storedPassword);
+            } catch (\RuntimeException $e) {
+                $isValidCurrent = false;
+            }
+        } else {
+            $isValidCurrent = ($storedPassword !== '' && hash_equals($storedPassword, $plainCurrent))
+                || (strlen($storedPassword) === 32 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), md5($plainCurrent)))
+                || (strlen($storedPassword) === 40 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), sha1($plainCurrent)));
+        }
+
+        if (!$isValidCurrent) {
             return back()->withErrors(['current_password' => 'Password saat ini tidak sesuai.']);
         }
 
