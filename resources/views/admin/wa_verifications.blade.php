@@ -145,7 +145,7 @@
                                 <span class="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400" x-text="'+' + botPhone"></span>
                             </div>
                             <p class="text-[11px] opacity-90">
-                                ✓ Bot aktif standby. Saat pembeli mengirim pesan berformat kode <code class="bg-emerald-100 dark:bg-emerald-900 px-1 py-0.5 rounded font-mono font-bold">NS-XXXXX</code>, nomor mereka langsung diverifikasi otomatis tanpa perlu konfirmasi manual!
+                                ✓ Bot aktif standby. Saat pembeli mengirim pesan berformat kode <code class="bg-emerald-100 dark:bg-emerald-900 px-1 py-0.5 rounded font-mono font-bold">PK-XXXXX</code>, nomor mereka langsung diverifikasi otomatis tanpa perlu konfirmasi manual!
                             </p>
                         </div>
                     </template>
@@ -264,7 +264,7 @@
                             rows="4" 
                             required 
                             class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-white/10 text-xs font-medium dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                        >Halo! Ini adalah pesan uji coba dari NandarStore WhatsApp Bot Gateway. Service bot berjalan normal.</textarea>
+                        >Halo! Ini adalah pesan uji coba dari PremiumKita WhatsApp Bot Gateway. Service bot berjalan normal.</textarea>
                     </div>
 
                     <div class="flex items-center justify-end gap-3 pt-2">
@@ -344,7 +344,7 @@
                 <input 
                     type="text" 
                     name="code" 
-                    placeholder="Paste kode (NS-XXXXX)" 
+                    placeholder="Paste kode (PK-XXXXX)" 
                     required 
                     class="px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-mono font-black text-gray-800 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500 uppercase w-48 shadow-inner"
                 >

@@ -42,7 +42,7 @@ export default function CategorySection({
                                 {cat.image ? (
                                     <img src={cat.image} alt={cat.name} className="w-full h-full object-cover rounded-xl" />
                                 ) : (
-                                    <div className="w-full h-full bg-gray-200 dark:bg-gray-600 rounded-xl flex items-center justify-center font-black text-gray-400 text-xs">NS</div>
+                                    <div className="w-full h-full bg-gray-200 dark:bg-gray-600 rounded-xl flex items-center justify-center font-black text-gray-400 text-xs">PK</div>
                                 )}
                             </div>
                             <span className={`text-[11px] sm:text-xs font-bold text-center leading-tight line-clamp-2 max-w-[80px] ${filters.category === cat.name ? 'text-orange-500' : 'text-gray-600 dark:text-gray-300'}`}>{cat.name}</span>

@@ -46,7 +46,7 @@ export default function ProductGrid({
                             {product.image ? (
                                 <img src={product.image} alt={product.name} className="w-[85%] h-[85%] sm:w-[95%] sm:h-[95%] object-contain rounded-xl group-hover:scale-105 transition-transform duration-500" />
                             ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700"><span className="font-extrabold text-2xl tracking-widest opacity-20">NS</span></div>
+                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 dark:text-gray-700"><span className="font-extrabold text-2xl tracking-widest opacity-20">PK</span></div>
                             )}
                         </div>
                         

@@ -85,7 +85,7 @@ export default function Register() {
     return (
         <div className="min-h-screen bg-[#0b1121] flex flex-col justify-center items-center p-4 sm:p-6 font-jakarta relative overflow-hidden">
             <Head>
-                <title>{`Daftar Akun - ${store?.name || 'NandarStore'}`}</title>
+                <title>{`Daftar Akun - ${store?.name || 'PremiumKita'}`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
                 <style>{`.font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}</style>
             </Head>
@@ -110,9 +110,9 @@ export default function Register() {
                         {store?.logo ? (
                             <img src={store.logo} alt={store?.name || 'Logo'} className="w-9 h-9 object-contain rounded-xl p-0.5 bg-white/10" />
                         ) : (
-                            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-sm shadow-lg shadow-orange-500/30">NS</div>
+                            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-sm shadow-lg shadow-orange-500/30">PK</div>
                         )}
-                        <span className="text-xl font-black text-white tracking-tight">{store?.name || 'NandarStore'}</span>
+                        <span className="text-xl font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
                     </div>
                     <h2 className="text-2xl font-black text-white tracking-tight mb-2">Buat Akun Baru</h2>
                     <p className="text-gray-400 text-xs font-medium px-4">Daftar sekarang dan nikmati penawaran produk digital terbaik.</p>
@@ -190,7 +190,7 @@ export default function Register() {
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                     </div>
                                     <input 
-                                        type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Misal: Ade Nandar"
+                                        type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Misal: Budi Santoso"
                                         className={`w-full pl-10 pr-4 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.name ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
                                     />
                                 </div>
@@ -335,7 +335,7 @@ export default function Register() {
                         <div className="bg-gradient-to-r from-amber-600 to-yellow-600 p-5 flex items-center justify-between text-gray-950">
                             <div>
                                 <span className="text-[10px] font-black uppercase tracking-widest bg-black/20 px-2 py-0.5 rounded-full inline-block mb-1">Biaya Aktivasi Akun</span>
-                                <h3 className="font-black text-lg">Reseller VIP NandarStore</h3>
+                                <h3 className="font-black text-lg">Reseller VIP PremiumKita</h3>
                             </div>
                             <div className="text-2xl">👑</div>
                         </div>

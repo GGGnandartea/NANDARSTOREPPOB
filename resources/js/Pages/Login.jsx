@@ -37,7 +37,7 @@ export default function Login({ status }) {
     return (
         <div className="min-h-screen bg-[#0b1121] flex flex-col justify-center items-center p-4 sm:p-6 font-jakarta relative overflow-hidden">
             <Head>
-                <title>{`Masuk Akun - ${store?.name || 'NandarStore'}`}</title>
+                <title>{`Masuk Akun - ${store?.name || 'PremiumKita'}`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
                 <style>{`.font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}</style>
             </Head>
@@ -66,11 +66,11 @@ export default function Login({ status }) {
                             <img src={store.logo} alt={store?.name || 'Logo'} className="w-10 h-10 object-contain rounded-xl p-0.5 bg-white/10" />
                         ) : (
                             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl text-white flex items-center justify-center font-black text-lg shadow-lg shadow-orange-500/30">
-                                NS
+                                PK
                             </div>
                         )}
                         <span className="text-2xl font-black text-white tracking-tight">
-                            {store?.name || 'NandarStore'}
+                            {store?.name || 'PremiumKita'}
                         </span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-2">

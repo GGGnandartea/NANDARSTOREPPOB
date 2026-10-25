@@ -183,7 +183,7 @@
                                         <img src="{{ $p->image }}" class="w-12 h-12 rounded-xl object-cover border border-gray-200 dark:border-white/10 shadow-sm shrink-0">
                                     @else
                                         <div class="w-12 h-12 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-sm shrink-0 shadow-sm">
-                                            NS
+                                            PK
                                         </div>
                                     @endif
                                     <div>
@@ -291,7 +291,7 @@
                                 <img src="{{ $p->image }}" class="w-12 h-12 rounded-xl object-cover border border-gray-200 dark:border-white/10 shadow-sm shrink-0">
                             @else
                                 <div class="w-12 h-12 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
-                                    NS
+                                    PK
                                 </div>
                             @endif
                             <div class="flex-1 min-w-0">

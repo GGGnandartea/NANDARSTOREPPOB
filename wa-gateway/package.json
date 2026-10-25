@@ -1,7 +1,7 @@
 {
   "name": "wa-gateway",
   "version": "1.0.0",
-  "description": "NandarStore 2.0 WhatsApp Bot Gateway",
+  "description": "PremiumKita 2.0 WhatsApp Bot Gateway",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

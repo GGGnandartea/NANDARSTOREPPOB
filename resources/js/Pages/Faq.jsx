@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
 export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsappGroupLink = '' }) {
-    const storeName = store?.name || 'NandarStore';
+    const storeName = store?.name || 'PremiumKita';
     const effectiveAdminWa = (adminWhatsapp || store?.whatsapp || '082317458496').replace(/[^0-9]/g, '');
 
     // Dark Mode Detection & Sync
@@ -38,7 +38,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             id: 1,
             category: 'order',
             categoryLabel: 'Akun & Order',
-            q: 'Bagaimana cara membeli akun premium di NandarStore?',
+            q: 'Bagaimana cara membeli akun premium di PremiumKita?',
             a: 'Caranya sangat mudah: (1) Pilih produk aplikasi premium yang diinginkan di Beranda, (2) Masukkan nomor WhatsApp & Email aktif Anda untuk pengiriman akun, (3) Pilih metode pembayaran (QRIS Otomatis atau Saldo Akun), (4) Selesaikan pembayaran. Akun dan invoice akan langsung muncul di layar dan otomatis dikirimkan ke WhatsApp Anda dalam hitungan detik!'
         },
         {
@@ -46,7 +46,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             category: 'order',
             categoryLabel: 'Akun & Order',
             q: 'Berapa lama proses pengiriman akun setelah pembayaran berhasil?',
-            a: 'Semua produk di NandarStore diproses secara OTOMATIS & INSTAN 24 Jam. Begitu pembayaran QRIS terdeteksi lunas atau Saldo terpotong, sistem gateway kami langsung memproses pesanan Anda dalam rentang waktu 1 hingga 30 detik.'
+            a: 'Semua produk di PremiumKita diproses secara OTOMATIS & INSTAN 24 Jam. Begitu pembayaran QRIS terdeteksi lunas atau Saldo terpotong, sistem gateway kami langsung memproses pesanan Anda dalam rentang waktu 1 hingga 30 detik.'
         },
         {
             id: 3,
@@ -59,7 +59,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             id: 4,
             category: 'order',
             categoryLabel: 'Akun & Order',
-            q: 'Apakah akun yang dijual di NandarStore legal dan aman?',
+            q: 'Apakah akun yang dijual di PremiumKita legal dan aman?',
             a: 'Ya, 100% legal dan aman! Kami menggunakan metode subscription dan pembayaran legal resmi. Akun terbebas dari tindakan ilegal atau hacking, serta dilengkapi garansi perlindungan penuh.'
         },
 
@@ -90,7 +90,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             category: 'ppob',
             categoryLabel: 'PPOB & Pulsa',
             q: 'Top-up E-Wallet (DANA, OVO, GoPay, ShopeePay) apakah ada biaya admin?',
-            a: 'Harga yang tertera pada produk e-wallet di NandarStore sudah merupakan harga final yang sangat kompetitif dan hemat dibanding transfer antar bank reguler.'
+            a: 'Harga yang tertera pada produk e-wallet di PremiumKita sudah merupakan harga final yang sangat kompetitif dan hemat dibanding transfer antar bank reguler.'
         },
 
         // KATEGORI: PEMBAYARAN & SALDO
@@ -98,14 +98,14 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             id: 9,
             category: 'payment',
             categoryLabel: 'Pembayaran & Saldo',
-            q: 'Metode pembayaran apa saja yang diterima di NandarStore?',
-            a: 'Kami menerima:\n1. QRIS Nasional Realtime: Bisa di-scan menggunakan seluruh aplikasi m-Banking (BCA, BRI, Mandiri, BNI, CIMB, Neo, Jago, dll) serta semua E-Wallet (DANA, GoPay, OVO, ShopeePay, LinkAja).\n2. Saldo Akun Member: Pembayaran 1-klik instan langsung terpotong dari saldo dompet NandarStore Anda tanpa biaya transaksi QRIS.'
+            q: 'Metode pembayaran apa saja yang diterima di PremiumKita?',
+            a: 'Kami menerima:\n1. QRIS Nasional Realtime: Bisa di-scan menggunakan seluruh aplikasi m-Banking (BCA, BRI, Mandiri, BNI, CIMB, Neo, Jago, dll) serta semua E-Wallet (DANA, GoPay, OVO, ShopeePay, LinkAja).\n2. Saldo Akun Member: Pembayaran 1-klik instan langsung terpotong dari saldo dompet PremiumKita Anda tanpa biaya transaksi QRIS.'
         },
         {
             id: 10,
             category: 'payment',
             categoryLabel: 'Pembayaran & Saldo',
-            q: 'Bagaimana cara mengisi (Top Up) Saldo Akun NandarStore?',
+            q: 'Bagaimana cara mengisi (Top Up) Saldo Akun PremiumKita?',
             a: 'Silakan Login ke akun Anda > Masuk ke menu Profil > Pilih tab Top Up Saldo > Masukkan nominal top-up yang diinginkan (minimal Rp 10.000) > Scan QRIS yang tampil. Saldo akan otomatis masuk ke akun Anda detik itu juga!'
         },
         {
@@ -151,7 +151,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
             id: 16,
             category: 'reseller',
             categoryLabel: 'Reseller & Kemitraan',
-            q: 'Bagaimana cara bergabung menjadi Reseller Resmi NandarStore?',
+            q: 'Bagaimana cara bergabung menjadi Reseller Resmi PremiumKita?',
             a: 'Daftar akun gratis di menu Register > Buka menu Profil Member > Pilih Upgrade ke Reseller VIP > Lakukan pembayaran aktivasi. Akun Anda langsung otomatis aktif sebagai Reseller seumur hidup.'
         }
     ];
@@ -199,7 +199,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
         <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
             <Head>
                 <title>{`Pusat Bantuan & FAQ - ${storeName}`}</title>
-                <meta name="description" content="Temukan jawaban cepat seputar cara pembelian akun premium, transaksi PPOB & pulsa, metode pembayaran QRIS/saldo, dan klaim garansi di NandarStore." />
+                <meta name="description" content="Temukan jawaban cepat seputar cara pembelian akun premium, transaksi PPOB & pulsa, metode pembayaran QRIS/saldo, dan klaim garansi di PremiumKita." />
             </Head>
 
             {/* TOP NAVIGATION BAR */}
@@ -221,7 +221,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
                                 <img src={store.logo} alt={storeName} className="w-8 h-8 rounded-lg object-contain bg-orange-500/10 p-0.5" />
                             ) : (
                                 <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-sm">
-                                    NS
+                                    PK
                                 </div>
                             )}
                             <div>

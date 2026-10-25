@@ -27,7 +27,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'favoriteProductIds' => fn () => $request->user()?->favoriteProducts()->pluck('products.id')->all() ?? [],
             'store' => [
-                'name'                => \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'NandarStore',
+                'name'                => \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita',
                 'logo'                => \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null,
                 'tagline'             => \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis',
                 'admin_whatsapp'      => $adminWaClean,

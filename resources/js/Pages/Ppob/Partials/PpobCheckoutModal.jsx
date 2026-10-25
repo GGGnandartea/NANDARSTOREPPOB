@@ -87,7 +87,7 @@ export default function PpobCheckoutModal({
               />
               <div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="font-black text-xs text-gray-900 dark:text-white">Saldo Akun NandarStore</p>
+                  <p className="font-black text-xs text-gray-900 dark:text-white">Saldo Akun PremiumKita</p>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/40">
                     Instan 1 Detik
                   </span>

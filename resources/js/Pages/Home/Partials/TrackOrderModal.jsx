@@ -70,7 +70,7 @@ export default function TrackOrderModal({
                                     Karena Anda membeli tanpa login menggunakan QRIS, silakan hubungi WhatsApp Admin dengan membawa <strong>bukti pembayaran QRIS</strong> &amp; <strong>tautan invoice (#{trackResult.order_id})</strong> untuk proses pengembalian dana (Refund) 100%.
                                 </p>
                                 <a
-                                    href={`https://wa.me/6282317458496?text=${encodeURIComponent(`Halo Admin NandarStore, saya Pembeli Publik (Tanpa Akun) ingin klaim Refund pesanan QRIS yang gagal.\n• No. Invoice: #${trackResult.order_id}\n• Produk: ${trackResult.product_name || '-'}\n• Link Invoice: ${trackResult.invoice_url || ''}\nBersama pesan ini saya lampirkan bukti pembayaran QRIS.`)}`}
+                                    href={`https://wa.me/6282317458496?text=${encodeURIComponent(`Halo Admin PremiumKita, saya Pembeli Publik (Tanpa Akun) ingin klaim Refund pesanan QRIS yang gagal.\n• No. Invoice: #${trackResult.order_id}\n• Produk: ${trackResult.product_name || '-'}\n• Link Invoice: ${trackResult.invoice_url || ''}\nBersama pesan ini saya lampirkan bukti pembayaran QRIS.`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center min-h-10 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"

@@ -172,7 +172,7 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
     return (
         <div className="min-h-screen bg-[#0b1121] flex flex-col justify-center items-center p-4 sm:p-6 font-jakarta relative overflow-hidden">
             <Head>
-                <title>{`Lupa Kata Sandi - ${store?.name || 'NandarStore'}`}</title>
+                <title>{`Lupa Kata Sandi - ${store?.name || 'PremiumKita'}`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
                 <style>{`.font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}</style>
             </Head>
@@ -197,9 +197,9 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                         {store?.logo ? (
                             <img src={store.logo} alt={store?.name || 'Logo'} className="w-9 h-9 object-contain rounded-xl p-0.5 bg-white/10" />
                         ) : (
-                            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl text-white flex items-center justify-center font-black text-sm shadow-lg shadow-orange-500/30">NS</div>
+                            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl text-white flex items-center justify-center font-black text-sm shadow-lg shadow-orange-500/30">PK</div>
                         )}
-                        <span className="text-xl font-black text-white tracking-tight">{store?.name || 'NandarStore'}</span>
+                        <span className="text-xl font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
                     </div>
                     <h2 className="text-2xl font-black text-white tracking-tight mb-1.5">
                         {isSuccess ? 'Reset Berhasil!' : (step === 'input_phone' ? 'Reset Kata Sandi' : 'Verifikasi OTP WhatsApp')}
@@ -335,7 +335,7 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
 
                                     {/* Tombol Kirim Chat ke Bot */}
                                     <a 
-                                        href={botWaUrl || `https://wa.me/628990738216?text=${encodeURIComponent(`Halo Bot NandarStore, saya meminta kode OTP reset password akun saya. Kode Verifikasi: ${triggerCode}`)}`}
+                                        href={botWaUrl || `https://wa.me/628990738216?text=${encodeURIComponent(`Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya. Kode Verifikasi: ${triggerCode}`)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/25 transition cursor-pointer"

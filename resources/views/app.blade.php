@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title inertia>NandarStore</title>
+    <title inertia>PremiumKita</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -142,7 +142,7 @@
         }
     </style>
     @php
-        $appStoreName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+        $appStoreName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
         $appStoreLogo = \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null;
         $appStoreFavicon = \App\Models\Setting::where('key', 'store_favicon')->value('value') ?: ($appStoreLogo ?: null);
         $appLoadingLogo = \App\Models\Setting::where('key', 'loading_logo')->value('value') ?: ($appStoreLogo ?: null);
@@ -246,7 +246,7 @@
                     <img src="{{ $appLoadingLogo }}" alt="{{ $appStoreName }}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 14px;">
                 </div>
             @else
-                <div class="ns-logo-emblem">NS</div>
+                <div class="ns-logo-emblem">PK</div>
             @endif
         </div>
         <div class="ns-brand-title">

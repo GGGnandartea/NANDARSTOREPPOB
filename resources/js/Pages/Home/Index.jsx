@@ -305,7 +305,7 @@ export default function Home({
     return (
         <div className="storefront-ui min-h-screen flex flex-col bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 font-jakarta pb-20 sm:pb-0">
             <Head>
-                <title>{`${store?.name || 'NandarStore'} - Platform Digital & Akun Premium`}</title>
+                <title>{`${store?.name || 'PremiumKita'} - Platform Digital & Akun Premium`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
                 <style>{`
                     .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }

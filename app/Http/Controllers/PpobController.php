@@ -30,7 +30,7 @@ class PpobController extends Controller
      */
     public function index()
     {
-        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
         $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Layanan PPOB & Produk Digital Otomatis';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
@@ -187,7 +187,7 @@ class PpobController extends Controller
         $paymentMethod = $request->input('payment_method');
         $buyerName     = $request->input('buyer_name') ?: (Auth::user()?->name ?: 'Pelanggan PPOB');
         $whatsapp      = $request->input('whatsapp') ?: (Auth::user()?->whatsapp ?: $customerId);
-        $email         = $request->input('email') ?: (Auth::user()?->email ?: 'user@nandarstore.com');
+        $email         = $request->input('email') ?: (Auth::user()?->email ?: 'user@premiumkita.com');
 
         // Data tagihan hasil inquiry (PDAM / PLN pascabayar / BPJS). Nominalnya tidak
         // diambil dari client, melainkan dari cache hasil inquiry di server.

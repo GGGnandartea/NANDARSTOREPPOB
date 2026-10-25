@@ -59,7 +59,7 @@ export default function ChangeWaModal({ onClose, currentWhatsapp, onNumberChange
             </div>
             <div>
               <h3 className="font-black text-lg">Ganti Nomor WhatsApp</h3>
-              <p className="text-orange-100 text-xs font-semibold">Perbarui nomor aktif akun NandarStore Anda</p>
+              <p className="text-orange-100 text-xs font-semibold">Perbarui nomor aktif akun PremiumKita Anda</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition cursor-pointer" aria-label="Tutup Ganti Nomor WA">

@@ -271,7 +271,7 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
   return (
     <div className="profile-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors">
       <Head>
-        <title>{isReseller ? 'Profil VIP Reseller - NandarStore' : 'Profil Saya - NandarStore'}</title>
+        <title>{isReseller ? 'Profil VIP Reseller - PremiumKita' : 'Profil Saya - PremiumKita'}</title>
         <link
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"

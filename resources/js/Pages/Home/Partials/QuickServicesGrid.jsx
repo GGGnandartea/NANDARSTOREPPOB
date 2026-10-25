@@ -101,7 +101,7 @@ export default function QuickServicesGrid({
 
                 {/* 7. Hubungi CS */}
                 <a
-                    href={`https://wa.me/${effectiveAdminWa}?text=Halo%20Admin%20${encodeURIComponent(store?.name || 'NandarStore')},%20saya%20butuh%20bantuan`}
+                    href={`https://wa.me/${effectiveAdminWa}?text=Halo%20Admin%20${encodeURIComponent(store?.name || 'PremiumKita')},%20saya%20butuh%20bantuan`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-emerald-50/60 dark:hover:bg-white/5 transition-all text-center"

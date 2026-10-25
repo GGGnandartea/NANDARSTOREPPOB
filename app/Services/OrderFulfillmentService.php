@@ -1005,7 +1005,7 @@ class OrderFulfillmentService
 
             $refundNotice = "⚠️ STOK HABIS SAAT PEMBAYARAN\n"
                           . "Mohon maaf, stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain yang menyelesaikan pembayaran terlebih dahulu.\n\n"
-                          . "✅ DANA ANDA SEBESAR Rp " . number_format($refundAmount, 0, ',', '.') . " TELAH OTOMATIS KAMI REFUND 100% KE SALDO AKUN NANDARSTORE ANDA.\n"
+                          . "✅ DANA ANDA SEBESAR Rp " . number_format($refundAmount, 0, ',', '.') . " TELAH OTOMATIS KAMI REFUND 100% KE SALDO AKUN PREMIUMKITA ANDA.\n"
                           . "Saldo dapat Anda gunakan langsung untuk membeli produk lain atau melakukan penarikan.";
 
             $order->sn_or_account   = $refundNotice;
@@ -1036,7 +1036,7 @@ class OrderFulfillmentService
             // B. PEMBELI TAMU (GUEST) TANPA AKUN (MEMERLUKAN REFUND MANUAL VIA WA)
             $guestNotice = "⚠️ STOK HABIS SAAT PEMBAYARAN\n"
                          . "Mohon maaf, stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain.\n\n"
-                         . "Hubungi CS Admin NandarStore via WhatsApp untuk proses pengembalian dana (refund) langsung ke rekening Bank / E-Wallet Anda senilai Rp " . number_format($refundAmount, 0, ',', '.') . ".";
+                         . "Hubungi CS Admin PremiumKita via WhatsApp untuk proses pengembalian dana (refund) langsung ke rekening Bank / E-Wallet Anda senilai Rp " . number_format($refundAmount, 0, ',', '.') . ".";
 
             $order->sn_or_account   = $guestNotice;
             $order->account_details = $guestNotice;
@@ -1075,14 +1075,14 @@ class OrderFulfillmentService
 
         $msg = "⚠️ *PEMBERITAHUAN PENGEMBALIAN DANA (REFUND OTOMATIS)*\n\n"
              . "Halo *{$buyer->name}*,\n"
-             . "Terima kasih telah bertransaksi di *NandarStore*.\n\n"
+             . "Terima kasih telah bertransaksi di *PremiumKita*.\n\n"
              . "Kami menginformasikan bahwa pesanan Anda:\n"
              . "• No. Invoice: *#{$order->invoice_number}*\n"
              . "• Layanan: *{$order->product_name}*\n\n"
              . "❌ *STATUS STOK:*\n"
              . "Stok terakhir produk tersebut baru saja habis terbeli bersamaan oleh pembeli lain yang menyelesaikan pembayaran beberapa milidetik lebih awal.\n\n"
              . "✅ *REFUND 100% TELAH BERHASIL:*\n"
-             . "Dana Anda sebesar *Rp {$nominalFormatted}* telah otomatis kami kembalikan 100% ke *Saldo Akun NandarStore* Anda saat ini juga!\n\n"
+             . "Dana Anda sebesar *Rp {$nominalFormatted}* telah otomatis kami kembalikan 100% ke *Saldo Akun PremiumKita* Anda saat ini juga!\n\n"
              . "👉 Cek Saldo Anda di: " . url('/profile') . "\n"
              . "Saldo tersebut dapat langsung Anda gunakan kembali untuk membeli produk lain tanpa biaya tambahan.\n\n"
              . "Mohon maaf atas ketidaknyamanan ini. Jika ada pertanyaan, hubungi CS kami: https://wa.me/" . preg_replace('/[^0-9]/', '', $adminWa);

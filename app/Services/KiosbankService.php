@@ -1530,7 +1530,7 @@ class KiosbankService
             : "ℹ️ Ini adalah pesan uji coba peringatan deposit. Saat ini saldo deposit Anda masih berada di atas batas minimum aman.";
 
         $msg = "{$headerBadge}\n\n"
-             . "Halo Admin *NandarStore*,\n"
+             . "Halo Admin *PremiumKita*,\n"
              . "{$statusExplain}\n\n"
              . "📊 *RINCIAN SALDO DEPOSIT KIOSBANK:*\n"
              . "• Mode Server: *{$modeLabel}*\n"
@@ -1541,7 +1541,7 @@ class KiosbankService
              . "💳 *TINDAKAN CEPAT ADMIN:*\n"
              . "Buat Tiket Top Up / Cek Deposit di:\n"
              . "👉 {$depositUrl}\n\n"
-             . "_Pesan otomatis dari Sistem Monitoring Deposit NandarStore 2.0._";
+             . "_Pesan otomatis dari Sistem Monitoring Deposit PremiumKita 2.0._";
 
         $sent = \App\Http\Controllers\WebhookController::sendWaMessage($targetWa, $msg);
 

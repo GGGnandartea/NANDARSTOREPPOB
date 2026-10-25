@@ -20,7 +20,7 @@
                     Selamat Datang, {{ Auth::user()->name ?? 'Administrator' }}!
                 </h1>
                 <p class="text-orange-100 text-xs sm:text-sm font-medium mt-1 max-w-xl leading-relaxed">
-                    Ringkasan performa penjualan, aktivitas reseller, dan status verifikasi sistem NANDARSTORE 2.0 hari ini.
+                    Ringkasan performa penjualan, aktivitas reseller, dan status verifikasi sistem PREMIUMKITA 2.0 hari ini.
                 </p>
             </div>
 

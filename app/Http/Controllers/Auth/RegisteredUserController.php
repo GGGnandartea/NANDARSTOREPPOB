@@ -54,7 +54,7 @@ class RegisteredUserController extends Controller
         if ($request->role === 'reseller') {
             // 1. JANGAN LOGIN-KAN MEREKA
             // 2. Gunakan Inertia::location untuk melempar ke web luar (WA) agar tidak BLANK
-            $pesanWa = "Halo Admin NandarStore, saya baru saja mendaftar akun Reseller dengan email: {$request->email}. Saya ingin membayar biaya pendaftaran agar akun saya segera diaktifkan.";
+            $pesanWa = "Halo Admin PremiumKita, saya baru saja mendaftar akun Reseller dengan email: {$request->email}. Saya ingin membayar biaya pendaftaran agar akun saya segera diaktifkan.";
             $adminWa = Setting::where('key', 'admin_whatsapp')->value('value') ?? '082317458496';
             $adminWaClean = preg_replace('/[^0-9]/', '', $adminWa);
             if (str_starts_with($adminWaClean, '0')) {

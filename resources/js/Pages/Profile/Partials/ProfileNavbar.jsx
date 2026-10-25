@@ -22,8 +22,8 @@ export default function ProfileNavbar({
             <Icon.Menu className="w-5 h-5 dark:text-white" />
           </button>
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-sm shadow-md">NS</div>
-            <span className="font-black text-gray-900 dark:text-white hidden sm:block">Nandar<span className="text-orange-500">Store</span></span>
+            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-sm shadow-md">PK</div>
+            <span className="font-black text-gray-900 dark:text-white hidden sm:block">Premium<span className="text-orange-500">Kita</span></span>
           </Link>
         </div>
         <div className="flex items-center gap-2">

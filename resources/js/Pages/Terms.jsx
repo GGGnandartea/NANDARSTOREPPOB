@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
 export default function Terms({ store = {}, terms = '', adminWhatsapp = '082317458496' }) {
-    const storeName = store?.name || 'NandarStore';
+    const storeName = store?.name || 'PremiumKita';
     const effectiveAdminWa = (adminWhatsapp || store?.whatsapp || '082317458496').replace(/[^0-9]/g, '');
 
     // Dark Mode Detection & Sync
@@ -64,7 +64,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
                                 <img src={store.logo} alt={storeName} className="w-8 h-8 rounded-lg object-contain bg-orange-500/10 p-0.5" />
                             ) : (
                                 <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-sm">
-                                    NS
+                                    PK
                                 </div>
                             )}
                             <div>

@@ -97,7 +97,7 @@ async function startWhatsAppBot() {
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
         auth: state,
-        browser: ['NandarStore WA Gateway', 'Desktop', '2.0.0'],
+        browser: ['PremiumKita WA Gateway', 'Desktop', '2.0.0'],
         syncFullHistory: false
     });
 
@@ -192,8 +192,8 @@ async function startWhatsAppBot() {
 
                 console.log(`[WA-BOT] 📥 Pesan masuk dari ${senderPhone || senderJid} (${rawSender}): "${text.trim()}"`);
 
-                // Deteksi Kode Verifikasi NS-XXXXX, VERIF-XXXXX, OTP-XXXXX, atau RESET-XXXXX
-                const match = text.match(/(NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i);
+                // Deteksi Kode Verifikasi PK-XXXXX / PK-XXXXX, VERIF-XXXXX, OTP-XXXXX, atau RESET-XXXXX
+                const match = text.match(/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i);
                 if (match) {
                     const code = match[1].toUpperCase();
                     console.log(`[WA-BOT] 🔍 Terdeteksi kode: ${code} dari ${senderPhone || senderJid}`);
@@ -252,7 +252,7 @@ async function startWhatsAppBot() {
                         if (resData.status === 'send_otp') {
                             const userName = resData.user_name || 'Pelanggan';
                             const otpCode = resData.otp_code;
-                            const replyMessage = `🔐 *KODE OTP RESET PASSWORD NANDARSTORE*\n\n` +
+                            const replyMessage = `🔐 *KODE OTP RESET PASSWORD PREMIUMKITA*\n\n` +
                                                  `Halo *${userName}*!\n` +
                                                  `Kode OTP untuk mereset kata sandi akun Anda adalah:\n\n` +
                                                  `*KODE:* ${otpCode}\n\n` +
@@ -264,32 +264,32 @@ async function startWhatsAppBot() {
                         } else if (resData.status === 'otp_expired') {
                             const expMessage = `⚠️ *KODE OTP TELAH HANGUS*\n\n` +
                                                  `Kode permintaan reset password Anda telah hangus karena telah melewati batas waktu 15 menit.\n\n` +
-                                                 `Silakan buka kembali website NandarStore untuk membuat permintaan kode baru.`;
+                                                 `Silakan buka kembali website PremiumKita untuk membuat permintaan kode baru.`;
                             await sendSingleReply(expMessage);
                         } else if (resData.status === 'otp_already_used' || resData.status === 'otp_used_or_invalid') {
                             const usedMessage = `⚠️ *KODE SUDAH HANGUS / SUDAH DIGUNAKAN*\n\n` +
                                                   `Kode verifikasi ini sudah pernah digunakan atau sudah hangus.\n\n` +
-                                                  `Silakan kunjungi website NandarStore untuk meminta kode baru jika diperlukan.`;
+                                                  `Silakan kunjungi website PremiumKita untuk meminta kode baru jika diperlukan.`;
                             await sendSingleReply(usedMessage);
                         } else if (resData.status === 'verified') {
                             const userName = resData.user_name || 'Kak';
                             const confirmedPhone = resData.whatsapp || senderPhone || 'Akun Anda';
                             const replyMessage = `✅ *VERIFIKASI NOMOR BERHASIL*\n\n` +
                                                  `Halo ${userName}!\n` +
-                                                 `Nomor WhatsApp Anda (*${confirmedPhone}*) telah berhasil divalidasi dan terverifikasi di *NandarStore*.\n\n` +
+                                                 `Nomor WhatsApp Anda (*${confirmedPhone}*) telah berhasil divalidasi dan terverifikasi di *PremiumKita*.\n\n` +
                                                  `🎉 *Manfaat Akun Terverifikasi:*\n` +
                                                  `• Notifikasi pesanan instan ke WhatsApp\n` +
                                                  `• Detail akun premium (Email & Password) otomatis dikirim ke chat ini\n` +
                                                  `• Akses promo khusus reseller\n\n` +
-                                                 `Terima kasih telah berbelanja di NandarStore! 🛒✨`;
+                                                 `Terima kasih telah berbelanja di PremiumKita! 🛒✨`;
 
                             await sendSingleReply(replyMessage);
                             console.log(`[WA-BOT] ✅ Balasan verifikasi berhasil dikirim (1x) ke ${confirmedPhone}`);
                         } else if (resData.status === 'already_verified') {
-                            const alreadyMessage = `ℹ️ *INFORMASI*\n\nNomor WhatsApp Anda sudah berstatus terverifikasi di NandarStore.\nJika butuh bantuan, silakan hubungi admin kami.`;
+                            const alreadyMessage = `ℹ️ *INFORMASI*\n\nNomor WhatsApp Anda sudah berstatus terverifikasi di PremiumKita.\nJika butuh bantuan, silakan hubungi admin kami.`;
                             await sendSingleReply(alreadyMessage);
                         } else {
-                            const notFoundMessage = `⚠️ *KODE TIDAK DITEMUKAN / HANGUS*\n\nKode *${code}* tidak ditemukan, sudah kadaluarsa, atau sudah hangus. Silakan periksa kembali instruksi di website NandarStore.`;
+                            const notFoundMessage = `⚠️ *KODE TIDAK DITEMUKAN / HANGUS*\n\nKode *${code}* tidak ditemukan, sudah kadaluarsa, atau sudah hangus. Silakan periksa kembali instruksi di website PremiumKita.`;
                             await sendSingleReply(notFoundMessage);
                         }
                     } catch (webhookErr) {
@@ -374,7 +374,7 @@ app.post('/api/logout', async (req, res) => {
 // Jalankan Express Server
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================================`);
-    console.log(`🤖 NANDARSTORE WHATSAPP GATEWAY SERVICE AKTIF!`);
+    console.log(`🤖 PREMIUMKITA WHATSAPP GATEWAY SERVICE AKTIF!`);
     console.log(`📡 Port API      : http://127.0.0.1:${PORT}`);
     console.log(`🔗 Webhook Tujuan : ${LARAVEL_WEBHOOK_URL}`);
     console.log(`=================================================`);

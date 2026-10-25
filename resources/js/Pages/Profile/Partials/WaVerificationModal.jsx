@@ -212,7 +212,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
                 <div className="flex items-start gap-2.5">
                   <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-black flex items-center justify-center shrink-0">2</span>
                   <p className="font-semibold text-gray-700 dark:text-gray-300">
-                    Kirimkan pesan tersebut. Bot WhatsApp NandarStore akan otomatis mendeteksi kode verifikasi dan mengonfirmasi akun Anda secara instan!
+                    Kirimkan pesan tersebut. Bot WhatsApp PremiumKita akan otomatis mendeteksi kode verifikasi dan mengonfirmasi akun Anda secara instan!
                   </p>
                 </div>
               </div>

@@ -60,7 +60,7 @@
                 @csrf
                 <div>
                     <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Kode Voucher</label>
-                    <input type="text" name="code" placeholder="Misal: PROMONANDAR" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-mono font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 uppercase tracking-wider">
+                    <input type="text" name="code" placeholder="Misal: PROMOKITA" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-mono font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 uppercase tracking-wider">
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

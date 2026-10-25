@@ -45,12 +45,12 @@ export default function Navbar({
                         <Link href="/" className={`absolute left-0 flex items-center gap-2 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? '-translate-y-16 opacity-0 sm:translate-y-0 sm:opacity-100 sm:relative sm:mr-6' : 'translate-y-0 opacity-100 relative sm:mr-6'}`}>
                             {store?.logo ? (
                                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 p-0.5 flex items-center justify-center shadow-md shrink-0 overflow-hidden">
-                                    <img src={store.logo} alt={store?.name || 'NandarStore'} className="w-full h-full object-contain rounded-lg" />
+                                    <img src={store.logo} alt={store?.name || 'PremiumKita'} className="w-full h-full object-contain rounded-lg" />
                                 </div>
                             ) : (
-                                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-bold shadow-md shrink-0 text-sm">NS</div>
+                                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-bold shadow-md shrink-0 text-sm">PK</div>
                             )}
-                            <span className="text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0">{store?.name || 'NandarStore'}</span>
+                            <span className="text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0">{store?.name || 'PremiumKita'}</span>
                         </Link>
 
                         <div className={`absolute left-0 w-full max-w-xl transition-all duration-300 ease-out ${isScrolled ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative' : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'}`}>

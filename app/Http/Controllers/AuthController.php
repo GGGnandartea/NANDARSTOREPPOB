@@ -249,12 +249,12 @@ class AuthController extends Controller
             if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di NandarStore.',
-                    'errors'  => ['whatsapp' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di NandarStore.'],
+                    'message' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di PremiumKita.',
+                    'errors'  => ['whatsapp' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di PremiumKita.'],
                 ], 422);
             }
             return back()->withErrors([
-                'whatsapp' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di NandarStore.',
+                'whatsapp' => 'Nomor WhatsApp ini tidak terdaftar pada akun manapun di PremiumKita.',
             ]);
         }
 
@@ -269,7 +269,7 @@ class AuthController extends Controller
         ]);
 
         $botPhone = '08990738216';
-        $botWaUrl = 'https://wa.me/628990738216?text=' . urlencode("Halo Bot NandarStore, saya meminta kode OTP reset password akun saya. Kode Verifikasi: {$triggerCode}");
+        $botWaUrl = 'https://wa.me/628990738216?text=' . urlencode("Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya. Kode Verifikasi: {$triggerCode}");
 
         if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
             return response()->json([
@@ -375,7 +375,7 @@ class AuthController extends Controller
         try {
             \App\Http\Controllers\WebhookController::sendWaMessage(
                 $user->whatsapp,
-                "✅ *KATA SANDI BERHASIL DIRESET*\n\nHalo *{$user->name}*, kata sandi akun NandarStore Anda telah berhasil diperbarui. Silakan login menggunakan kata sandi baru Anda."
+                "✅ *KATA SANDI BERHASIL DIRESET*\n\nHalo *{$user->name}*, kata sandi akun PremiumKita Anda telah berhasil diperbarui. Silakan login menggunakan kata sandi baru Anda."
             );
         } catch (\Exception $e) {}
 

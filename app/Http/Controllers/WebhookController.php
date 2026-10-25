@@ -254,7 +254,7 @@ class WebhookController extends Controller
         // 4. Proses Transaksi Sukses ('order.success' atau status 'success')
         if ($event === 'order.success' || strtolower($data['status'] ?? '') === 'success') {
             $invoice = $data['invoice'] ?? null; // Invoice transaksi di server Premku
-            $refId   = $data['ref_id'] ?? null;  // Invoice toko NandarStore
+            $refId   = $data['ref_id'] ?? null;  // Invoice toko PremiumKita
 
             if (!$refId && !$invoice) {
                 return response()->json(['status' => false, 'message' => 'Missing ref_id and invoice'], 400);
@@ -352,11 +352,11 @@ class WebhookController extends Controller
         $sender = $request->input('sender') ?? $request->input('raw_sender') ?? '';
 
         if (empty($code) && !empty($message)) {
-            if (preg_match('/(NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $message, $matches)) {
+            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $message, $matches)) {
                 $code = strtoupper($matches[1]);
             }
         } else {
-            if (preg_match('/(NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $code, $matches)) {
+            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $code, $matches)) {
                 $code = strtoupper($matches[1]);
             } else {
                 $code = strtoupper(trim($code));
@@ -552,7 +552,7 @@ class WebhookController extends Controller
         }
 
         $pesanWa = "✅ *PEMBAYARAN BERHASIL & PESANAN LUNAS*\n\n"
-                 . "Halo *{$buyerUser->name}*, pesanan Anda telah berhasil diproses oleh sistem *NandarStore*.\n\n"
+                 . "Halo *{$buyerUser->name}*, pesanan Anda telah berhasil diproses oleh sistem *PremiumKita*.\n\n"
                  . "📋 *DETAIL PESANAN:*\n"
                  . "• No. Invoice: *{$order->invoice_number}*\n"
                  . "• Layanan: *{$productName}*\n"
@@ -569,7 +569,7 @@ class WebhookController extends Controller
                  . "{$invoiceUrl}\n\n"
                  . "💬 *Bantuan CS Admin:* https://wa.me/{$adminWaClean}\n"
                  . "👥 *Grup Komunitas:* {$waGroup}\n\n"
-                 . "_Pesan otomatis oleh Sistem Bot WhatsApp NandarStore._";
+                 . "_Pesan otomatis oleh Sistem Bot WhatsApp PremiumKita._";
 
         $sent = self::sendWaMessage($targetPhone, $pesanWa);
 

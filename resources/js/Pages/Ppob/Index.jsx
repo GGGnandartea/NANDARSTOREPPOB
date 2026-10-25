@@ -647,7 +647,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
-      <Head title="Dashboard Layanan PPOB & Pulsa - NandarStore" />
+      <Head title="Dashboard Layanan PPOB & Pulsa - PremiumKita" />
 
       {/* TOP HEADER */}
       <PpobHeader
@@ -785,7 +785,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       {/* FOOTER */}
       <footer className="mt-16 border-t border-gray-200/80 dark:border-white/5 py-8 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>&copy; {new Date().getFullYear()} {store?.name || 'NandarStore'}. Hak Cipta Dilindungi.</p>
+          <p>&copy; {new Date().getFullYear()} {store?.name || 'PremiumKita'}. Hak Cipta Dilindungi.</p>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-emerald-500 transition">Beranda Toko</Link>
             <span>•</span>

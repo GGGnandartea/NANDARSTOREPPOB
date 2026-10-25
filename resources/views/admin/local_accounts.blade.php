@@ -25,7 +25,7 @@
                 <img src="{{ $product->image }}" class="w-14 h-14 rounded-2xl object-cover border border-gray-200 dark:border-white/10 shadow-sm shrink-0">
             @else
                 <div class="w-14 h-14 rounded-2xl gradient-orange text-white flex items-center justify-center font-black text-base shadow-sm shrink-0">
-                    NS
+                    PK
                 </div>
             @endif
             <div>

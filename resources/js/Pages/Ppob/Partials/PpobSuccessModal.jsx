@@ -111,7 +111,7 @@ export default function PpobSuccessModal({
       : invoiceUrl;
   const paidNominal = fmt.rp(successOrder.total_amount || successOrder.total_nominal || successOrder.price || 0);
   const guestRefundWaText = encodeURIComponent(
-    `Halo Admin NandarStore, saya Pembeli Publik (Tanpa Akun) yang melakukan pembayaran via QRIS namun status transaksi PPOB saya GAGAL.\n\n` +
+    `Halo Admin PremiumKita, saya Pembeli Publik (Tanpa Akun) yang melakukan pembayaran via QRIS namun status transaksi PPOB saya GAGAL.\n\n` +
       `Berikut rincian pesanan saya:\n` +
       `• No. Invoice: #${invoiceNumber}\n` +
       `• Layanan: ${successOrder.product_name || 'Produk PPOB'}\n` +

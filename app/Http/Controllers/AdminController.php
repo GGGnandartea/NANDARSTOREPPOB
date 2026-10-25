@@ -90,7 +90,7 @@ class AdminController extends Controller
         $botWhatsapp = Setting::where('key', 'bot_whatsapp')->value('value') ?? '08990738216';
         $whatsappGroupLink = Setting::where('key', 'whatsapp_group_link')->value('value') ?? 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H';
 
-        $storeName = Setting::where('key', 'store_name')->value('value') ?? 'NandarStore';
+        $storeName = Setting::where('key', 'store_name')->value('value') ?? 'PremiumKita';
         $storeTagline = Setting::where('key', 'store_tagline')->value('value') ?? 'Platform Digital & Akun Premium Otomatis';
         $storeLogo = Setting::where('key', 'store_logo')->value('value') ?? null;
         $storeFavicon = Setting::where('key', 'store_favicon')->value('value') ?? null;
@@ -528,7 +528,7 @@ class AdminController extends Controller
     }
 
     public function branding() {
-        $storeName = Setting::where('key', 'store_name')->value('value') ?? 'NandarStore';
+        $storeName = Setting::where('key', 'store_name')->value('value') ?? 'PremiumKita';
         $storeTagline = Setting::where('key', 'store_tagline')->value('value') ?? 'Platform Digital & Akun Premium Otomatis';
         $storeLogo = Setting::where('key', 'store_logo')->value('value') ?? null;
         $storeFavicon = Setting::where('key', 'store_favicon')->value('value') ?? null;
@@ -1033,7 +1033,7 @@ class AdminController extends Controller
             try {
                 $nominalFmt = number_format($amount, 0, ',', '.');
                 $saldoFmt = number_format($finalBalance, 0, ',', '.');
-                $titleWa = $action === 'add' ? '✅ *PENAMBAHAN SALDO AKUN NANDARSTORE*' : 'ℹ️ *PENYESUAIAN SALDO AKUN NANDARSTORE*';
+                $titleWa = $action === 'add' ? '✅ *PENAMBAHAN SALDO AKUN PREMIUMKITA*' : 'ℹ️ *PENYESUAIAN SALDO AKUN PREMIUMKITA*';
                 $sign = $action === 'add' ? '+' : '-';
                 $waMsg = "{$titleWa}\n\n"
                     . "Halo *{$targetUser->name}*,\n"
@@ -1069,7 +1069,7 @@ class AdminController extends Controller
             try {
                 $waMsg = "👑 *SELAMAT! AKUN ANDA TELAH UPGRADE KE RESELLER VIP*\n\n"
                     . "Halo *{$user->name}*,\n"
-                    . "Akun NandarStore Anda telah ditingkatkan menjadi *Mitra Reseller VIP* oleh Admin.\n\n"
+                    . "Akun PremiumKita Anda telah ditingkatkan menjadi *Mitra Reseller VIP* oleh Admin.\n\n"
                     . "Keuntungan Anda sekarang:\n"
                     . "• Harga modal khusus Reseller di semua produk aplikasi & PPOB\n"
                     . "• Prioritas layanan transaksi otomatis 24 jam\n\n"
@@ -1330,12 +1330,12 @@ class AdminController extends Controller
             \App\Http\Controllers\WebhookController::sendWaMessage(
                 $targetUser->whatsapp,
                 "🎉 *VERIFIKASI WHATSAPP BERHASIL*\n\n"
-                . "Halo *{$targetUser->name}*, nomor WhatsApp Anda (*{$targetUser->whatsapp}*) telah berhasil diverifikasi oleh Admin di *NandarStore*.\n\n"
+                . "Halo *{$targetUser->name}*, nomor WhatsApp Anda (*{$targetUser->whatsapp}*) telah berhasil diverifikasi oleh Admin di *PremiumKita*.\n\n"
                 . "Sekarang setiap transaksi Anda akan menerima:\n"
                 . "✓ Pengiriman akun & lisensi otomatis via WhatsApp\n"
                 . "✓ Link invoice resmi format cetak PDF\n"
                 . "✓ Notifikasi status pembelian langsung\n\n"
-                . "Selamat berbelanja di NandarStore! 🛒✨"
+                . "Selamat berbelanja di PremiumKita! 🛒✨"
             );
         }
 
@@ -1942,7 +1942,7 @@ class AdminController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $fileName = 'Laporan_Penjualan_NANDARSTORE_' . $filePeriodName . '_' . date('Ymd_His') . '.csv';
+        $fileName = 'Laporan_Penjualan_PREMIUMKITA_' . $filePeriodName . '_' . date('Ymd_His') . '.csv';
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -1959,7 +1959,7 @@ class AdminController extends Controller
             fputs($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
             // Judul & Metadata Laporan
-            fputcsv($handle, ['LAPORAN PENJUALAN & TRANSAKSI NANDARSTORE 2.0'], ';');
+            fputcsv($handle, ['LAPORAN PENJUALAN & TRANSAKSI PREMIUMKITA 2.0'], ';');
             fputcsv($handle, ['Periode', $startDate->format('d/m/Y') . ' s/d ' . $endDate->format('d/m/Y')], ';');
             fputcsv($handle, ['Tanggal Unduh', now()->translatedFormat('d F Y, H:i:s') . ' WIB'], ';');
             fputcsv($handle, ['Total Pesanan', count($orders)], ';');

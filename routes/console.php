@@ -79,6 +79,12 @@ Artisan::command('ppob:check-low-balance {--force : Paksa kirim pesan WhatsApp m
  * yang belum dibayar setelah melewati batas waktu 30 menit.
  */
 Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa dalam menit}', function () {
+    try {
+        \App\Models\Setting::where('key', 'store_name')
+            ->where('value', 'like', '%nandar%')
+            ->update(['value' => 'PremiumKita']);
+    } catch (\Throwable $e) {}
+
     $minutes = max(5, (int) $this->option('minutes'));
     $result = OrderFulfillmentService::expireUnpaidQrisRecords($minutes);
 

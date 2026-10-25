@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Admin Panel') - NANDAR STORE 2.0</title>
+    <title>@yield('title', 'Admin Panel') - PREMIUMKITA 2.0</title>
     @php
         $siteFavicon = \App\Models\Setting::where('key', 'store_favicon')->value('value') ?: (\App\Models\Setting::where('key', 'store_logo')->value('value') ?: null);
     @endphp
@@ -72,7 +72,7 @@
             
             <!-- Sidebar Header & Logo -->
             @php
-                $adminStoreName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+                $adminStoreName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
                 $adminStoreLogo = \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null;
                 $currentSection = request('section');
             @endphp
@@ -84,7 +84,7 @@
                         </div>
                     @else
                         <div class="w-9 h-9 min-w-[2.25rem] rounded-xl gradient-orange text-white flex items-center justify-center font-black shadow-lg shadow-orange-500/25 group-hover:scale-105 transition-transform">
-                            NS
+                            PK
                         </div>
                     @endif
                     <div :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="flex-col min-w-0">

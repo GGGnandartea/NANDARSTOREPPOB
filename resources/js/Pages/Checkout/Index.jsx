@@ -481,7 +481,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   return (
     <div className="checkout-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center p-4 sm:p-6 font-jakarta">
       <Head>
-        <title>{`Checkout - ${store?.name || 'NandarStore'}`}</title>
+        <title>{`Checkout - ${store?.name || 'PremiumKita'}`}</title>
         <link
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"

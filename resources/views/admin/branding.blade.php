@@ -75,7 +75,7 @@
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
                             <img id="store_logo_preview" src="{{ !empty($storeLogo) ? $storeLogo : '' }}" alt="Logo Toko" class="w-full h-full object-contain p-2 {{ !empty($storeLogo) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('store_logo_fallback').classList.remove('hidden');">
                             <div id="store_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm {{ !empty($storeLogo) ? 'hidden' : '' }}">
-                                NS
+                                PK
                             </div>
                         </div>
                     </div>
@@ -109,7 +109,7 @@
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
                             <img id="store_favicon_preview" src="{{ $initialFavicon }}" alt="Favicon" class="w-14 h-14 object-contain p-1 {{ !empty($initialFavicon) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('store_favicon_fallback').classList.remove('hidden');">
                             <div id="store_favicon_fallback" class="w-14 h-14 rounded-2xl gradient-orange text-white flex items-center justify-center font-black text-xl shadow-sm {{ !empty($initialFavicon) ? 'hidden' : '' }}">
-                                NS
+                                PK
                             </div>
                         </div>
                     </div>
@@ -143,7 +143,7 @@
                         <div class="relative w-28 h-28 mx-auto rounded-2xl bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden shadow-inner group">
                             <img id="loading_logo_preview" src="{{ $initialLoading }}" alt="Logo Loading" class="w-full h-full object-contain p-2 {{ !empty($initialLoading) ? '' : 'hidden' }}" onerror="this.classList.add('hidden'); document.getElementById('loading_logo_fallback').classList.remove('hidden');">
                             <div id="loading_logo_fallback" class="w-full h-full gradient-orange text-white flex items-center justify-center font-black text-3xl shadow-sm {{ !empty($initialLoading) ? 'hidden' : '' }}">
-                                NS
+                                PK
                             </div>
                         </div>
                     </div>
@@ -170,7 +170,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-gray-100 dark:border-white/5">
                 <div>
                     <label class="block text-xs font-black text-gray-600 dark:text-gray-300 uppercase tracking-wider mb-2">Nama Toko / Brand Utama</label>
-                    <input type="text" name="store_name" value="{{ $storeName ?? 'NandarStore' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: NandarStore">
+                    <input type="text" name="store_name" value="{{ $storeName ?? 'PremiumKita' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: PremiumKita">
                     <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
                         *Nama ini akan muncul di judul navbar, invoice, footer, dan seluruh halaman toko.
                     </p>

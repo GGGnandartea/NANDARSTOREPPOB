@@ -18,5 +18,5 @@ return [
     'merchant_id' => env('KIOSBANK_MERCHANT_ID', ''),
     'account_id' => env('KIOSBANK_ACCOUNT_ID', ''),
     'counter_id' => env('KIOSBANK_COUNTER_ID', '1'),
-    'merchant_name' => env('KIOSBANK_MERCHANT_NAME', 'NANDARSTORE'),
+    'merchant_name' => env('KIOSBANK_MERCHANT_NAME', 'PREMIUMKITA'),
 ];

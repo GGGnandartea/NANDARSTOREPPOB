@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice {{ $order->invoice_number }} - NandarStore</title>
+    <title>Invoice {{ $order->invoice_number }} - PremiumKita</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -503,7 +503,7 @@
 
 @php
     $storeLogo = \App\Models\Setting::where('key', 'store_logo')->value('value');
-    $storeName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+    $storeName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
     $storeTagline = \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Akun Premium & Produk Digital Otomatis';
     $adminWa = \App\Models\Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
     $adminWaClean = preg_replace('/[^0-9]/', '', $adminWa);
@@ -834,7 +834,7 @@
                     Stok Produk Habis Terbeli Bersamaan
                 </h3>
                 <p style="font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 20px; max-width: 480px; margin-left: auto; margin-right: auto; line-height: 1.6;">
-                    Mohon maaf, saat Anda menyelesaikan pembayaran, sisa stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain. Dana Anda sebesar <strong>Rp {{ number_format($order->total_amount ?: ($order->price ?: 0), 0, ',', '.') }}</strong> telah otomatis kami kembalikan <strong>100% ke Saldo Akun NandarStore</strong> Anda.
+                    Mohon maaf, saat Anda menyelesaikan pembayaran, sisa stok produk ini baru saja habis terbeli bersamaan oleh pembeli lain. Dana Anda sebesar <strong>Rp {{ number_format($order->total_amount ?: ($order->price ?: 0), 0, ',', '.') }}</strong> telah otomatis kami kembalikan <strong>100% ke Saldo Akun PremiumKita</strong> Anda.
                 </p>
                 <a href="/profile" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 14px; background: #ea580c; color: #ffffff; font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
                     <span>Cek Saldo di Menu Profil &amp; Beli Produk Lain</span>
@@ -892,8 +892,8 @@
 
         <!-- FOOTER -->
         <div class="footer">
-            Invoice ini diterbitkan secara otomatis oleh sistem NandarStore dan sah tanpa tanda tangan basah.<br>
-            © {{ date('Y') }} NandarStore. Hak Cipta Dilindungi.
+            Invoice ini diterbitkan secara otomatis oleh sistem PremiumKita dan sah tanpa tanda tangan basah.<br>
+            © {{ date('Y') }} PremiumKita. Hak Cipta Dilindungi.
         </div>
     </div>
 

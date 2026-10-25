@@ -416,7 +416,7 @@ class FrontController extends Controller
             if (empty($manualDesc)) { $product->description = "Layanan Premium: " . $product->name . "\n\nKeunggulan Layanan:\n- Proses Pengisian Instan (Otomatis).\n- 100% Legal, Aman, dan Bergaransi Resmi.\n- Layanan Aktif 24 Jam Non-Stop tanpa hari libur.\n\nCatatan Penting:\nPastikan Anda memasukkan data tujuan dengan benar."; }
         } else {
             $manualDesc = trim(strip_tags($product->description));
-            if (empty($manualDesc)) { $product->description = "Layanan digital eksklusif dari NandarStore.\nProses dilakukan manual oleh Admin setelah pembayaran berhasil dikonfirmasi. Harap tunggu notifikasi via WhatsApp."; }
+            if (empty($manualDesc)) { $product->description = "Layanan digital eksklusif dari PremiumKita.\nProses dilakukan manual oleh Admin setelah pembayaran berhasil dikonfirmasi. Harap tunggu notifikasi via WhatsApp."; }
         }
         return Inertia::render('ProductDetail', ['product' => $product, 'auth' => ['user' => Auth::user()]]);
     }
@@ -1390,7 +1390,7 @@ class FrontController extends Controller
         }
 
         // Generate kode verifikasi unik baru untuk nomor baru
-        $code = 'NS-' . rand(10000, 99999);
+        $code = 'PK-' . rand(10000, 99999);
 
         // Reset status verifikasi karena nomor telah diubah
         $user->update([
@@ -1406,7 +1406,7 @@ class FrontController extends Controller
             $cleanBotNumber = '62' . substr($cleanBotNumber, 1);
         }
 
-        $waMsg = "Halo Admin NandarStore, saya ingin verifikasi nomor WhatsApp akun saya di NandarStore.\n\n"
+        $waMsg = "Halo Admin PremiumKita, saya ingin verifikasi nomor WhatsApp akun saya di PremiumKita.\n\n"
                . "*Kode Verifikasi:* {$code}\n"
                . "*Nama Akun:* {$user->name}\n"
                . "*Email:* {$user->email}\n"
@@ -1446,8 +1446,8 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Nomor WhatsApp belum diisi. Silakan masukkan nomor WhatsApp Anda.']);
         }
 
-        // Generate kode unik 5 digit angka: misal NS-84920
-        $code = 'NS-' . rand(10000, 99999);
+        // Generate kode unik 5 digit angka: misal PK-84920
+        $code = 'PK-' . rand(10000, 99999);
         $user->update([
             'wa_verification_code' => $code,
         ]);
@@ -1458,7 +1458,7 @@ class FrontController extends Controller
             $cleanBotNumber = '62' . substr($cleanBotNumber, 1);
         }
 
-        $waMsg = "Halo Admin NandarStore, saya ingin verifikasi nomor WhatsApp akun saya di NandarStore.\n\n"
+        $waMsg = "Halo Admin PremiumKita, saya ingin verifikasi nomor WhatsApp akun saya di PremiumKita.\n\n"
                . "*Kode Verifikasi:* {$code}\n"
                . "*Nama Akun:* {$user->name}\n"
                . "*Email:* {$user->email}\n"
@@ -1549,7 +1549,7 @@ class FrontController extends Controller
 
     // Pusat Bantuan & FAQ
     public function faq() {
-        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
         $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
@@ -1569,7 +1569,7 @@ class FrontController extends Controller
 
     // Syarat & Ketentuan Layanan
     public function terms() {
-        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'NandarStore';
+        $storeName     = Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
         $storeLogo     = Setting::where('key', 'store_logo')->value('value') ?: null;
         $storeTagline  = Setting::where('key', 'store_tagline')->value('value') ?: 'Pusat Akun Premium & PPOB Terpercaya';
         $adminWhatsapp = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';

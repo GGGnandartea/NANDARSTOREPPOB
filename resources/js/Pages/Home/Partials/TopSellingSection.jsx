@@ -120,7 +120,7 @@ export default function TopSellingSection({
                                                 )}
                                             </div>
                                         ) : (
-                                            <span className="text-[11px] font-medium text-gray-400">NS</span>
+                                            <span className="text-[11px] font-medium text-gray-400">PK</span>
                                         )}
                                     </div>
 

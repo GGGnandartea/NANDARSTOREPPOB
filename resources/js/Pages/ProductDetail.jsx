@@ -34,7 +34,7 @@ export default function ProductDetail({ product, auth }) {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300">
-            <Head title={`${product.name} - NandarStore`} />
+            <Head title={`${product.name} - PremiumKita`} />
             <style dangerouslySetInnerHTML={{__html: `@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'); .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}} />
 
             {/* Navbar */}
@@ -58,7 +58,7 @@ export default function ProductDetail({ product, auth }) {
                             {product.image ? (
                                 <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={product.name} />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800 text-gray-400 font-black text-4xl">NS</div>
+                                <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800 text-gray-400 font-black text-4xl">PK</div>
                             )}
                             <div className="absolute top-3 left-3">
                                 <span className={`text-[10px] font-extrabold px-3 py-1.5 rounded-lg shadow-sm border backdrop-blur-md ${isOutOfStock ? 'bg-red-500/90 text-white border-red-400' : 'bg-gray-900/80 dark:bg-white/90 text-white dark:text-black border-transparent'}`}>

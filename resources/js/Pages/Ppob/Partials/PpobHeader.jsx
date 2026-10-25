@@ -24,12 +24,12 @@ export default function PpobHeader({ store, user, userBalance, isDark, toggleDar
               <img src={store.logo} alt={store.name} className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain bg-emerald-500/10 p-0.5 shrink-0" />
             ) : (
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-teal-600 text-white font-black flex items-center justify-center text-[10px] sm:text-xs shadow-sm shrink-0">
-                NS
+                PK
               </div>
             )}
             <div className="min-w-0 flex items-center gap-1.5">
               <span className="font-black text-xs sm:text-sm tracking-tight text-gray-900 dark:text-white truncate">
-                {store?.name || 'NandarStore'}
+                {store?.name || 'PremiumKita'}
               </span>
               <span className="hidden sm:inline-flex text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
                 PPOB RESMI
