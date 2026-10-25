@@ -59,6 +59,7 @@ class PpobController extends Controller
                 ] : null,
             ],
             'initialPulsa' => $initialPulsa,
+            'cutoff'       => $this->kiosbank->getCutoffStatus(),
         ]);
     }
 
@@ -101,6 +102,14 @@ class PpobController extends Controller
     {
         if (!$this->kiosbank->isEnabled()) {
             return response()->json(['status' => 'error', 'message' => 'Layanan PPOB sedang dinonaktifkan.'], 503);
+        }
+        $cutoff = $this->kiosbank->getCutoffStatus();
+        if (!empty($cutoff['is_cutoff'])) {
+            return response()->json([
+                'status'    => 'error',
+                'is_cutoff' => true,
+                'message'   => $cutoff['message'],
+            ], 503);
         }
         $request->validate([
             'product_id'  => 'required|string',
@@ -154,6 +163,14 @@ class PpobController extends Controller
     {
         if (!$this->kiosbank->isEnabled() || !$this->kiosbank->isConfigured()) {
             return response()->json(['status' => 'error', 'message' => 'Layanan PPOB belum tersedia. Hubungi admin.'], 503);
+        }
+        $cutoff = $this->kiosbank->getCutoffStatus();
+        if (!empty($cutoff['is_cutoff'])) {
+            return response()->json([
+                'status'    => 'error',
+                'is_cutoff' => true,
+                'message'   => $cutoff['message'],
+            ], 503);
         }
         $request->validate([
             'product_code'   => 'required|string',
@@ -430,10 +447,12 @@ class PpobController extends Controller
             return response()->json(['status' => 'NOT_FOUND'], 404);
         }
 
-        // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
-        if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
-            Order::whereKey($order->id)->where('payment_status', 'pending')
-                ->whereRaw("LOWER(order_status) IN ('pending', 'processing')")
+        // Otomatis tandai pesanan QRIS pending lebih dari 30 menit sebagai expired
+        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 30) {
+            Order::whereKey($order->id)
+                ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
+                ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
+                ->whereNull('fulfillment_started_at')
                 ->update(['payment_status' => 'expired', 'order_status' => 'expired']);
             $order->refresh();
         }

@@ -27,6 +27,8 @@ use Illuminate\Database\Schema\Blueprint;
 class AdminController extends Controller
 {
     public function dashboard() {
+        \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
+
         $totalRevenue = Order::whereIn('payment_status', ['paid', 'success', 'settlement'])->sum('total_amount');
         $newOrders = Order::where('payment_status', 'pending')->orWhereDate('created_at', today())->count();
         $totalResellers = User::where('role', 'reseller')->count();
@@ -897,20 +899,224 @@ class AdminController extends Controller
     public function updateLocalAccount(Request $request, $id) { LocalAccount::findOrFail($id)->update(['email' => $request->email, 'password' => $request->password]); return back()->with('success', 'Akun diedit!'); }
     public function deleteLocalAccount($id) { $acc = LocalAccount::findOrFail($id); $p = Product::find($acc->product_id); $acc->delete(); $p->update(['stock' => $p->accounts()->where('is_sold', false)->count()]); return back()->with('success', 'Akun dihapus!'); }
     public function clearLocalAccounts($id) { $product = Product::findOrFail($id); LocalAccount::where('product_id', $id)->delete(); $product->update(['stock' => 0]); return back()->with('success', 'Semua stok berhasil dikosongkan secara instan!'); }
+    /**
+     * Halaman Kelola Semua Member & Pengguna (Member Biasa + Reseller VIP)
+     */
+    public function members(Request $request) {
+        $roleFilter = $request->get('role', 'all');
+        $query = User::whereIn('role', ['user', 'reseller'])->orderBy('id', 'desc');
+
+        if ($roleFilter === 'user') {
+            $query->where('role', 'user');
+        } elseif ($roleFilter === 'reseller') {
+            $query->where('role', 'reseller');
+        }
+
+        if ($request->filled('search')) {
+            $s = trim($request->search);
+            $query->where(function ($q) use ($s) {
+                $q->where('name', 'like', '%' . $s . '%')
+                  ->orWhere('email', 'like', '%' . $s . '%')
+                  ->orWhere('whatsapp', 'like', '%' . $s . '%');
+            });
+        }
+
+        $members = $query->with([
+            'transactionLogs' => fn($q) => $q->orderBy('id', 'desc')->limit(50),
+            'orders' => fn($q) => $q->orderBy('id', 'desc')->limit(50),
+        ])->get();
+
+        $totalMembers = User::whereIn('role', ['user', 'reseller'])->count();
+        $regularMembersCount = User::where('role', 'user')->count();
+        $resellerMembersCount = User::where('role', 'reseller')->count();
+        $totalUserBalance = (int) User::whereIn('role', ['user', 'reseller'])->sum('balance');
+
+        return view('admin.members', compact(
+            'members',
+            'roleFilter',
+            'totalMembers',
+            'regularMembersCount',
+            'resellerMembersCount',
+            'totalUserBalance'
+        ));
+    }
+
+    public function storeMember(Request $request) {
+        $request->validate([
+            'name'            => 'required|string|max:120',
+            'email'           => 'required|email|max:150|unique:users,email',
+            'whatsapp'        => 'nullable|string|max:25',
+            'password'        => 'required|string|min:6',
+            'role'            => 'required|in:user,reseller',
+            'initial_balance' => 'nullable|integer|min:0|max:100000000',
+        ]);
+
+        $initialBalance = max(0, (int) $request->input('initial_balance', 0));
+        $cleanWa = $request->filled('whatsapp') ? preg_replace('/[^0-9]/', '', $request->whatsapp) : null;
+
+        DB::transaction(function () use ($request, $initialBalance, $cleanWa) {
+            $member = User::create([
+                'name'                 => trim($request->name),
+                'email'                => strtolower(trim($request->email)),
+                'whatsapp'             => $cleanWa ?: null,
+                'is_whatsapp_verified' => !empty($cleanWa),
+                'password'             => Hash::make($request->password),
+                'role'                 => $request->role,
+                'balance'              => $initialBalance,
+                'is_active'            => true,
+            ]);
+
+            if ($initialBalance > 0) {
+                TransactionLog::create([
+                    'user_id'     => $member->id,
+                    'type'        => 'deposit',
+                    'amount'      => $initialBalance,
+                    'description' => 'Saldo Awal Pendaftaran oleh Admin',
+                ]);
+            }
+        });
+
+        $roleLabel = $request->role === 'reseller' ? 'Reseller VIP' : 'Member Biasa';
+        return redirect()->route('admin.members')->with('success', "Akun {$roleLabel} ({$request->name}) berhasil ditambahkan!");
+    }
+
+    public function manageMemberBalance(Request $request, $id) {
+        $request->validate([
+            'action'      => 'required|in:add,deduct',
+            'amount'      => 'required|integer|min:1|max:100000000',
+            'description' => 'nullable|string|max:200',
+        ]);
+
+        $amount = (int) $request->amount;
+        $action = $request->action;
+        $customNote = trim((string) $request->input('description', ''));
+
+        $targetUser = User::findOrFail($id);
+        if ($targetUser->role === 'admin') {
+            return back()->with('error', 'Saldo akun Administrator tidak dapat diubah melalui menu ini.');
+        }
+
+        if ($action === 'deduct' && (int) $targetUser->balance < $amount) {
+            return back()->with('error', 'Saldo pengguna (' . $targetUser->name . ') saat ini Rp ' . number_format($targetUser->balance, 0, ',', '.') . ', tidak mencukupi untuk dipotong Rp ' . number_format($amount, 0, ',', '.') . '.');
+        }
+
+        $finalBalance = 0;
+        $logDescription = '';
+
+        DB::transaction(function () use ($id, $action, $amount, $customNote, &$finalBalance, &$logDescription) {
+            $locked = User::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ($action === 'add') {
+                $locked->balance = (int) $locked->balance + $amount;
+                $logDescription = $customNote !== '' ? $customNote : 'Top Up Saldo Manual oleh Admin';
+                TransactionLog::create([
+                    'user_id'     => $locked->id,
+                    'type'        => 'deposit',
+                    'amount'      => $amount,
+                    'description' => $logDescription,
+                ]);
+            } else {
+                $locked->balance = max(0, (int) $locked->balance - $amount);
+                $logDescription = $customNote !== '' ? $customNote : 'Pemotongan Saldo Manual oleh Admin';
+                TransactionLog::create([
+                    'user_id'     => $locked->id,
+                    'type'        => 'deduction',
+                    'amount'      => $amount,
+                    'description' => $logDescription,
+                ]);
+            }
+            $locked->save();
+            $finalBalance = (int) $locked->balance;
+        });
+
+        // Kirim notifikasi WhatsApp otomatis jika user memiliki nomor WhatsApp
+        if (!empty($targetUser->whatsapp)) {
+            try {
+                $nominalFmt = number_format($amount, 0, ',', '.');
+                $saldoFmt = number_format($finalBalance, 0, ',', '.');
+                $titleWa = $action === 'add' ? '✅ *PENAMBAHAN SALDO AKUN NANDARSTORE*' : 'ℹ️ *PENYESUAIAN SALDO AKUN NANDARSTORE*';
+                $sign = $action === 'add' ? '+' : '-';
+                $waMsg = "{$titleWa}\n\n"
+                    . "Halo *{$targetUser->name}*,\n"
+                    . "Saldo akun Anda telah diperbarui oleh Admin:\n\n"
+                    . "• Mutasi: *{$sign} Rp {$nominalFmt}*\n"
+                    . "• Keterangan: *{$logDescription}*\n"
+                    . "• Saldo Akhir: *Rp {$saldoFmt}*\n\n"
+                    . "👉 Cek riwayat saldo Anda di: " . url('/profile');
+                \App\Http\Controllers\WebhookController::sendWaMessage($targetUser->whatsapp, $waMsg);
+            } catch (\Throwable $e) {}
+        }
+
+        $actLabel = $action === 'add' ? 'ditambahkan' : 'dipotong';
+        return back()->with('success', "Saldo {$targetUser->name} berhasil {$actLabel} sebesar Rp " . number_format($amount, 0, ',', '.') . " (Saldo akhir: Rp " . number_format($finalBalance, 0, ',', '.') . ")!");
+    }
+
+    public function toggleMemberRole(Request $request, $id) {
+        $user = User::findOrFail($id);
+        if ($user->role === 'admin') {
+            return back()->with('error', 'Role Administrator tidak dapat diubah.');
+        }
+
+        $newRole = $request->filled('role') && in_array($request->role, ['user', 'reseller'], true)
+            ? $request->role
+            : ($user->role === 'reseller' ? 'user' : 'reseller');
+
+        $user->update([
+            'role'      => $newRole,
+            'is_active' => true,
+        ]);
+
+        if ($newRole === 'reseller' && !empty($user->whatsapp)) {
+            try {
+                $waMsg = "👑 *SELAMAT! AKUN ANDA TELAH UPGRADE KE RESELLER VIP*\n\n"
+                    . "Halo *{$user->name}*,\n"
+                    . "Akun NandarStore Anda telah ditingkatkan menjadi *Mitra Reseller VIP* oleh Admin.\n\n"
+                    . "Keuntungan Anda sekarang:\n"
+                    . "• Harga modal khusus Reseller di semua produk aplikasi & PPOB\n"
+                    . "• Prioritas layanan transaksi otomatis 24 jam\n\n"
+                    . "👉 Yuk transaksi sekarang di: " . url('/');
+                \App\Http\Controllers\WebhookController::sendWaMessage($user->whatsapp, $waMsg);
+            } catch (\Throwable $e) {}
+        }
+
+        $roleBadge = $newRole === 'reseller' ? 'Reseller VIP 👑' : 'Member Biasa';
+        return back()->with('success', "Level akun {$user->name} berhasil diubah menjadi {$roleBadge}!");
+    }
+
+    public function toggleMemberStatus($id) {
+        $user = User::findOrFail($id);
+        if ($user->role === 'admin') {
+            return back()->with('error', 'Status Administrator tidak dapat dinonaktifkan.');
+        }
+        $user->update(['is_active' => !$user->is_active]);
+        $stText = $user->is_active ? 'diaktifkan' : 'dinonaktifkan';
+        return back()->with('success', "Akun {$user->name} berhasil {$stText}!");
+    }
+
+    public function deleteMember($id) {
+        $user = User::findOrFail($id);
+        if ($user->role === 'admin') {
+            return back()->with('error', 'Akun Administrator tidak dapat dihapus.');
+        }
+        $name = $user->name;
+        $user->delete();
+        return back()->with('success', "Akun pengguna {$name} berhasil dihapus!");
+    }
+
     public function resellers(Request $request) {
         $query = User::where('role', 'reseller')->orderBy('id', 'desc');
-        if ($request->search) { $query->where('name', 'like', '%' . $request->search . '%')->orWhere('email', 'like', '%' . $request->search . '%'); }
+        if ($request->filled('search')) {
+            $s = trim($request->search);
+            $query->where(function ($q) use ($s) {
+                $q->where('name', 'like', '%' . $s . '%')
+                  ->orWhere('email', 'like', '%' . $s . '%')
+                  ->orWhere('whatsapp', 'like', '%' . $s . '%');
+            });
+        }
         $resellers = $query->with(['transactionLogs', 'orders'])->get(); return view('admin.resellers', compact('resellers'));
     }
     public function storeReseller(Request $request) { User::create(['name' => $request->name, 'email' => $request->email, 'password' => Hash::make($request->password), 'role' => 'reseller']); return back()->with('success', 'Reseller ditambahkan!'); }
     public function manageResellerBalance(Request $request, $id) {
-        $user = User::findOrFail($id); $amount = $request->amount;
-        DB::transaction(function() use ($user, $request, $amount) {
-            if ($request->action == 'add') { $user->balance += $amount; TransactionLog::create(['user_id' => $user->id, 'type' => 'deposit', 'amount' => $amount, 'description' => 'Topup Manual by Admin']); } 
-            else { $user->balance -= $amount; TransactionLog::create(['user_id' => $user->id, 'type' => 'deduction', 'amount' => $amount, 'description' => 'Deduction Manual by Admin']); }
-            $user->save();
-        });
-        return back()->with('success', 'Saldo diperbarui!');
+        return $this->manageMemberBalance($request, $id);
     }
     public function toggleResellerStatus($id) { $user = User::findOrFail($id); $user->update(['is_active' => !$user->is_active]); return back()->with('success', 'Status diubah!'); }
     public function deleteReseller($id) { User::findOrFail($id)->delete(); return back()->with('success', 'Reseller dihapus!'); }
@@ -984,6 +1190,8 @@ class AdminController extends Controller
         return back()->with('success', "Status pendaftaran Reseller VIP berhasil diubah menjadi: {$statusText}!");
     }
     public function orders(Request $request) {
+        \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
+
         $query = Order::with(['user', 'product'])->orderBy('id', 'desc');
 
         if ($request->filled('search')) {
@@ -1003,6 +1211,8 @@ class AdminController extends Controller
             $st = strtolower($request->status);
             if ($st === 'failed') {
                 $query->whereIn('order_status', ['failed', 'refunded', 'canceled', 'cancelled']);
+            } elseif ($st === 'expired') {
+                $query->where('order_status', 'expired');
             } else {
                 $query->where('order_status', $request->status);
             }

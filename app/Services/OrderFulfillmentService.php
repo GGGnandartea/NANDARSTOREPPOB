@@ -1115,4 +1115,72 @@ class OrderFulfillmentService
 
         return WebhookController::sendWaMessage($targetWa, $msg);
     }
+
+    /**
+     * Batalkan / Expire otomatis semua pesanan QRIS, Top Up QRIS, dan Pendaftaran Reseller QRIS
+     * yang belum dibayar (unpaid / pending) setelah melewati batas waktu tertentu (default: 30 menit).
+     */
+    public static function expireUnpaidQrisRecords(int $minutes = 30): array
+    {
+        $minutes = max(5, $minutes);
+        $cutoff = now()->subMinutes($minutes);
+
+        $expiredOrdersCount = 0;
+        $expiredTopupsCount = 0;
+        $expiredResellersCount = 0;
+
+        try {
+            $staleOrders = Order::whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
+                ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
+                ->whereNull('fulfillment_started_at')
+                ->where(function ($q) {
+                    $q->whereNull('api_trx_id')->orWhere('api_trx_id', '');
+                })
+                ->where('created_at', '<=', $cutoff)
+                ->get();
+
+            foreach ($staleOrders as $staleOrder) {
+                $existingNotes = trim((string) $staleOrder->notes);
+                $expireReason = "Tagihan QRIS otomatis dibatalkan karena melewati batas waktu pembayaran {$minutes} menit.";
+                $newNotes = $existingNotes !== ''
+                    ? (str_contains($existingNotes, 'otomatis dibatalkan') ? $existingNotes : $existingNotes . ' | ' . $expireReason)
+                    : $expireReason;
+
+                $updated = Order::whereKey($staleOrder->id)
+                    ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
+                    ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
+                    ->whereNull('fulfillment_started_at')
+                    ->update([
+                        'payment_status' => 'expired',
+                        'order_status'   => 'expired',
+                        'notes'          => $newNotes,
+                    ]);
+
+                if ($updated) {
+                    $expiredOrdersCount++;
+                }
+            }
+
+            if (class_exists(\App\Models\TopupRequest::class)) {
+                $expiredTopupsCount = \App\Models\TopupRequest::whereRaw("LOWER(status) IN ('pending', 'unpaid')")
+                    ->where('created_at', '<=', $cutoff)
+                    ->update(['status' => 'expired']);
+            }
+
+            if (class_exists(\App\Models\ResellerRegistration::class)) {
+                $expiredResellersCount = \App\Models\ResellerRegistration::whereRaw("LOWER(status) IN ('pending', 'unpaid')")
+                    ->where('created_at', '<=', $cutoff)
+                    ->update(['status' => 'expired']);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[AUTO-EXPIRE-QRIS] Gagal menjalankan auto-expire: ' . $e->getMessage());
+        }
+
+        return [
+            'orders'    => $expiredOrdersCount,
+            'topups'    => $expiredTopupsCount,
+            'resellers' => $expiredResellersCount,
+            'total'     => $expiredOrdersCount + $expiredTopupsCount + $expiredResellersCount,
+        ];
+    }
 }

@@ -199,10 +199,25 @@
 
                 <a href="{{ route('admin.ppob.settings') }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
-                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') ? 'active' : '' }}">
+                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && $currentSection !== 'cutoff' ? 'active' : '' }}">
                     <svg class="w-5 h-5 shrink-0 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
                     <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
                         <span class="whitespace-nowrap">Akun Kiosbank</span>
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.ppob.settings', ['section' => 'cutoff']) }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && $currentSection === 'cutoff' ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Cut-Off PPOB</span>
+                        @php
+                            $isMaintSidebar = \App\Models\Setting::where('key', 'ppob_maintenance_enabled')->value('value') === '1';
+                        @endphp
+                        @if($isMaintSidebar)
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-500 text-white">MAINT</span>
+                        @endif
                     </span>
                 </a>
 
@@ -233,11 +248,30 @@
                     </span>
                 </a>
 
-                <!-- Mitra & Promo Section -->
+                <!-- Pengguna, Mitra & Promo Section -->
                 <div class="pt-2.5 pb-1">
-                    <p :class="(sidebarOpen || window.innerWidth < 1024) ? 'block' : 'hidden'" class="px-3 text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Mitra &amp; Promo</p>
+                    <p :class="(sidebarOpen || window.innerWidth < 1024) ? 'block' : 'hidden'" class="px-3 text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Pengguna, Mitra &amp; Promo</p>
                     <div :class="(!sidebarOpen && window.innerWidth >= 1024) ? 'block' : 'hidden'" class="w-full h-px bg-gray-200 dark:bg-white/5 my-1.5"></div>
                 </div>
+
+                <a href="{{ route('admin.members', ['section' => 'list']) }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.members') && $currentSection !== 'create' ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Kelola Member</span>
+                        <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40">SALDO</span>
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.members', ['section' => 'create']) }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.members') && $currentSection === 'create' ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Tambah Member</span>
+                    </span>
+                </a>
 
                 <a href="{{ route('admin.resellers', ['section' => 'list']) }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"

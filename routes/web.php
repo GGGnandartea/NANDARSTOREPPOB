@@ -108,6 +108,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     // --- RUTE MANAJEMEN PPOB KIOSBANK & DEPOSIT ADMIN ---
     Route::get('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'edit'])->name('ppob.settings');
     Route::post('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'update'])->name('ppob.settings.update');
+    Route::post('/ppob/settings/cutoff', [\App\Http\Controllers\KiosbankSettingsController::class, 'updateCutoff'])->name('ppob.settings.cutoff');
     Route::get('/ppob/products', [AdminController::class, 'ppobProducts'])->name('ppob.products');
     Route::post('/ppob/products/bulk-margin', [AdminController::class, 'bulkUpdatePpobMargin'])->name('ppob.products.bulk_margin');
     Route::post('/ppob/products/{id}/update', [AdminController::class, 'updatePpobProduct'])->name('ppob.products.update');
@@ -131,6 +132,14 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/products/local/accounts/{id}/update', [AdminController::class, 'updateLocalAccount'])->name('products.local.accounts.update');
     Route::post('/products/local/accounts/{id}/delete', [AdminController::class, 'deleteLocalAccount'])->name('products.local.accounts.delete');
     
+    // --- RUTE KELOLA MEMBER & SEMUA USER ADMIN ---
+    Route::get('/members', [AdminController::class, 'members'])->name('members');
+    Route::post('/members', [AdminController::class, 'storeMember'])->name('members.store');
+    Route::post('/members/{id}/balance', [AdminController::class, 'manageMemberBalance'])->name('members.balance');
+    Route::post('/members/{id}/role', [AdminController::class, 'toggleMemberRole'])->name('members.role');
+    Route::post('/members/{id}/toggle', [AdminController::class, 'toggleMemberStatus'])->name('members.toggle');
+    Route::post('/members/{id}/delete', [AdminController::class, 'deleteMember'])->name('members.delete');
+
     Route::get('/resellers', [AdminController::class, 'resellers'])->name('resellers');
     Route::get('/resellers/settings', [AdminController::class, 'resellerSettings'])->name('resellers.settings');
     Route::post('/resellers/settings', [AdminController::class, 'saveResellerSettings'])->name('resellers.settings.save');

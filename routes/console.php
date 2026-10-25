@@ -74,5 +74,23 @@ Artisan::command('ppob:check-low-balance {--force : Paksa kirim pesan WhatsApp m
     return 0;
 })->purpose('Cek batas minimum saldo deposit Kiosbank dan kirim peringatan WhatsApp ke Admin');
 
+/**
+ * Cron / CLI Command: Auto-Expire / Auto-Cancel Pesanan QRIS, Top Up QRIS, dan Reseller QRIS
+ * yang belum dibayar setelah melewati batas waktu 30 menit.
+ */
+Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa dalam menit}', function () {
+    $minutes = max(5, (int) $this->option('minutes'));
+    $result = OrderFulfillmentService::expireUnpaidQrisRecords($minutes);
+
+    if (($result['total'] ?? 0) === 0) {
+        $this->info("Tidak ada tagihan QRIS unpaid yang melewati {$minutes} menit.");
+        return 0;
+    }
+
+    $this->info("Auto-Expire selesai (>{$minutes} menit): {$result['orders']} Pesanan, {$result['topups']} Top Up Saldo, {$result['resellers']} Registrasi Reseller dibatalkan (expired).");
+    return 0;
+})->purpose('Batalkan otomatis tagihan QRIS (Pesanan, Top Up, Reseller) yang belum dibayar lebih dari 30 menit');
+
+Schedule::command('orders:expire-unpaid')->everyMinute()->withoutOverlapping();
 Schedule::command('ppob:sync-pending')->everyThreeMinutes()->withoutOverlapping();
 Schedule::command('ppob:check-low-balance')->everyThirtyMinutes()->withoutOverlapping();

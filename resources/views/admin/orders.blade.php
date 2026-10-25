@@ -69,6 +69,9 @@
                 <a href="{{ route('admin.orders', array_merge(request()->except('page'), ['status' => 'failed'])) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ in_array(request('status'), ['failed', 'canceled']) ? 'bg-red-500 text-white shadow-md shadow-red-500/20' : 'bg-white dark:bg-gray-800 text-red-600 hover:bg-red-50 border border-red-200 dark:border-red-900/40' }}">
                     ✕ Gagal / Batal
                 </a>
+                <a href="{{ route('admin.orders', array_merge(request()->except('page'), ['status' => 'expired'])) }}" class="px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 {{ request('status') == 'expired' ? 'bg-slate-600 text-white shadow-md shadow-slate-600/20' : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 border border-slate-200 dark:border-slate-700/60' }}">
+                    ⏰ Kadaluarsa
+                </a>
             </div>
         </div>
     </div>
@@ -263,9 +266,21 @@
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/50 animate-pulse">
                                         ⏳ Diproses
                                     </span>
-                                @elseif($st === 'canceled')
+                                @elseif($st === 'pending')
+                                    <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 border border-orange-300 dark:border-orange-800/50">
+                                        ⏳ Menunggu Bayar
+                                    </span>
+                                @elseif($st === 'expired')
+                                    <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                                        ⏰ Kadaluarsa (Unpaid)
+                                    </span>
+                                @elseif($st === 'refunded')
+                                    <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-800/50">
+                                        ↩ Refund Saldo
+                                    </span>
+                                @elseif(in_array($st, ['canceled', 'cancelled', 'failed']))
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
-                                        ✕ Batal
+                                        ✕ {{ $st === 'failed' ? 'Gagal' : 'Batal' }}
                                     </span>
                                 @else
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
@@ -297,6 +312,7 @@
                             <!-- Kolom 7: Aksi -->
                             @php
                                 $isDone = in_array($st, ['completed', 'selesai', 'success']);
+                                $isClosed = in_array($st, ['expired', 'canceled', 'cancelled', 'failed', 'refunded']);
                                 $isManualProduct = ($order->product_type === 'local' && (($order->product->process_type ?? 'auto') === 'manual' || $prov === 'Manual Admin'));
                             @endphp
                             <td class="text-right">
@@ -314,6 +330,8 @@
                                         @else
                                             <span class="text-xs font-bold text-gray-400 dark:text-gray-500 mr-2">-</span>
                                         @endif
+                                    @elseif($isClosed)
+                                        <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 mr-2">Ditutup</span>
                                     @else
                                         @if(in_array($order->product_type, ['api', 'ppob']) && empty($order->sn_or_account))
                                             <form action="{{ route('admin.orders.retry_api', $order->id) }}" method="POST" class="inline">
@@ -366,6 +384,7 @@
                     $prov = $order->provider;
                     $st = strtolower($order->order_status ?? 'pending');
                     $isDone = in_array($st, ['completed', 'selesai', 'success']);
+                    $isClosed = in_array($st, ['expired', 'canceled', 'cancelled', 'failed', 'refunded']);
                     $isManualProduct = ($order->product_type === 'local' && (($order->product->process_type ?? 'auto') === 'manual' || $prov === 'Manual Admin'));
                 @endphp
                 <div class="p-4 space-y-3">
@@ -386,9 +405,21 @@
                                 <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/50 animate-pulse">
                                     ⏳ Diproses
                                 </span>
-                            @elseif($st === 'canceled')
+                            @elseif($st === 'pending')
+                                <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 border border-orange-300 dark:border-orange-800/50">
+                                    ⏳ Menunggu Bayar
+                                </span>
+                            @elseif($st === 'expired')
+                                <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                                    ⏰ Kadaluarsa
+                                </span>
+                            @elseif($st === 'refunded')
+                                <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-800/50">
+                                    ↩ Refund Saldo
+                                </span>
+                            @elseif(in_array($st, ['canceled', 'cancelled', 'failed']))
                                 <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
-                                    ✕ Batal
+                                    ✕ {{ $st === 'failed' ? 'Gagal' : 'Batal' }}
                                 </span>
                             @else
                                 <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
@@ -490,6 +521,8 @@
                                         ✏️ Edit Akun
                                     </button>
                                 @endif
+                            @elseif($isClosed)
+                                <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500">Ditutup</span>
                             @else
                                 @if($order->product_type === 'api' && empty($order->sn_or_account))
                                     <form action="{{ route('admin.orders.retry_api', $order->id) }}" method="POST" class="inline">

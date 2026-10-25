@@ -792,7 +792,8 @@ export default function OrdersTab({
         <div className="space-y-3">
           {computedPaginatedOrders.map((o, i) => {
             const isOrderPpob = o.product_type === 'ppob' || String(o.invoice_number || '').startsWith('PPOB-');
-            const isOrderPending = ['processing', 'pending'].includes(String(o.order_status || '').toLowerCase());
+            const isOrderPaid = ['paid', 'success', 'settlement', 'lunas'].includes(String(o.payment_status || '').toLowerCase());
+            const isOrderPending = isOrderPaid && ['processing', 'pending'].includes(String(o.order_status || '').toLowerCase());
             const isOrderRechecking = recheckingOrderId === (o.invoice_number || o.id);
 
             return (

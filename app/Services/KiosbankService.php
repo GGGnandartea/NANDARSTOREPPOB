@@ -93,6 +93,59 @@ class KiosbankService
         return $this->enabled;
     }
 
+    /**
+     * Cek status Jam Cut-Off Harian Otomatis (default 23:50 - 00:10 WIB)
+     * dan Sakelar Maintenance Manual Layanan PPOB.
+     */
+    public function getCutoffStatus(): array
+    {
+        $maintenanceEnabled = Setting::where('key', 'ppob_maintenance_enabled')->value('value') === '1';
+        $cutoffEnabledRaw = Setting::where('key', 'ppob_cutoff_enabled')->value('value');
+        $cutoffEnabled = $cutoffEnabledRaw === null ? true : ($cutoffEnabledRaw === '1');
+
+        $cutoffStart = trim((string) (Setting::where('key', 'ppob_cutoff_start')->value('value') ?: '23:50'));
+        $cutoffEnd = trim((string) (Setting::where('key', 'ppob_cutoff_end')->value('value') ?: '00:10'));
+
+        if (!preg_match('/^\d{2}:\d{2}$/', $cutoffStart)) {
+            $cutoffStart = '23:50';
+        }
+        if (!preg_match('/^\d{2}:\d{2}$/', $cutoffEnd)) {
+            $cutoffEnd = '00:10';
+        }
+
+        $nowWib = now('Asia/Jakarta');
+        $currentHm = $nowWib->format('H:i');
+
+        if ($cutoffStart <= $cutoffEnd) {
+            $inWindow = ($currentHm >= $cutoffStart && $currentHm <= $cutoffEnd);
+        } else {
+            // Rentang lintas tengah malam (misal 23:50 s/d 00:10 WIB)
+            $inWindow = ($currentHm >= $cutoffStart || $currentHm <= $cutoffEnd);
+        }
+
+        $isCutoffActive = $maintenanceEnabled || ($cutoffEnabled && $inWindow);
+        $defaultMsg = "Layanan PPOB sedang dalam jam rekonsiliasi / cut-off harian pusat ({$cutoffStart} - {$cutoffEnd} WIB). Transaksi dihentikan sementara agar saldo Anda tidak terpotong di jam rawan gangguan pusat, dan akan aktif kembali secara otomatis setelah pukul {$cutoffEnd} WIB.";
+        $customMsg = trim((string) (Setting::where('key', 'ppob_cutoff_message')->value('value') ?? ''));
+
+        $message = $customMsg !== '' ? $customMsg : $defaultMsg;
+        $title = $maintenanceEnabled
+            ? 'Pemeliharaan Layanan PPOB Sedang Berlangsung'
+            : "Jam Cut-Off & Rekonsiliasi Harian PPOB ({$cutoffStart} - {$cutoffEnd} WIB)";
+
+        return [
+            'is_cutoff'           => $isCutoffActive,
+            'mode'                => $maintenanceEnabled ? 'maintenance' : (($cutoffEnabled && $inWindow) ? 'scheduled_cutoff' : 'normal'),
+            'maintenance_enabled' => $maintenanceEnabled,
+            'cutoff_enabled'      => $cutoffEnabled,
+            'cutoff_start'        => $cutoffStart,
+            'cutoff_end'          => $cutoffEnd,
+            'in_schedule_window'  => $inWindow,
+            'current_time_wib'    => $currentHm,
+            'title'               => $title,
+            'message'             => $message,
+        ];
+    }
+
     protected function sessionCacheKey(): string
     {
         return 'kiosbank_session_id_'.hash('sha256', json_encode([

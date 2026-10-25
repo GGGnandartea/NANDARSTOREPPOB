@@ -16,7 +16,7 @@ import PpobQrisModal from './Partials/PpobQrisModal';
 import PpobSuccessModal from './Partials/PpobSuccessModal';
 import PpobMobileNav from './Partials/PpobMobileNav';
 
-export default function PpobIndex({ store, initialPulsa }) {
+export default function PpobIndex({ store, initialPulsa, cutoff }) {
   const { auth } = usePage().props;
   const user = auth?.user;
   const [userBalance, setUserBalance] = useState(user?.balance ?? 0);
@@ -392,6 +392,18 @@ export default function PpobIndex({ store, initialPulsa }) {
       return;
     }
 
+    if (cutoff?.is_cutoff) {
+      Swal.fire({
+        icon: 'warning',
+        title: cutoff.title || 'Jam Cut-Off / Pemeliharaan PPOB',
+        text:
+          cutoff.message ||
+          `Layanan PPOB sedang dalam jam rekonsiliasi harian (${cutoff.cutoff_start || '23:50'} - ${cutoff.cutoff_end || '00:10'} WIB). Silakan transaksi kembali setelah jam cut-off berakhir agar saldo Anda tetap aman.`,
+        confirmButtonColor: '#10b981',
+      });
+      return;
+    }
+
     setSelectedProduct(product);
 
     if (activeTab === 'pulsa' && (!phoneNumber || phoneNumber.length < 9)) {
@@ -648,7 +660,44 @@ export default function PpobIndex({ store, initialPulsa }) {
 
       {/* HERO SECTION */}
       <section className="relative overflow-hidden pt-5 pb-6 sm:pt-8 sm:pb-12 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 space-y-4">
+          {cutoff?.is_cutoff && (
+            <div
+              role="alert"
+              className="relative overflow-hidden rounded-2xl border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-r from-amber-50 via-orange-50/90 to-amber-50 dark:from-amber-950/60 dark:via-orange-950/40 dark:to-amber-950/60 p-4 sm:p-5 shadow-lg shadow-amber-500/10"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-md shadow-amber-500/30">
+                    ⏰
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950">
+                        {cutoff.mode === 'maintenance' ? 'Maintenance Layanan' : `Cut-Off Harian ${cutoff.cutoff_start} - ${cutoff.cutoff_end} WIB`}
+                      </span>
+                      <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300">
+                        • Pengaman Saldo Pelanggan Aktif
+                      </span>
+                    </div>
+                    <h2 className="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                      {cutoff.title || 'Jam Rekonsiliasi & Cut-Off Harian PPOB'}
+                    </h2>
+                    <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 leading-relaxed max-w-3xl">
+                      {cutoff.message}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-1 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-black/30 border border-amber-200/70 dark:border-white/10">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Jam Operasional</span>
+                  <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
+                    Aktif Pukul {cutoff.cutoff_end || '00:10'} WIB
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <PpobPromoBanner />
           <PpobTabNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
         </div>

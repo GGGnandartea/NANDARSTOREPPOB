@@ -12,7 +12,9 @@ export default function StatusBadge({ status, isPpob = false }) {
       PROCESSING: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40',
       REFUNDED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
       FAILED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
-      EXPIRED: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300',
+      CANCELED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+      CANCELLED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+      EXPIRED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
     };
     const ppobLabels = {
       PAID: 'Lunas',
@@ -22,7 +24,9 @@ export default function StatusBadge({ status, isPpob = false }) {
       PROCESSING: 'Pending',
       REFUNDED: 'Gagal (Saldo Di-Refund)',
       FAILED: 'Gagal (Saldo Di-Refund)',
-      EXPIRED: 'Kadaluarsa',
+      CANCELED: 'Dibatalkan',
+      CANCELLED: 'Dibatalkan',
+      EXPIRED: 'Kadaluarsa (Belum Bayar)',
     };
     return (
       <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${ppobMap[s] || 'bg-gray-100 text-gray-500'}`}>
@@ -39,17 +43,21 @@ export default function StatusBadge({ status, isPpob = false }) {
     PROCESSING: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     REFUNDED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
     FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    EXPIRED: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300',
+    CANCELED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+    CANCELLED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+    EXPIRED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
   };
   const labels = {
     PAID: 'Lunas',
     SUCCESS: 'Berhasil',
     COMPLETED: 'Selesai',
-    PENDING: 'Menunggu',
+    PENDING: 'Menunggu Bayar',
     PROCESSING: 'Diproses',
     REFUNDED: 'Di-refund ke Saldo',
     FAILED: 'Gagal',
-    EXPIRED: 'Kadaluarsa'
+    CANCELED: 'Dibatalkan',
+    CANCELLED: 'Dibatalkan',
+    EXPIRED: 'Kadaluarsa (Belum Bayar)'
   };
   return <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${map[s] || 'bg-gray-100 text-gray-500'}`}>{labels[s] || s || '-'}</span>;
 }

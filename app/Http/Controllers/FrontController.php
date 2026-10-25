@@ -627,10 +627,12 @@ class FrontController extends Controller
             return response()->json(['status' => 'NOT_FOUND']);
         }
 
-        // Otomatis tandai pesanan QRIS pending lebih dari 15 menit sebagai expired
-        if ($order->payment_status === 'pending' && $order->created_at && $order->created_at->diffInMinutes(now()) >= 15) {
-            Order::whereKey($order->id)->where('payment_status', 'pending')
-                ->whereRaw("LOWER(order_status) IN ('pending', 'processing')")
+        // Otomatis tandai pesanan QRIS pending lebih dari 30 menit sebagai expired
+        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 30) {
+            Order::whereKey($order->id)
+                ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
+                ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
+                ->whereNull('fulfillment_started_at')
                 ->update(['payment_status' => 'expired', 'order_status' => 'expired']);
             $order->refresh();
         }
@@ -815,9 +817,9 @@ class FrontController extends Controller
                     'description' => 'Top Up Saldo via QRIS - ' . $pt->invoice_number,
                 ]);
             } else {
-                // Kadaluarsa otomatis jika lebih dari 10 menit (600 detik)
-                $secondsPassed = $pt->created_at ? $pt->created_at->diffInSeconds(now()) : 999;
-                if ($secondsPassed >= 600) {
+                // Kadaluarsa otomatis jika lebih dari 30 menit (1800 detik)
+                $secondsPassed = $pt->created_at ? $pt->created_at->diffInSeconds(now()) : 9999;
+                if ($secondsPassed >= 1800) {
                     $pt->update(['status' => 'expired']);
                 }
             }
@@ -825,14 +827,8 @@ class FrontController extends Controller
 
         $user->refresh();
 
-        // Otomatis tandai pesanan QRIS yang pending lebih dari 15 menit sebagai expired
-        Order::where('user_id', $user->id)
-            ->where('payment_status', 'pending')
-            ->where('created_at', '<', now()->subMinutes(15))
-            ->update([
-                'payment_status' => 'expired',
-                'order_status'   => 'expired',
-            ]);
+        // Otomatis tandai semua pesanan QRIS & Top Up QRIS yang belum dibayar lebih dari 30 menit sebagai expired
+        \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
 
         $orders = Order::where('user_id', $user->id)
             ->with('product')
@@ -1238,8 +1234,8 @@ class FrontController extends Controller
                     ]);
                 }
             } else {
-                $secondsPassed = $topup->created_at ? $topup->created_at->diffInSeconds(now()) : 999;
-                if ($secondsPassed >= 600) {
+                $secondsPassed = $topup->created_at ? $topup->created_at->diffInSeconds(now()) : 9999;
+                if ($secondsPassed >= 1800) {
                     $topup->update(['status' => 'expired']);
                 }
             }

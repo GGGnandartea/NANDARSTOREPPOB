@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Services\KiosbankConfiguration;
+use App\Services\KiosbankService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,11 +22,44 @@ class KiosbankSettingsController extends Controller
             $profiles[$mode] = $profile;
         }
 
+        $kiosbankService = new KiosbankService();
+
         return view('admin.ppob.settings', [
-            'profiles' => $profiles,
-            'mode' => $configuration->mode(),
-            'enabled' => Setting::where('key', 'kiosbank_enabled')->value('value') !== '0',
+            'profiles'     => $profiles,
+            'mode'         => $configuration->mode(),
+            'enabled'      => Setting::where('key', 'kiosbank_enabled')->value('value') !== '0',
+            'cutoffStatus' => $kiosbankService->getCutoffStatus(),
         ]);
+    }
+
+    public function updateCutoff(Request $request)
+    {
+        $request->validate([
+            'ppob_cutoff_start'   => ['required', 'regex:/^\d{2}:\d{2}$/'],
+            'ppob_cutoff_end'     => ['required', 'regex:/^\d{2}:\d{2}$/'],
+            'ppob_cutoff_message' => 'nullable|string|max:500',
+        ]);
+
+        $maintenanceEnabled = $request->boolean('ppob_maintenance_enabled') ? '1' : '0';
+        $cutoffEnabled = $request->boolean('ppob_cutoff_enabled') ? '1' : '0';
+        $cutoffStart = trim($request->input('ppob_cutoff_start', '23:50'));
+        $cutoffEnd = trim($request->input('ppob_cutoff_end', '00:10'));
+        $cutoffMsg = trim((string) $request->input('ppob_cutoff_message', ''));
+
+        DB::transaction(function () use ($maintenanceEnabled, $cutoffEnabled, $cutoffStart, $cutoffEnd, $cutoffMsg) {
+            Setting::updateOrCreate(['key' => 'ppob_maintenance_enabled'], ['value' => $maintenanceEnabled]);
+            Setting::updateOrCreate(['key' => 'ppob_cutoff_enabled'], ['value' => $cutoffEnabled]);
+            Setting::updateOrCreate(['key' => 'ppob_cutoff_start'], ['value' => $cutoffStart]);
+            Setting::updateOrCreate(['key' => 'ppob_cutoff_end'], ['value' => $cutoffEnd]);
+            Setting::updateOrCreate(['key' => 'ppob_cutoff_message'], ['value' => $cutoffMsg]);
+        });
+
+        $statusInfo = $maintenanceEnabled === '1'
+            ? 'Mode Maintenance Manual PPOB DIAKTIFKAN.'
+            : ($cutoffEnabled === '1' ? "Jadwal Cut-Off Otomatis ({$cutoffStart} - {$cutoffEnd} WIB) AKTIF." : 'Jadwal Cut-Off Otomatis DINONAKTIFKAN.');
+
+        return redirect()->route('admin.ppob.settings', ['section' => 'cutoff'])
+            ->with('success', 'Pengaturan Jam Cut-Off & Maintenance PPOB berhasil disimpan! ' . $statusInfo);
     }
 
     public function update(Request $request, KiosbankConfiguration $configuration)
