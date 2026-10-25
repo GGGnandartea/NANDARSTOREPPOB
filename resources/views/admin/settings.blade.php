@@ -796,7 +796,7 @@ function apiHub() {
         async refreshLiveStatus() {
             this.isRefreshing = true;
             try {
-                const res = await fetch('{{ route("admin.settings.api_status") }}', {
+                const res = await fetch('{{ route("admin.settings.api_status", [], false) }}', {
                     headers: { 'Accept': 'application/json' }
                 });
                 const data = await res.json();
@@ -838,7 +838,7 @@ function apiHub() {
             this.isCreatingDeposit = true;
             this.depositError = null;
             try {
-                const res = await fetch('{{ route("admin.settings.premku.deposit") }}', {
+                const res = await fetch('{{ route("admin.settings.premku.deposit", [], false) }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -875,7 +875,7 @@ function apiHub() {
             if (manual) this.isCheckingDeposit = true;
 
             try {
-                const res = await fetch('{{ route("admin.settings.premku.check_deposit") }}', {
+                const res = await fetch('{{ route("admin.settings.premku.check_deposit", [], false) }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -914,7 +914,7 @@ function apiHub() {
                 return;
             }
             try {
-                await fetch('{{ route("admin.settings.premku.cancel_deposit") }}', {
+                await fetch('{{ route("admin.settings.premku.cancel_deposit", [], false) }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

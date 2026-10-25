@@ -23,7 +23,7 @@
     
     async fetchStatus() {
         try {
-            const res = await fetch('{{ route('admin.wa_gateway.status') }}');
+            const res = await fetch('{{ route('admin.wa_gateway.status', [], false) }}');
             if (res.ok) {
                 const data = await res.json();
                 this.botStatus = data.status;

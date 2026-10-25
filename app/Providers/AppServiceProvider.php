@@ -22,8 +22,16 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(Request $request): void
     {
+        if (
+            str_starts_with((string) config('app.url'), 'https://') ||
+            $request->header('X-Forwarded-Proto') === 'https' ||
+            str_contains((string) $request->header('CF-Visitor'), 'https')
+        ) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Kunci ketat parameter URL secara global (Mencegah URL Tampering & SQL Injection di Route)
         Route::pattern('id', '[0-9]+');
         Route::pattern('orderId', '[A-Za-z0-9\-_]+');
