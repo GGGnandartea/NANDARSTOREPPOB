@@ -130,20 +130,33 @@ class PpobController extends Controller
             // hanya berlaku 10 menit, sehingga checkout wajib memakai data ini.
             if (($result['status'] ?? '') === 'success' && (int) ($result['total'] ?? 0) > 0) {
                 $result['inquiry_key'] = hash('sha256', $productId . '|' . $customerId . '|' . ($result['reference_id'] ?? ''));
-                Cache::put('ppob_inquiry:' . $result['inquiry_key'], [
-                    'product_id'   => $productId,
-                    'customer_id'  => $customerId,
-                    'reference_id' => $result['reference_id'] ?? null,
-                    'amount'       => (int) ($result['amount'] ?? 0),
-                    'admin_fee'    => (int) ($result['admin_fee'] ?? 0),
-                    'penalty'      => (int) ($result['penalty'] ?? 0),
-                    'total'        => (int) $result['total'],
-                    'service_fee'  => (int) ($result['service_fee'] ?? 0),
-                    'grand_total'  => (int) ($result['grand_total'] ?? $result['total']),
-                    'customer_name'=> $result['customer_name'] ?? '',
+                $inquiryPayload = [
+                    'product_id'    => $productId,
+                    'customer_id'   => $customerId,
+                    'reference_id'  => $result['reference_id'] ?? null,
+                    'amount'        => (int) ($result['amount'] ?? 0),
+                    'admin_fee'     => (int) ($result['admin_fee'] ?? 0),
+                    'penalty'       => (int) ($result['penalty'] ?? 0),
+                    'total'         => (int) $result['total'],
+                    'service_fee'   => (int) ($result['service_fee'] ?? 0),
+                    'grand_total'   => (int) ($result['grand_total'] ?? $result['total']),
+                    'customer_name' => $result['customer_name'] ?? '',
                     'kiosbank_mode' => $this->kiosbank->getMode(),
-                    'expires_at'   => now()->addMinutes(10)->timestamp,
-                ], now()->addMinutes(10));
+                    'expires_at'    => now()->addMinutes(10)->timestamp,
+                ];
+
+                try {
+                    Cache::put('ppob_inquiry:' . $result['inquiry_key'], $inquiryPayload, now()->addMinutes(10));
+                } catch (\Throwable $cacheErr) {
+                    Log::warning('[PPOB-INQUIRY-CACHE-FALLBACK] ' . $cacheErr->getMessage());
+                }
+
+                try {
+                    Setting::updateOrCreate(
+                        ['key' => 'ppob_inq_' . substr($result['inquiry_key'], 0, 32)],
+                        ['value' => json_encode($inquiryPayload)]
+                    );
+                } catch (\Throwable $dbErr) {}
             }
 
             return response()->json($result);
@@ -202,7 +215,19 @@ class PpobController extends Controller
         // Jangan percaya nominal tagihan dari client. Ambil ulang hasil inquiry
         // dari cache server dan tolak bila sudah melewati batas 10 menit.
         if ($inquiryKey) {
-            $cachedInquiry = Cache::get('ppob_inquiry:' . $inquiryKey);
+            $cachedInquiry = null;
+            try {
+                $cachedInquiry = Cache::get('ppob_inquiry:' . $inquiryKey);
+            } catch (\Throwable $cacheErr) {
+                $cachedInquiry = null;
+            }
+
+            if (!$cachedInquiry) {
+                $rawFallback = Setting::where('key', 'ppob_inq_' . substr($inquiryKey, 0, 32))->value('value');
+                if ($rawFallback) {
+                    $cachedInquiry = json_decode($rawFallback, true);
+                }
+            }
             if (!$cachedInquiry
                 || $cachedInquiry['product_id'] !== $productCode
                 || $cachedInquiry['customer_id'] !== $customerId

@@ -37,21 +37,92 @@ class KiosbankService
         return config("kiosbank.profiles.{$this->mode}.ca_bundle") ?: true;
     }
 
+    protected function safeCacheSettingKey(string $key): string
+    {
+        return 'kb_cache_' . substr(hash('sha256', $key), 0, 32);
+    }
+
+    protected function safeCacheGet(string $key, $default = null)
+    {
+        try {
+            $val = Cache::get($key);
+            if ($val !== null) {
+                return $val;
+            }
+        } catch (\Throwable $e) {
+            // Fallback ke tabel settings jika folder storage/framework/cache terkena Permission Denied
+        }
+
+        try {
+            $raw = Setting::where('key', $this->safeCacheSettingKey($key))->value('value');
+            if ($raw) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded) && isset($decoded['expires_at']) && $decoded['expires_at'] >= now()->timestamp) {
+                    return $decoded['data'] ?? $default;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return $default;
+    }
+
+    protected function safeCachePut(string $key, $value, $ttl = 3600): void
+    {
+        $expiresAt = $ttl instanceof \DateTimeInterface
+            ? $ttl->getTimestamp()
+            : (now()->timestamp + (is_numeric($ttl) ? (int) $ttl : 3600));
+
+        try {
+            Cache::put($key, $value, $ttl);
+        } catch (\Throwable $e) {
+            // Abaikan error permission file cache, simpan ke fallback database di bawah
+        }
+
+        try {
+            Setting::updateOrCreate(
+                ['key' => $this->safeCacheSettingKey($key)],
+                ['value' => json_encode(['data' => $value, 'expires_at' => $expiresAt])]
+            );
+        } catch (\Throwable $e) {}
+    }
+
+    protected function safeCacheForget(string $key): void
+    {
+        try {
+            Cache::forget($key);
+        } catch (\Throwable $e) {}
+
+        try {
+            Setting::where('key', $this->safeCacheSettingKey($key))->delete();
+        } catch (\Throwable $e) {}
+    }
+
     protected function reserveSignOnAttempt(): bool
     {
         $key = 'kiosbank_signon_attempts_'.hash('sha256', json_encode([
             $this->mode, $this->getBaseUrl(), $this->username, $this->merchantId,
             $this->accountId, now('Asia/Jakarta')->toDateString(),
         ]));
-        return Cache::lock($key.'_lock', 10)->block(5, function () use ($key) {
-            $attempts = (int) Cache::get($key, 0);
+
+        try {
+            return Cache::lock($key.'_lock', 10)->block(5, function () use ($key) {
+                $attempts = (int) $this->safeCacheGet($key, 0);
+                if ($attempts >= 99) {
+                    $this->connectionError = 'Batas 99 percobaan Sign-On hari ini tercapai. Gunakan sesi aktif atau hubungi helpdesk Kiosbank.';
+                    return false;
+                }
+                $this->safeCachePut($key, $attempts + 1, $this->sessionExpiresAt());
+                return true;
+            });
+        } catch (\Throwable $e) {
+            $attempts = (int) $this->safeCacheGet($key, 0);
             if ($attempts >= 99) {
                 $this->connectionError = 'Batas 99 percobaan Sign-On hari ini tercapai. Gunakan sesi aktif atau hubungi helpdesk Kiosbank.';
                 return false;
             }
-            Cache::put($key, $attempts + 1, $this->sessionExpiresAt());
+            $this->safeCachePut($key, $attempts + 1, $this->sessionExpiresAt());
             return true;
-        });
+        }
     }
 
     /**
@@ -347,7 +418,7 @@ class KiosbankService
         $cacheKey = $this->sessionCacheKey();
 
         if (!$forceRefresh) {
-            $cached = Cache::get($cacheKey);
+            $cached = $this->safeCacheGet($cacheKey);
             if (!empty($cached) && !str_starts_with($cached, 'DEV-SESSION-')) {
                 return [
                     'ok'         => true,
@@ -431,7 +502,7 @@ class KiosbankService
         if ($sessionId) {
             // Cache sampai akhir hari yang sama di zona WIB.
             $secondsUntilMidnight = $this->sessionExpiresAt();
-            Cache::put($cacheKey, $sessionId, $secondsUntilMidnight);
+            $this->safeCachePut($cacheKey, $sessionId, $secondsUntilMidnight);
             Log::info("[KIOSBANK-SIGNON-RSA-SUCCESS] Sesi aktif untuk mode ".$this->mode);
 
             return [
@@ -460,7 +531,7 @@ class KiosbankService
      */
     public function testSignOn(): array
     {
-        $cached = Cache::get($this->sessionCacheKey());
+        $cached = $this->safeCacheGet($this->sessionCacheKey());
         $realCached = $cached && !str_starts_with($cached, 'DEV-SESSION-');
         $session = $this->signOn($cached && !$realCached);
         $ok = $session && !str_starts_with($session, 'DEV-SESSION-');
@@ -484,7 +555,7 @@ class KiosbankService
         $cacheKey = $this->sessionCacheKey();
 
         if (!$forceRefresh) {
-            $cached = Cache::get($cacheKey);
+            $cached = $this->safeCacheGet($cacheKey);
             if (!empty($cached)) {
                 return $cached;
             }
@@ -513,7 +584,7 @@ class KiosbankService
         if (!empty($res['SessionID']) || !empty($res['sessionID'])) {
             $sessionId = $res['SessionID'] ?? $res['sessionID'];
             $secondsUntilMidnight = $this->sessionExpiresAt();
-            Cache::put($cacheKey, $sessionId, $secondsUntilMidnight);
+            $this->safeCachePut($cacheKey, $sessionId, $secondsUntilMidnight);
             Log::info("[KIOSBANK-SIGNON-SUCCESS] Sesi aktif untuk mode ".$this->mode);
             return $sessionId;
         }
@@ -524,7 +595,7 @@ class KiosbankService
         if ($this->isDeveloperMode()) {
             $mockSession = 'DEV-SESSION-' . strtoupper(md5($this->username . date('Ymd')));
             // A failed development connection must not hide recovery for twelve hours.
-            Cache::put($cacheKey, $mockSession, 60);
+            $this->safeCachePut($cacheKey, $mockSession, 60);
             return $mockSession;
         }
 
@@ -901,10 +972,17 @@ class KiosbankService
         }
         $key = $this->sessionCacheKey().'_mobile_status';
         if ($fresh) {
-            Cache::forget($key);
+            $this->safeCacheForget($key);
         }
 
-        return Cache::remember($key, 60, fn () => $this->getActiveProductStatus());
+        $cached = $this->safeCacheGet($key);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $status = $this->getActiveProductStatus();
+        $this->safeCachePut($key, $status, 60);
+        return $status;
     }
 
     public function mobileAvailability(PpobProduct $product, array $providerStatus): array
@@ -1789,7 +1867,7 @@ class KiosbankService
         $this->ensureCatalogSeeded();
 
         // Retry mock sessions, but reuse real sessions until midnight WIB.
-        $cached = Cache::get($this->sessionCacheKey());
+        $cached = $this->safeCacheGet($this->sessionCacheKey());
         $session = $this->signOn($cached && str_starts_with($cached, 'DEV-SESSION-'));
         if (!$session || str_starts_with($session, 'DEV-SESSION-')) {
             throw new \RuntimeException($this->connectionError ?? 'Sign-On Kiosbank gagal. Periksa konfigurasi akun dan koneksi server.');
