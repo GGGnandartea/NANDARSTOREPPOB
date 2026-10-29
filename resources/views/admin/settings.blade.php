@@ -229,7 +229,7 @@
                                 Public Widget Key
                             </span>
                         </div>
-                        <input type="text" id="turnstileSiteKeyInput" name="turnstile_site_key" value="{{ $turnstileSiteKey ?? '' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
+                        <input type="text" autocomplete="off" spellcheck="false" id="turnstileSiteKeyInput" name="turnstile_site_key" value="{{ $turnstileSiteKey ?? '' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
                         <p class="text-[11px] text-gray-400 mt-1.5">
                             Digunakan untuk menampilkan kotak centang <strong class="text-gray-600 dark:text-gray-300">Success! Cloudflare</strong> di halaman publik.
                         </p>
@@ -243,7 +243,7 @@
                             </span>
                         </div>
                         <div class="relative">
-                            <input :type="showSecret ? 'text' : 'password'" id="turnstileSecretKeyInput" name="turnstile_secret_key" value="{{ $turnstileSecretKey ?? '' }}" class="w-full pl-4 pr-20 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
+                            <input type="text" autocomplete="off" spellcheck="false" :style="showSecret ? '' : '-webkit-text-security: disc;'" id="turnstileSecretKeyInput" name="turnstile_secret_key" value="{{ $turnstileSecretKey ?? '' }}" class="w-full pl-4 pr-20 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
                             <button type="button" @click="showSecret = !showSecret" class="absolute right-3 top-2.5 px-2.5 py-1 rounded-lg bg-gray-200/70 dark:bg-white/10 text-[10px] font-black text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <span x-text="showSecret ? 'Sembunyikan' : 'Lihat'">Lihat</span>
                             </button>
