@@ -110,7 +110,8 @@ class AuthController extends Controller
         $emailInput = trim($credentials['email']);
         $plainPassword = (string) $credentials['password'];
 
-        $user = User::where('email', $emailInput)->first();
+        $user = User::where('email', $emailInput)->first()
+            ?: User::whereRaw('LOWER(email) = ?', [strtolower($emailInput)])->first();
         if (!$user && in_array(strtolower($emailInput), ['admin@nandarstore.com', 'admin@premiumkita.com'], true)) {
             $altEmail = strtolower($emailInput) === 'admin@nandarstore.com' ? 'admin@premiumkita.com' : 'admin@nandarstore.com';
             $user = User::where('email', $altEmail)->first()
@@ -121,16 +122,16 @@ class AuthController extends Controller
             $storedPassword = (string) $user->getAuthPassword();
             $algoName = password_get_info($storedPassword)['algoName'] ?? 'unknown';
 
-            // Otomatis perbaiki jika password di database diubah lewat phpMyAdmin (plain text / MD5 / SHA1 / non-bcrypt)
-            if ($algoName !== 'bcrypt') {
+            // Otomatis perbaiki jika password di database diubah lewat phpMyAdmin / migrasi ($2a$, $2b$, plain text, MD5, SHA1, non-bcrypt)
+            if ($algoName !== 'bcrypt' || !str_starts_with($storedPassword, '$2y$')) {
                 $isLegacyMatch = false;
-                if ($storedPassword !== '' && hash_equals($storedPassword, $plainPassword)) {
+                if ($algoName !== 'unknown' && password_verify($plainPassword, $storedPassword)) {
+                    $isLegacyMatch = true;
+                } elseif ($storedPassword !== '' && hash_equals($storedPassword, $plainPassword)) {
                     $isLegacyMatch = true;
                 } elseif (strlen($storedPassword) === 32 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), md5($plainPassword))) {
                     $isLegacyMatch = true;
                 } elseif (strlen($storedPassword) === 40 && ctype_xdigit($storedPassword) && hash_equals(strtolower($storedPassword), sha1($plainPassword))) {
-                    $isLegacyMatch = true;
-                } elseif ($algoName !== 'unknown' && password_verify($plainPassword, $storedPassword)) {
                     $isLegacyMatch = true;
                 }
 
@@ -150,10 +151,15 @@ class AuthController extends Controller
             $credentials['email'] = $user->email;
         }
 
+        $remember = $request->boolean('remember');
         try {
-            $authenticated = Auth::attempt($credentials, $request->boolean('remember'));
-        } catch (\RuntimeException $e) {
-            $authenticated = false;
+            $authenticated = Auth::attempt($credentials, $remember);
+        } catch (\Throwable $e) {
+            try {
+                $authenticated = Auth::attempt($credentials, false);
+            } catch (\Throwable $inner) {
+                $authenticated = false;
+            }
         }
 
         if ($authenticated) {

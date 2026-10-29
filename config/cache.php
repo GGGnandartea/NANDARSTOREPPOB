@@ -15,7 +15,9 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => env('CACHE_STORE', 'failover'),
+
+    'limiter' => env('CACHE_LIMITER', 'failover'),
 
     /*
     |--------------------------------------------------------------------------
@@ -47,11 +49,20 @@ return [
             'lock_table' => env('DB_CACHE_LOCK_TABLE'),
         ],
 
-        'file' => [
+        'file_safe' => [
             'driver' => 'file',
-            'path' => storage_path('framework/cache/data'),
-            'lock_path' => storage_path('framework/cache/data'),
+            'path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
+            'lock_path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
             'permission' => 0666,
+        ],
+
+        'file' => [
+            'driver' => 'failover',
+            'stores' => [
+                'file_safe',
+                'database',
+                'array',
+            ],
         ],
 
         'memcached' => [
@@ -95,6 +106,7 @@ return [
         'failover' => [
             'driver' => 'failover',
             'stores' => [
+                'file_safe',
                 'database',
                 'array',
             ],
