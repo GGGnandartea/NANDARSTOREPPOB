@@ -5,9 +5,11 @@ export default function Navbar({
     auth,
     store,
     isScrolled,
+    filters = {},
     searchTerm,
     handleInputChange,
     handleSearch,
+    handleClearSearch,
     toggleDarkMode,
     isDark,
     profileMenuRef,
@@ -15,6 +17,8 @@ export default function Navbar({
     setShowProfileMenu,
     setShowTrackModal,
 }) {
+    const hasCategoryFilter = Boolean(filters?.category || filters?.tipe);
+
     return (
         <>
             {/* ADMIN MONITOR BAR */}
@@ -26,8 +30,8 @@ export default function Navbar({
                             <span className="font-black text-orange-400">Mode Pantau Admin:</span>
                             <span className="text-[11px] text-slate-300 hidden sm:inline">Akun profil, saldo pelanggan, checkout, dan top-up dinonaktifkan.</span>
                         </div>
-                        <Link 
-                            href="/admin/dashboard" 
+                        <Link
+                            href="/admin/dashboard"
                             className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-[11px] rounded-lg transition shrink-0 shadow-sm"
                         >
                             <span>Dashboard Admin</span>
@@ -37,12 +41,19 @@ export default function Navbar({
                 </div>
             )}
 
-            {/* NAVBAR */}
-            <nav className={`glass-nav sticky ${auth?.user?.role === 'admin' ? 'top-8' : 'top-0'} z-40 transition-all duration-300 ${isScrolled ? 'border-b border-gray-200 dark:border-gray-800 shadow-sm' : 'border-b border-transparent dark:border-transparent'}`}>
+            {/* STICKY TOP NAVBAR */}
+            <nav className={`glass-nav sticky ${auth?.user?.role === 'admin' ? 'top-8' : 'top-0'} z-40 transition-all duration-300 ${isScrolled ? 'border-b border-gray-200/90 dark:border-gray-800 shadow-md' : 'border-b border-transparent dark:border-transparent'}`}>
                 <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-3">
-                    
+
                     <div className="flex-1 min-w-0 h-full relative overflow-hidden flex items-center">
-                        <Link href="/" className={`absolute left-0 flex items-center gap-2 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isScrolled ? '-translate-y-16 opacity-0 sm:translate-y-0 sm:opacity-100 sm:relative sm:mr-6' : 'translate-y-0 opacity-100 relative sm:mr-6'}`}>
+                        <Link
+                            href="/"
+                            className={`absolute left-0 flex items-center gap-2 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                                isScrolled
+                                    ? '-translate-y-16 opacity-0 sm:translate-y-0 sm:opacity-100 sm:relative sm:mr-5'
+                                    : 'translate-y-0 opacity-100 relative sm:mr-5'
+                            }`}
+                        >
                             {store?.logo ? (
                                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-white/10 p-0.5 flex items-center justify-center shadow-md shrink-0 overflow-hidden">
                                     <img src={store.logo} alt={store?.name || 'PremiumKita'} className="w-full h-full object-contain rounded-lg" />
@@ -53,22 +64,52 @@ export default function Navbar({
                             <span className="text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0">{store?.name || 'PremiumKita'}</span>
                         </Link>
 
-                        <div className={`absolute left-0 w-full max-w-xl transition-all duration-300 ease-out ${isScrolled ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative' : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'}`}>
-                            <form onSubmit={handleSearch} className="relative w-full">
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={handleInputChange}
-                                    placeholder="Cari layanan..."
-                                    className="min-h-11 w-full pl-3.5 pr-12 sm:pl-4 sm:pr-12 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-orange-500 rounded-full text-sm font-medium dark:text-white outline-none transition-colors shadow-inner"
-                                />
-                                <button
-                                    type="submit"
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer"
-                                    title="Cari Produk"
-                                >
-                                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                </button>
+                        {/* Sticky Search Bar in Top Navbar */}
+                        <div
+                            className={`absolute left-0 w-full max-w-xl transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                                isScrolled
+                                    ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative'
+                                    : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'
+                            }`}
+                        >
+                            <form onSubmit={handleSearch} className="relative w-full flex items-center">
+                                <div className="relative w-full flex items-center bg-gray-100 dark:bg-gray-800/95 border border-gray-200 dark:border-gray-700 focus-within:border-orange-500 dark:focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 rounded-full p-1 transition-all shadow-inner">
+                                    <span className="pl-2.5 sm:pl-3 text-gray-400 shrink-0" aria-hidden="true">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={handleInputChange}
+                                        placeholder={hasCategoryFilter ? 'Cari di semua produk...' : 'Cari aplikasi, pulsa, game...'}
+                                        className="w-full px-2.5 py-1.5 bg-transparent text-xs sm:text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400 outline-none"
+                                    />
+                                    {searchTerm && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSearch}
+                                            className="!min-h-0 w-6 h-6 mr-1 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white flex items-center justify-center transition cursor-pointer shrink-0"
+                                            title="Hapus pencarian"
+                                            aria-label="Hapus pencarian"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        className="!min-h-0 h-8 px-3 sm:h-8 sm:px-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-full flex items-center justify-center gap-1.5 text-xs font-extrabold transition-all shadow-xs cursor-pointer shrink-0"
+                                        title="Cari Produk"
+                                    >
+                                        <svg className="w-3.5 h-3.5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Cari</span>
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -82,12 +123,12 @@ export default function Navbar({
                         >
                             <span>PPOB</span>
                             <span className="hidden sm:inline">&amp; Pulsa</span>
-                            <span className="hidden sm:inline-block text-[11px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
+                            <span className="hidden sm:inline-block text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
                         </Link>
 
                         <button
                             onClick={toggleDarkMode}
-                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-black dark:text-gray-300 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
+                            className="!min-h-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-gray-500 hover:text-black dark:text-gray-300 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
                             title="Ganti Mode Gelap / Terang"
                         >
                             {isDark ? (
@@ -102,7 +143,7 @@ export default function Navbar({
                                 {auth.user.role === 'admin' ? (
                                     <button
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                        className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 hover:border-orange-500 transition-colors focus:outline-none cursor-pointer shadow-sm"
+                                        className="!min-h-0 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 hover:border-orange-500 transition-colors focus:outline-none cursor-pointer shadow-sm"
                                         title="Mode Pantau Admin"
                                     >
                                         <span className="text-xs">👑</span>
@@ -114,7 +155,7 @@ export default function Navbar({
                                 ) : (
                                     <button
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                        className="flex items-center justify-center p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none cursor-pointer"
+                                        className="!min-h-0 flex items-center justify-center p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none cursor-pointer"
                                     >
                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
@@ -187,7 +228,7 @@ export default function Navbar({
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Saldo Info */}
                                             <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
@@ -222,7 +263,7 @@ export default function Navbar({
                                                     </div>
                                                     Riwayat Pembelian
                                                 </Link>
-                                                
+
                                                 <Link
                                                     href="/profile?tab=topup"
                                                     onClick={() => setShowProfileMenu(false)}
@@ -233,9 +274,9 @@ export default function Navbar({
                                                     </div>
                                                     Top Up &amp; Mutasi
                                                 </Link>
-                                                
+
                                                 <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
-                                                
+
                                                 <button
                                                     onClick={() => { setShowProfileMenu(false); router.post('/logout'); }}
                                                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer group"
@@ -252,11 +293,11 @@ export default function Navbar({
                             </div>
                         ) : (
                             <div className="flex items-center gap-1.5 sm:gap-3">
-                                <button onClick={() => setShowTrackModal(true)} className="hidden sm:flex text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-4 py-2 sm:py-2.5 rounded-full transition shadow-sm cursor-pointer items-center gap-2">
+                                <button onClick={() => setShowTrackModal(true)} className="!min-h-0 hidden sm:flex text-xs font-bold text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 px-3.5 py-2 rounded-full transition shadow-sm cursor-pointer items-center gap-2">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                     Lacak Pesanan
                                 </button>
-                                <Link href="/login" className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-full transition shadow-sm cursor-pointer">
+                                <Link href="/login" className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full transition shadow-sm cursor-pointer">
                                     <span className="sm:hidden">Masuk</span>
                                     <span className="hidden sm:inline">Masuk/Daftar</span>
                                 </Link>
@@ -269,4 +310,3 @@ export default function Navbar({
         </>
     );
 }
-

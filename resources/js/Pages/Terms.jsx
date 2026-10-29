@@ -39,7 +39,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
     };
 
     return (
-        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-hidden">
+        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-clip">
             <Head>
                 <title>{`Syarat & Ketentuan Layanan - ${storeName}`}</title>
                 <meta name="description" content={`Syarat & Ketentuan, aturan transaksi, serta kebijakan garansi resmi di ${storeName}.`} />

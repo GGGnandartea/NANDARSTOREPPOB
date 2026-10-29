@@ -40,7 +40,8 @@ export default function Home({
     const [isScrolled, setIsScrolled] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    
+    const searchDebounceRef = useRef(null);
+
     const [showTrackModal, setShowTrackModal] = useState(false);
     const [trackOrderId, setTrackOrderId] = useState('');
     const [trackResult, setTrackResult] = useState(null);
@@ -52,7 +53,7 @@ export default function Home({
     }, [showTrackModal]);
 
     const [showFabMenu, setShowFabMenu] = useState(false);
-    
+
     const [currentBanner, setCurrentBanner] = useState(0);
     const [isHoveredBanner, setIsHoveredBanner] = useState(false);
     const [touchStartX, setTouchStartX] = useState(null);
@@ -76,15 +77,15 @@ export default function Home({
     ];
 
     const bannerList = (serverBanners && serverBanners.length > 0) ? serverBanners : defaultBanners;
-    
+
     const brandContainerRef = useRef(null);
     const typeContainerRef = useRef(null);
     const topSellingContainerRef = useRef(null);
     const profileMenuRef = useRef(null);
-    
+
     const productList = Array.isArray(products) ? products : (products?.data || []);
     const categoryList = Array.isArray(categories) ? categories : (categories?.data || []);
-    
+
     useEffect(() => {
         const theme = localStorage.getItem('theme');
         if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -93,16 +94,20 @@ export default function Home({
             setIsDark(false); document.documentElement.classList.remove('dark');
         }
 
-        const handleScroll = () => { setIsScrolled(window.scrollY > 200); };
-        window.addEventListener('scroll', handleScroll);
-        
+        const handleScroll = () => {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+            setIsScrolled(scrollTop > 130);
+        };
+        handleScroll();
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
         const handleClickOutside = (e) => {
             if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
                 setShowProfileMenu(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
-        
+
         // Polling realtime ringan untuk produk & penjualan hari ini
         const silentRefresh = setInterval(() => {
             router.reload({ only: ['products', 'topSellingToday'], preserveState: true, preserveScroll: true, replace: true });
@@ -112,6 +117,7 @@ export default function Home({
             window.removeEventListener('scroll', handleScroll);
             document.removeEventListener('mousedown', handleClickOutside);
             clearInterval(silentRefresh);
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         };
     }, []);
 
@@ -230,31 +236,62 @@ export default function Home({
         }
     };
 
+    // Saat mengetik di search bar, otomatis keluar dari filter kategori/tipe dan cari di Semua Produk
     const handleInputChange = (e) => {
-        const value = e.target.value; setSearchTerm(value);
-        if (value === '') {
-            router.get('/', {}, { preserveState: true, replace: true, preserveScroll: true });
+        const value = e.target.value;
+        setSearchTerm(value);
+
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
         }
+
+        const trimmed = value.trim();
+        if (trimmed === '') {
+            router.get('/', {}, { preserveState: true, replace: true, preserveScroll: true });
+            return;
+        }
+
+        searchDebounceRef.current = setTimeout(() => {
+            router.get('/', { search: trimmed }, { preserveState: true, replace: true, preserveScroll: true });
+        }, 300);
     };
 
+    const handleClearSearch = () => {
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+        }
+        setSearchTerm('');
+        router.get('/', {}, { preserveState: true, replace: true, preserveScroll: true });
+    };
+
+    // Saat submit pencarian (Enter / klik tombol Cari), reset kategori & cari di Semua Produk
     const handleSearch = (e) => {
-        e.preventDefault();
-        const params = {};
-        if (searchTerm) params.search = searchTerm;
-        router.get('/', params, { preserveState: true, preserveScroll: true });
+        e?.preventDefault();
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+        }
+        const trimmed = searchTerm.trim();
+        const params = trimmed ? { search: trimmed } : {};
+        router.get('/', params, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const handleCategoryBrand = (cat) => {
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+        }
+        setSearchTerm('');
         const params = {};
-        if (searchTerm) params.search = searchTerm;
-        if (cat) params.category = cat; 
+        if (cat) params.category = cat;
         router.get('/', params, { preserveState: true, preserveScroll: true });
         setShowCategoryModal(false);
     };
 
     const handleCategoryTipe = (tipe) => {
+        if (searchDebounceRef.current) {
+            clearTimeout(searchDebounceRef.current);
+        }
+        setSearchTerm('');
         const params = {};
-        if (searchTerm) params.search = searchTerm;
         if (tipe) params.tipe = tipe;
         router.get('/', params, { preserveState: true, preserveScroll: true });
     };
@@ -263,13 +300,6 @@ export default function Home({
         if (ref.current) {
             const scrollAmount = direction === 'left' ? -250 : 250;
             ref.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-        }
-    };
-
-    const scrollToSection = (id) => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth' });
         }
     };
 
@@ -303,7 +333,7 @@ export default function Home({
     };
 
     return (
-        <div className="storefront-ui min-h-[100dvh] flex flex-col bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 font-jakarta pb-20 sm:pb-0 overflow-x-hidden">
+        <div className="storefront-ui min-h-[100dvh] flex flex-col bg-gray-50 dark:bg-[#0f172a] transition-colors duration-300 font-jakarta pb-20 sm:pb-0 overflow-x-clip">
             <Head>
                 <title>{`${store?.name || 'PremiumKita'} - Platform Digital & Akun Premium`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -311,19 +341,21 @@ export default function Home({
                     .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-                    .glass-nav { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-                    .dark .glass-nav { background: rgba(15, 23, 42, 0.9); }
+                    .glass-nav { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+                    .dark .glass-nav { background: rgba(15, 23, 42, 0.92); }
                 `}</style>
             </Head>
 
             {/* NAVBAR */}
-            <Navbar 
+            <Navbar
                 auth={auth}
                 store={store}
                 isScrolled={isScrolled}
+                filters={filters}
                 searchTerm={searchTerm}
                 handleInputChange={handleInputChange}
                 handleSearch={handleSearch}
+                handleClearSearch={handleClearSearch}
                 toggleDarkMode={toggleDarkMode}
                 isDark={isDark}
                 profileMenuRef={profileMenuRef}
@@ -333,7 +365,7 @@ export default function Home({
             />
 
             {/* HERO CAROUSEL & SEARCH SECTION */}
-            <HeroBanner 
+            <HeroBanner
                 bannerList={bannerList}
                 currentBanner={currentBanner}
                 setCurrentBanner={setCurrentBanner}
@@ -348,20 +380,22 @@ export default function Home({
                 searchTerm={searchTerm}
                 handleInputChange={handleInputChange}
                 handleSearch={handleSearch}
+                handleClearSearch={handleClearSearch}
                 isScrolled={isScrolled}
+                filters={filters}
             />
 
             {/* LIVE NOTIFICATION TOAST */}
-            <RecentPurchaseToast 
+            <RecentPurchaseToast
                 showNotif={showNotif && !showFabMenu && !showTrackModal && !showCategoryModal}
                 activeNotif={activeNotif}
             />
 
             {/* KONTEN UTAMA */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20 flex-1 w-full">
-                
+
                 {/* MENU LAYANAN UNGGULAN & SHORTCUT CEPAT */}
-                <QuickServicesGrid 
+                <QuickServicesGrid
                     filters={filters}
                     setShowTrackModal={setShowTrackModal}
                     effectiveAdminWa={effectiveAdminWa}
@@ -372,7 +406,7 @@ export default function Home({
                 <PpobBanner filters={filters} />
 
                 {/* FLASH SALE / PALING BANYAK DIBELI (REALTIME HARIAN) */}
-                <TopSellingSection 
+                <TopSellingSection
                     liveTopSelling={liveTopSelling}
                     productList={productList}
                     filters={filters}
@@ -381,7 +415,7 @@ export default function Home({
                 />
 
                 {/* SLIDER KATEGORI & PRODUK */}
-                <CategorySection 
+                <CategorySection
                     categoryList={categoryList}
                     manualCategories={manualCategories}
                     filters={filters}
@@ -391,10 +425,11 @@ export default function Home({
                     handleCategoryBrand={handleCategoryBrand}
                     handleCategoryTipe={handleCategoryTipe}
                     setShowCategoryModal={setShowCategoryModal}
+                    handleClearSearch={handleClearSearch}
                 />
 
                 {/* DAFTAR PRODUK (GRID) */}
-                <ProductGrid 
+                <ProductGrid
                     productList={productList}
                     promo={promo}
                     auth={auth}
@@ -403,15 +438,15 @@ export default function Home({
                 />
             </div>
 
-            {/* FOOTER 3 KOLOM */}
-            <FooterSection 
+            {/* FOOTER */}
+            <FooterSection
                 store={store}
                 effectiveAdminWa={effectiveAdminWa}
                 setShowTrackModal={setShowTrackModal}
             />
 
             {/* FLOATING ACTION BUTTON */}
-            <FloatingActionMenu 
+            <FloatingActionMenu
                 showFabMenu={showFabMenu}
                 setShowFabMenu={setShowFabMenu}
                 whatsappGroupLink={whatsappGroupLink}
@@ -420,7 +455,7 @@ export default function Home({
             />
 
             {/* MODAL LACAK PESANAN */}
-            <TrackOrderModal 
+            <TrackOrderModal
                 showTrackModal={showTrackModal}
                 setShowTrackModal={setShowTrackModal}
                 trackOrderId={trackOrderId}
@@ -432,14 +467,14 @@ export default function Home({
             />
 
             {/* MODAL SYARAT KETENTUAN */}
-            <TermsModal 
+            <TermsModal
                 showTerms={showTerms}
                 setShowTerms={setShowTerms}
                 terms={terms}
             />
 
             {/* MODAL KATEGORI */}
-            <CategoryModal 
+            <CategoryModal
                 showCategoryModal={showCategoryModal}
                 setShowCategoryModal={setShowCategoryModal}
                 categoryList={categoryList}
@@ -448,7 +483,7 @@ export default function Home({
             />
 
             {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) - PERSISTENT & SLEEK */}
-            <MobileBottomNav 
+            <MobileBottomNav
                 auth={auth}
                 showTrackModal={showTrackModal}
                 setShowTrackModal={setShowTrackModal}
@@ -459,4 +494,3 @@ export default function Home({
         </div>
     );
 }
-

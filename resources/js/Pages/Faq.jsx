@@ -196,7 +196,7 @@ export default function Faq({ store = {}, adminWhatsapp = '082317458496', whatsa
     };
 
     return (
-        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-hidden">
+        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-clip">
             <Head>
                 <title>{`Pusat Bantuan & FAQ - ${storeName}`}</title>
                 <meta name="description" content="Temukan jawaban cepat seputar cara pembelian akun premium, transaksi PPOB & pulsa, metode pembayaran QRIS/saldo, dan klaim garansi di PremiumKita." />

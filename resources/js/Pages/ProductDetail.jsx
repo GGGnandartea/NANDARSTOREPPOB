@@ -33,7 +33,7 @@ export default function ProductDetail({ product, auth }) {
     };
 
     return (
-        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300 overflow-x-hidden">
+        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300 overflow-x-clip">
             <Head title={`${product.name} - PremiumKita`} />
             <style dangerouslySetInnerHTML={{__html: `@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'); .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}} />
 
