@@ -87,6 +87,5 @@ export const extractBillSummary = (inquiry) => {
 export const BILL_SERVICES = [
   { id: 'pdam', label: 'PDAM Air Bersih (Kota / Kabupaten)', productId: null, placeholder: 'Contoh: 123456789', minLength: 4 },
   { id: 'pln_postpaid', label: 'PLN Pascabayar (Tagihan Listrik)', productId: '100301', placeholder: 'Contoh: 551600530024', minLength: 8 },
-  { id: 'pln_nontag', label: 'PLN Non-Taglis (Penyambungan Baru)', productId: '100311', placeholder: 'Contoh: 2140012018190', minLength: 8 },
   { id: 'bpjs', label: 'BPJS Kesehatan', productId: '900001', placeholder: 'Contoh: 8888800020839792', minLength: 8 },
 ];

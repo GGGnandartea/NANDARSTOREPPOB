@@ -40,7 +40,7 @@ export default function PpobTagihanPanel({ inquiryResult, isInquiring, onOpenChe
   }
 
   return (
-    <div className="lg:col-span-7 space-y-4">
+    <div className="lg:col-span-7 space-y-4 ppob-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">

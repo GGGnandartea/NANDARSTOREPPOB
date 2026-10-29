@@ -33,12 +33,11 @@ export default function PpobInputSection({
   selectedStreaming,
   setSelectedStreaming,
   streamingAccount,
-  setStreamingAccount,
   streamingSearch,
+  setStreamingAccount,
   setStreamingSearch,
   // Tagihan state
   tagihanType,
-  setTagihanType,
   tagihanCustomerId,
   setTagihanCustomerId,
   tagihanInquiryResult,
@@ -55,9 +54,15 @@ export default function PpobInputSection({
   const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
   const isBillTab = ['pdam', 'pln_postpaid', 'bpjs'].includes(activeTab);
   const selectedPdam = PDAM_PRODUCTS.find((product) => product.id === tagihanPdamRegion);
-  const filteredPdam = PDAM_PRODUCTS.filter((product) => product.name.toLowerCase().includes(tagihanPdamSearch.trim().toLowerCase()));
+  const filteredPdam = PDAM_PRODUCTS.filter((product) =>
+    product.name.toLowerCase().includes(tagihanPdamSearch.trim().toLowerCase())
+  );
+
   return (
-    <div className="bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5">
+    <div
+      key={activeTab}
+      className="ppob-fade-in bg-white dark:bg-[#131b2e] border border-gray-200/80 dark:border-white/5 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4 sm:space-y-5"
+    >
       {/* TAB 1: PULSA & DATA */}
       {activeTab === 'pulsa' && (
         <>
@@ -71,7 +76,7 @@ export default function PpobInputSection({
                 <p className="text-[11px] text-gray-400 font-medium">Operator terdeteksi otomatis</p>
               </div>
             </div>
-            <span className="text-xs font-black uppercase px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+            <span className="text-xs font-black uppercase px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 transition-all duration-300">
               {selectedOperator.name}
             </span>
           </div>
@@ -89,7 +94,7 @@ export default function PpobInputSection({
                 className="w-full pl-4 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
               />
               {phoneNumber.length >= 4 && (
-                <div className="absolute right-3.5 top-3.5 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-300 dark:border dark:border-emerald-500/40 shadow-xs">
+                <div className="ppob-fade-in absolute right-3.5 top-3.5 text-xs font-bold px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white dark:bg-emerald-500/20 dark:text-emerald-300 dark:border dark:border-emerald-500/40 shadow-xs">
                   {selectedOperator.name.split(' ')[0]}
                 </div>
               )}
@@ -110,10 +115,10 @@ export default function PpobInputSection({
                     type="button"
                     onClick={() => setSelectedOperator(op)}
                     aria-pressed={isSelected}
-                    className={`p-2.5 rounded-xl border text-center transition cursor-pointer text-xs font-black ${
+                    className={`p-2.5 rounded-xl border text-center transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer text-xs font-black ${
                       isSelected
-                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60 dark:shadow-xs'
-                        : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm scale-[1.02] dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60 dark:shadow-xs'
+                        : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0'
                     }`}
                   >
                     {op.id === 'wifi' ? op.name : op.name.split(' ')[0]}
@@ -122,24 +127,52 @@ export default function PpobInputSection({
               })}
             </div>
           </div>
+
           <div>
-            <p id="pulsa-type-label" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-2">Mau Beli Apa?</p>
-            <div role="group" aria-labelledby="pulsa-type-label" className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 dark:bg-gray-950/40 p-1.5">
-              {[{ id: 'pulsa', label: 'Pulsa' }, { id: 'data', label: 'Paket Data' }].map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  aria-pressed={pulsaType === type.id}
-                  onClick={() => { if (pulsaType !== type.id) setPulsaType(type.id); }}
-                  className={`min-h-11 rounded-xl px-3 py-3 text-xs font-black transition-colors ${pulsaType === type.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-white/5'}`}
-                >{type.label}</button>
-              ))}
+            <p id="pulsa-type-label" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-2">
+              Mau Beli Apa?
+            </p>
+            <div
+              role="group"
+              aria-labelledby="pulsa-type-label"
+              className="relative grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 dark:bg-gray-950/60 p-1.5 border border-gray-200/60 dark:border-white/5"
+            >
+              {/* Sliding Active Indicator */}
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute top-1.5 bottom-1.5 left-1.5 w-[calc(50%-0.5rem)] rounded-xl bg-emerald-600 shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  pulsaType === 'data' ? 'translate-x-[calc(100%+0.5rem)]' : 'translate-x-0'
+                }`}
+              />
+              {[
+                { id: 'pulsa', label: 'Pulsa' },
+                { id: 'data', label: 'Paket Data' },
+              ].map((type) => {
+                const selected = pulsaType === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      if (pulsaType !== type.id) setPulsaType(type.id);
+                    }}
+                    className={`relative z-10 min-h-11 rounded-xl px-3 py-3 text-xs font-black transition-colors duration-250 cursor-pointer ${
+                      selected
+                        ? 'text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </>
       )}
 
-      {/* TAB 2: TOKEN LISTRIK PLN (PRABAYAR SAJA — tagihan punya tab sendiri) */}
+      {/* TAB 2: TOKEN LISTRIK PLN (PRABAYAR SAJA) */}
       {activeTab === 'pln' && (
         <>
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
@@ -149,7 +182,7 @@ export default function PpobInputSection({
               </div>
               <div>
                 <h3 className="font-black text-sm text-gray-900 dark:text-white">Token Listrik Prabayar</h3>
-                <p className="text-[11px] text-gray-400 font-medium">Token langsung masuk ke meter</p>
+                <p className="text-[11px] text-gray-400 font-medium">Token 20 digit langsung tampil di struk</p>
               </div>
             </div>
           </div>
@@ -160,17 +193,18 @@ export default function PpobInputSection({
             </label>
             <input
               type="text"
+              inputMode="numeric"
               value={plnCustomerId}
               onChange={(e) => setPlnCustomerId(e.target.value.replace(/[^0-9]/g, ''))}
               placeholder="Contoh: 14012345678"
               className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
             />
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[11px] text-gray-400 mt-1.5">
               Masukkan 11–12 digit nomor meteran. Untuk tagihan bulanan, pilih
               <button
                 type="button"
                 onClick={() => onSwitchTab && onSwitchTab('pln_postpaid')}
-                className="ml-1 font-bold text-emerald-600 hover:underline"
+                className="ml-1 font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
               >
                 Pascabayar
               </button>.
@@ -205,15 +239,19 @@ export default function PpobInputSection({
                     setSelectedGame(game);
                     setSelectedProduct(null);
                   }}
-                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
+                  className={`p-3 rounded-xl border text-left transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex items-center gap-2.5 ${
                     isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
-                      : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm scale-[1.02] dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
+                      : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40 hover:-translate-y-0.5'
                   }`}
                 >
-                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md ${
-                    isSelected ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  }`}>
+                  <span
+                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md transition-colors ${
+                      isSelected
+                        ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300'
+                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
                     {game.badge}
                   </span>
                   <span className="text-xs font-black truncate">{game.name}</span>
@@ -237,21 +275,32 @@ export default function PpobInputSection({
             </div>
 
             {selectedGame.needZone && (
-              <div>
+              <div className="ppob-fade-in">
                 <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
                   {selectedGame.zoneLabel || 'Zone ID / Server'}
                 </label>
                 {selectedGame.servers ? (
-                  <select
-                    value={gameZoneId}
-                    onChange={(e) => setGameZoneId(e.target.value)}
-                    className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
-                  >
-                    <option value="">Pilih Server</option>
-                    {selectedGame.servers.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label={selectedGame.zoneLabel || 'Pilih Server'}>
+                    {selectedGame.servers.map((s) => {
+                      const activeServer = gameZoneId === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={activeServer}
+                          onClick={() => setGameZoneId(s)}
+                          className={`px-3 py-2.5 rounded-xl border text-xs font-black transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex items-center justify-between ${
+                            activeServer
+                              ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs scale-[1.01] dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
+                              : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
+                          }`}
+                        >
+                          <span>{s}</span>
+                          {activeServer && <Icons.Check className="w-3.5 h-3.5 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <input
                     type="text"
@@ -293,15 +342,19 @@ export default function PpobInputSection({
                     setSelectedEwallet(ew);
                     setSelectedProduct(null);
                   }}
-                  className={`p-3.5 rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`p-3.5 rounded-xl border text-center transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex items-center justify-center gap-2 ${
                     isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
-                      : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm scale-[1.02] dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
+                      : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40 hover:-translate-y-0.5'
                   }`}
                 >
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                    isSelected ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  }`}>
+                  <span
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                      isSelected
+                        ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300'
+                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
                     {ew.badge}
                   </span>
                   <span className="text-xs font-black">{ew.name}</span>
@@ -381,15 +434,19 @@ export default function PpobInputSection({
                       setSelectedStreaming(stream);
                       setSelectedProduct(null);
                     }}
-                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center gap-2 ${
+                    className={`p-2.5 rounded-xl border text-left transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex items-center gap-2 ${
                       isSelected
                         ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
                         : 'bg-gray-50 dark:bg-gray-900/60 border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-300 hover:border-emerald-500/40'
                     }`}
                   >
-                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
-                      isSelected ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                    }`}>
+                    <span
+                      className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        isSelected
+                          ? 'bg-white/20 text-white dark:bg-emerald-500/30 dark:text-emerald-300'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
                       {stream.badge}
                     </span>
                     <span className="text-xs font-black truncate">{stream.name}</span>
@@ -418,7 +475,7 @@ export default function PpobInputSection({
         </>
       )}
 
-      {/* TAB: TAGIHAN (PDAM, TAGIHAN PLN, BPJS — masing-masing menu terpisah) */}
+      {/* TAB: TAGIHAN (PDAM, TAGIHAN PLN PASCABAYAR, BPJS — masing-masing menu terpisah) */}
       {isBillTab && (
         <>
           <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/5">
@@ -434,37 +491,14 @@ export default function PpobInputSection({
                 </h3>
                 <p className="text-[11px] text-gray-400 font-medium">
                   {activeTab === 'pdam' && 'Air bersih seluruh kota & kabupaten'}
-                  {activeTab === 'pln_postpaid' && 'Listrik pascabayar & non-taglis'}
-                  {activeTab === 'bpjs' && 'Iuran BPJS Kesehatan'}
+                  {activeTab === 'pln_postpaid' && 'Tagihan listrik bulanan pascabayar'}
+                  {activeTab === 'bpjs' && 'Iuran bulanan BPJS Kesehatan'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            {/* PLN punya dua jenis transaksi: tagihan rutin dan penyambungan baru */}
-            {activeTab === 'pln_postpaid' && (
-              <div>
-                <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                  Jenis Tagihan PLN
-                </label>
-                <select
-                  value={tagihanType}
-                  onChange={(e) => {
-                    setTagihanType(e.target.value);
-                    setTagihanCustomerId('');
-                    setTagihanInquiryResult(null);
-                    setSelectedProduct(null);
-                  }}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
-                >
-                  {BILL_SERVICES.filter((s) => s.id === 'pln_postpaid' || s.id === 'pln_nontag').map((service) => (
-                    <option key={service.id} value={service.id}>{service.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
+          <div className="space-y-3.5">
             {/* Pilih wilayah PDAM karena setiap kota/kabupaten punya kode produk sendiri */}
             {tagihanType === 'pdam' && (
               <div>
@@ -490,11 +524,22 @@ export default function PpobInputSection({
                   placeholder="Cari kota / kabupaten..."
                   className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition mb-2"
                 />
-                <div role="group" aria-labelledby="pdam-region-label" className="max-h-52 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 p-1 space-y-1">
+                <div
+                  role="group"
+                  aria-labelledby="pdam-region-label"
+                  className="max-h-52 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 p-1 space-y-1"
+                >
                   {filteredPdam.map((product) => {
                     const selected = product.id === tagihanPdamRegion;
                     return (
-                      <label key={product.id} className={`min-h-11 flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-semibold cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-emerald-500 ${selected ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5'}`}>
+                      <label
+                        key={product.id}
+                        className={`min-h-11 flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-semibold cursor-pointer transition-all duration-200 focus-within:ring-2 focus-within:ring-emerald-500 ${
+                          selected
+                            ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5'
+                        }`}
+                      >
                         <input
                           type="radio"
                           name="pdam-region"
@@ -512,7 +557,11 @@ export default function PpobInputSection({
                       </label>
                     );
                   })}
-                  {filteredPdam.length === 0 && <p className="px-3 py-4 text-xs text-gray-500 dark:text-gray-400">Wilayah tidak ditemukan. Coba nama kota atau kabupaten lain.</p>}
+                  {filteredPdam.length === 0 && (
+                    <p className="px-3 py-4 text-xs text-gray-500 dark:text-gray-400">
+                      Wilayah tidak ditemukan. Coba nama kota atau kabupaten lain.
+                    </p>
+                  )}
                 </div>
                 <p role="status" className={`mt-2 text-xs font-semibold ${selectedPdam ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
                   {selectedPdam ? `Terpilih: ${selectedPdam.name}` : 'Pilih wilayah PDAM sebelum cek tagihan.'}
@@ -523,21 +572,47 @@ export default function PpobInputSection({
             {/* BPJS memerlukan jumlah bulan tagihan yang akan dibayar */}
             {tagihanType === 'bpjs' && (
               <div>
-                <label className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                  Jumlah Bulan Tagihan
+                <label htmlFor="bpjs-period-select" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-2">
+                  Periode Pembayaran (Bulan)
                 </label>
+                <div className="grid grid-cols-4 gap-1.5 mb-2" role="group" aria-label="Pilihan cepat bulan BPJS">
+                  {['01', '02', '03', '06'].map((code) => {
+                    const activePeriod = tagihanPeriod === code;
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        aria-pressed={activePeriod}
+                        onClick={() => {
+                          setTagihanPeriod(code);
+                          setTagihanInquiryResult(null);
+                          setSelectedProduct(null);
+                        }}
+                        className={`py-2 px-2 rounded-xl border text-xs font-black transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer ${
+                          activePeriod
+                            ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs scale-[1.02] dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/60'
+                            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-emerald-500/40'
+                        }`}
+                      >
+                        {parseInt(code, 10)} Bln
+                      </button>
+                    );
+                  })}
+                </div>
                 <select
+                  id="bpjs-period-select"
+                  name="periode"
                   value={tagihanPeriod}
                   onChange={(e) => {
                     setTagihanPeriod(e.target.value);
                     setTagihanInquiryResult(null);
                     setSelectedProduct(null);
                   }}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
+                  className="animated-select w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition cursor-pointer"
                 >
                   {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((code) => (
                     <option key={code} value={code}>
-                      {parseInt(code, 10)} Bulan
+                      Bayar {parseInt(code, 10)} Bulan
                     </option>
                   ))}
                 </select>
@@ -546,7 +621,7 @@ export default function PpobInputSection({
 
             <div>
               <label htmlFor="bill-customer-id" className="block text-[11px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                Nomor Pelanggan
+                {activeTab === 'pln_postpaid' ? 'ID Pelanggan PLN Pascabayar' : 'Nomor Pelanggan'}
               </label>
               <input
                 id="bill-customer-id"
@@ -561,12 +636,22 @@ export default function PpobInputSection({
                 placeholder={activeBillService.placeholder || 'Contoh: 123456789'}
                 className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
               />
+              {activeTab === 'pln_postpaid' && (
+                <p className="text-[11px] text-gray-400 mt-1.5">
+                  Masukkan 12 digit ID Pelanggan PLN Pascabayar untuk cek rincian tagihan bulanan.
+                </p>
+              )}
             </div>
 
             <button
               type="button"
               onClick={handleTagihanInquiry}
-              disabled={isTagihanInquiring || (tagihanType === 'pdam' && !selectedPdam) || !tagihanCustomerId || tagihanCustomerId.length < (activeBillService.minLength || 4)}
+              disabled={
+                isTagihanInquiring ||
+                (tagihanType === 'pdam' && !selectedPdam) ||
+                !tagihanCustomerId ||
+                tagihanCustomerId.length < (activeBillService.minLength || 4)
+              }
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isTagihanInquiring ? (
@@ -585,7 +670,7 @@ export default function PpobInputSection({
             </button>
 
             {tagihanInquiryResult?.summary && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs space-y-1.5">
+              <div className="ppob-fade-in p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-gray-500 font-medium">Nama:</span>
                   <span className="font-black text-gray-900 dark:text-white text-right">{tagihanInquiryResult.summary.customerName}</span>
@@ -602,4 +687,3 @@ export default function PpobInputSection({
     </div>
   );
 }
-

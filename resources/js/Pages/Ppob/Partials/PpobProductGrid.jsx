@@ -9,7 +9,7 @@ export default function PpobProductGrid({
   title = 'Pilih Nominal & Produk',
 }) {
   return (
-    <div className="lg:col-span-7 space-y-4">
+    <div className="lg:col-span-7 space-y-4 ppob-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -52,14 +52,14 @@ export default function PpobProductGrid({
               <div
                 key={item.code}
                 onClick={() => { if (canBuy) onOpenCheckout(item); }}
-                className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
+                className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
                   isMaintenance
                     ? 'bg-amber-500/5 border-amber-500/30 opacity-75'
                     : !canBuy
                     ? 'bg-gray-100 dark:bg-white/5 opacity-50 cursor-not-allowed'
                     : isSelected
-                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
-                    : 'bg-white dark:bg-[#131b2e] border-gray-200/80 dark:border-white/5 hover:border-emerald-500/50 hover:shadow-md'
+                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/20 -translate-y-0.5'
+                    : 'bg-white dark:bg-[#131b2e] border-gray-200/80 dark:border-white/5 hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5'
                 }`}
               >
                 <div>
