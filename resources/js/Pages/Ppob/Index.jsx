@@ -550,17 +550,26 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       }
 
       if (res.ok && data.status === 'success') {
-        if (!user) rememberGuestOrder({ ...data, product_name: selectedProduct.name });
+        const normalizedOrder = {
+          ...data,
+          product_name: data.product_name || selectedProduct?.name || 'Layanan PPOB',
+          total_amount: data.total_amount ?? data.total_nominal ?? selectedProduct?.price ?? 0,
+        };
+        if (!user) rememberGuestOrder(normalizedOrder);
         if (typeof data.user_balance === 'number') {
           setUserBalance(data.user_balance);
         }
         if (paymentMethod === 'balance') {
           setCheckoutModal(false);
-          setSuccessOrder(data);
+          if (BILL_TABS.includes(activeTab)) {
+            setTagihanInquiryResult(null);
+            setSelectedProduct(null);
+          }
+          setSuccessOrder(normalizedOrder);
         } else {
           // QRIS mode
           setCheckoutModal(false);
-          setQrisData(data);
+          setQrisData(normalizedOrder);
           setQrisTimer(300);
         }
       } else {
@@ -619,7 +628,14 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
           clearInterval(poller);
           setQrisData(null);
           setCheckoutModal(false);
-          setSuccessOrder(data);
+          if (BILL_TABS.includes(activeTab)) {
+            setTagihanInquiryResult(null);
+            setSelectedProduct(null);
+          }
+          setSuccessOrder({
+            ...qrisData,
+            ...data,
+          });
         } else if (['expired', 'failed', 'canceled'].includes(data.payment_status)) {
           clearInterval(poller);
           setQrisData(null);

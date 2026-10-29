@@ -13,24 +13,22 @@ export default function PpobSuccessModal({
   const [isRechecking, setIsRechecking] = useState(false);
   const [recheckFeedback, setRecheckFeedback] = useState('');
 
-  if (!successOrder) return null;
-
-  const status = String(successOrder.order_status || successOrder.status || '').toLowerCase();
+  const status = String(successOrder?.order_status || successOrder?.status || '').toLowerCase();
   const completed = ['completed', 'success', 'lunas'].includes(status);
   const failed = ['failed', 'refunded'].includes(status);
-  const isPending = !completed && !failed;
-  const isGuestBuyer = !user && !successOrder.is_refunded;
+  const isPending = Boolean(successOrder) && !completed && !failed;
+  const isGuestBuyer = !user && !successOrder?.is_refunded;
 
-  const invoiceNumber = successOrder.invoice_number || successOrder.order_id || '';
+  const invoiceNumber = successOrder?.invoice_number || successOrder?.order_id || '';
   const invoiceUrl =
-    successOrder.invoice_url ||
-    successOrder.redirect_url ||
+    successOrder?.invoice_url ||
+    successOrder?.redirect_url ||
     (invoiceNumber ? `/order/invoice/${invoiceNumber}` : '/ppob');
 
   // Extract guest token from invoice_url if present so /ppob/check-status/{orderId}?token=... works for guests too
   const getGuestTokenParam = () => {
     try {
-      if (successOrder.guest_access_token) return `?token=${encodeURIComponent(successOrder.guest_access_token)}`;
+      if (successOrder?.guest_access_token) return `?token=${encodeURIComponent(successOrder.guest_access_token)}`;
       if (invoiceUrl && invoiceUrl.includes('token=')) {
         const u = new URL(invoiceUrl, window.location.origin);
         const tk = u.searchParams.get('token');
@@ -43,7 +41,7 @@ export default function PpobSuccessModal({
   };
 
   const handleRecheckNow = async (silent = false) => {
-    if (!invoiceNumber || isRechecking) return;
+    if (!successOrder || !invoiceNumber || isRechecking) return;
     if (!silent) {
       setIsRechecking(true);
       setRecheckFeedback('');
@@ -95,14 +93,21 @@ export default function PpobSuccessModal({
   // Auto-poll every 8 seconds while modal is open and order is still pending
   useEffect(() => {
     setRecheckFeedback('');
-    if (!invoiceNumber || !isPending) return;
+    if (!successOrder || !invoiceNumber || !isPending) return;
     const timer = setInterval(() => {
       if (!document.hidden) {
         handleRecheckNow(true);
       }
     }, 8000);
     return () => clearInterval(timer);
-  }, [invoiceNumber, isPending]);
+  }, [ Boolean(successOrder), invoiceNumber, isPending ]);
+
+  if (!successOrder) return null;
+
+  const safeSnText =
+    typeof successOrder.sn_or_account === 'object' && successOrder.sn_or_account !== null
+      ? JSON.stringify(successOrder.sn_or_account)
+      : String(successOrder.sn_or_account || '');
 
   const cleanAdminWa = String(adminWhatsapp || '6282317458496').replace(/[^0-9]/g, '').replace(/^0/, '62');
   const fullInvoiceLink =
@@ -235,18 +240,18 @@ export default function PpobSuccessModal({
           </div>
         )}
 
-        {completed && successOrder.sn_or_account && (
+        {completed && safeSnText && (
           <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-left space-y-1.5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
               Nomor Seri (SN) / Kode Token Pengisian:
             </p>
             <div className="flex items-center justify-between gap-2">
               <span className="font-mono font-black text-sm text-gray-900 dark:text-white break-all">
-                {successOrder.sn_or_account}
+                {safeSnText}
               </span>
               <button
                 type="button"
-                onClick={() => copyToClipboard(successOrder.sn_or_account)}
+                onClick={() => copyToClipboard(safeSnText)}
                 className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shrink-0 cursor-pointer transition"
               >
                 {isCopied ? 'Tersalin' : 'Salin'}

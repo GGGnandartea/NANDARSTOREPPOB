@@ -109,7 +109,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   // Cek apakah teks akun masih berupa status tunggu provider
   const isAccountPending = (text) => {
     if (!text) return true;
-    const lower = text.toLowerCase();
+    const lower = String(text).toLowerCase();
     return (
       lower.includes('sedang diproses') ||
       lower.includes('menunggu') ||

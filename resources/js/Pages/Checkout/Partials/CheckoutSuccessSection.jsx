@@ -18,7 +18,11 @@ export default function CheckoutSuccessSection({
   isResendingWa,
   fmt,
 }) {
-  const accountText = completedOrder?.sn_or_account || balanceSuccess?.sn_or_account;
+  const rawAccountText = completedOrder?.sn_or_account || balanceSuccess?.sn_or_account;
+  const accountText =
+    typeof rawAccountText === 'object' && rawAccountText !== null
+      ? JSON.stringify(rawAccountText, null, 2)
+      : String(rawAccountText || '');
   const currentOrderId = completedOrder?.order_id || balanceSuccess?.order_id || orderId;
   const productName = completedOrder?.product_name || product?.name;
   const totalAmount = completedOrder?.total_amount || balanceSuccess?.total_nominal || finalPrice;

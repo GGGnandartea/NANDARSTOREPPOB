@@ -8,6 +8,7 @@ const formatTime = value => {
         : null;
 };
 export default function OrderProgress({ order }) {
+    if (!order || typeof order !== 'object') return null;
     const { step, exception, isPpob } = orderProgress(order);
     const updated = formatTime(order.updated_at);
     const created = formatTime(order.placed_at || order.created_at);

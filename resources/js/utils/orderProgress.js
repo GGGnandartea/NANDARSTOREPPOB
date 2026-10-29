@@ -1,7 +1,8 @@
-export function orderProgress(order) {
-    const status = String(order.order_status || order.status || '').toLowerCase();
-    const payment = String(order.payment_status || '').toLowerCase();
-    const isPpob = order.product_type === 'ppob' || String(order.invoice_number || '').startsWith('PPOB-');
+export function orderProgress(order = {}) {
+    const safeOrder = order && typeof order === 'object' ? order : {};
+    const status = String(safeOrder.order_status || safeOrder.status || '').toLowerCase();
+    const payment = String(safeOrder.payment_status || '').toLowerCase();
+    const isPpob = safeOrder.product_type === 'ppob' || String(safeOrder.invoice_number || safeOrder.order_id || '').startsWith('PPOB-');
     const paid = ['paid', 'success', 'settlement', 'lunas'].includes(payment) || status === 'paid';
     const stopped = {
         refunded: isPpob ? 'Transaksi gagal — Dana telah dikembalikan (refund) otomatis ke Saldo Akun' : 'Dana dikembalikan',
