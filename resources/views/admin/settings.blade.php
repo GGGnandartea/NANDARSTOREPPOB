@@ -6,6 +6,7 @@
         'api' => 'Provider API',
         'whatsapp' => 'Kontak & CS',
         'promo' => 'Harga Coret',
+        'turnstile' => 'Cloudflare Turnstile',
     ];
 @endphp
 
@@ -148,6 +149,145 @@
                 </button>
             </div>
         </form>
+
+    @elseif($activeSection === 'turnstile')
+        <!-- ======================================================== -->
+        <!-- SECTION: KEAMANAN CLOUDFLARE TURNSTILE (ANTI-BOT)        -->
+        <!-- ======================================================== -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+                    <span>Keamanan Cloudflare Turnstile</span>
+                    @if(($turnstileEnabled ?? '0') === '1' && !empty($turnstileSiteKey) && !empty($turnstileSecretKey))
+                        <span class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-green text-white shadow-sm shadow-emerald-500/20">
+                            PROTEKSI AKTIF
+                        </span>
+                    @else
+                        <span class="text-xs font-black px-2.5 py-0.5 rounded-full bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300">
+                            NONAKTIF
+                        </span>
+                    @endif
+                </h1>
+                <p class="text-xs font-semibold text-gray-400 mt-1">Lindungi halaman pendaftaran dan login dari bot spammer otomatis menggunakan verifikasi Cloudflare Turnstile.</p>
+            </div>
+            <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener" class="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-300 hover:border-orange-500 transition flex items-center gap-2 self-start sm:self-auto">
+                <span>Buka Dashboard Cloudflare</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <form action="{{ route('admin.settings.save') }}" method="POST" class="admin-card p-6 sm:p-8 space-y-6 lg:col-span-2" x-data="{ showSecret: false }">
+                @csrf
+                <input type="hidden" name="turnstile_form_submitted" value="1">
+
+                <div class="flex items-center justify-between gap-3 pb-4 border-b border-gray-100 dark:border-white/5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-sm shadow-sm">
+                            CF
+                        </div>
+                        <div>
+                            <h3 class="font-black text-base text-gray-900 dark:text-white">Konfigurasi Widget &amp; Kunci Turnstile</h3>
+                            <p class="text-[11px] font-semibold text-gray-400">Verifikasi token real-time ke server challenges.cloudflare.com</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Aktif / Nonaktif -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Status Proteksi Turnstile</label>
+                        <select name="turnstile_enabled" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
+                            <option value="1" @selected(($turnstileEnabled ?? '0') === '1')>🟢 AKTIF (Wajib Verifikasi Cloudflare)</option>
+                            <option value="0" @selected(($turnstileEnabled ?? '0') !== '1')>⚪ NONAKTIF (Tanpa Captcha)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Terapkan Pada Halaman</label>
+                        <div class="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10">
+                            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-gray-800 dark:text-gray-200">
+                                <input type="hidden" name="turnstile_on_register" value="0">
+                                <input type="checkbox" name="turnstile_on_register" value="1" @checked(($turnstileOnRegister ?? '1') === '1') class="w-4 h-4 rounded text-orange-500 focus:ring-orange-500">
+                                <span>Halaman Daftar Akun (<code class="text-orange-500 font-mono">/register</code>)</span>
+                            </label>
+                            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-gray-800 dark:text-gray-200">
+                                <input type="hidden" name="turnstile_on_login" value="0">
+                                <input type="checkbox" name="turnstile_on_login" value="1" @checked(($turnstileOnLogin ?? '0') === '1') class="w-4 h-4 rounded text-orange-500 focus:ring-orange-500">
+                                <span>Halaman Masuk / Login (<code class="text-orange-500 font-mono">/login</code>)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Site Key & Secret Key -->
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Turnstile Site Key (Client-Side)</label>
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">
+                                Public Widget Key
+                            </span>
+                        </div>
+                        <input type="text" id="turnstileSiteKeyInput" name="turnstile_site_key" value="{{ $turnstileSiteKey ?? '' }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
+                        <p class="text-[11px] text-gray-400 mt-1.5">
+                            Digunakan untuk menampilkan kotak centang <strong class="text-gray-600 dark:text-gray-300">Success! Cloudflare</strong> di halaman publik.
+                        </p>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Turnstile Secret Key (Server-Side)</label>
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                Siteverify API Secret
+                            </span>
+                        </div>
+                        <div class="relative">
+                            <input :type="showSecret ? 'text' : 'password'" id="turnstileSecretKeyInput" name="turnstile_secret_key" value="{{ $turnstileSecretKey ?? '' }}" class="w-full pl-4 pr-20 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" placeholder="Contoh: 0x4AAAAAA...">
+                            <button type="button" @click="showSecret = !showSecret" class="absolute right-3 top-2.5 px-2.5 py-1 rounded-lg bg-gray-200/70 dark:bg-white/10 text-[10px] font-black text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <span x-text="showSecret ? 'Sembunyikan' : 'Lihat'">Lihat</span>
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-1.5">
+                            Digunakan oleh backend (<code class="text-emerald-500 font-mono">AuthController.php</code>) untuk memvalidasi token ke <code class="font-mono">challenges.cloudflare.com/turnstile/v0/siteverify</code>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-3">
+                    <button type="button"
+                            onclick="document.getElementById('turnstileSiteKeyInput').value='1x00000000000000000000AA'; document.getElementById('turnstileSecretKeyInput').value='1x0000000000000000000000000000000AA';"
+                            class="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 font-bold text-xs transition cursor-pointer">
+                        Isi Key Testing Cloudflare (Simulasi)
+                    </button>
+
+                    <button type="submit" class="gradient-orange text-white font-black py-3.5 px-8 rounded-xl shadow-lg shadow-orange-500/20 transition-all hover:opacity-90 flex items-center gap-2 cursor-pointer text-xs">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                        <span>Simpan Pengaturan Turnstile</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Panduan Cara Mendapatkan Key -->
+            <div class="admin-card p-6 space-y-4">
+                <div class="flex items-center gap-2.5 pb-3 border-b border-gray-100 dark:border-white/5">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-black text-sm">
+                        i
+                    </div>
+                    <h4 class="font-black text-sm text-gray-900 dark:text-white">Cara Mendapatkan Key</h4>
+                </div>
+                <ol class="text-xs text-gray-600 dark:text-gray-300 space-y-2.5 list-decimal list-inside leading-relaxed font-medium">
+                    <li>Login ke <strong>dash.cloudflare.com</strong> lalu pilih menu <strong>Turnstile</strong> di sidebar kiri.</li>
+                    <li>Klik tombol <strong>Add Widget</strong> dan beri nama (misal: <code class="font-mono text-orange-500">PremiumKita</code>).</li>
+                    <li>Tambahkan domain Anda (<code class="font-mono">v2.premiumkita.com</code> dan <code class="font-mono">premiumkita.com</code>).</li>
+                    <li>Pilih mode <strong>Managed (Recommended)</strong> lalu klik <strong>Create</strong>.</li>
+                    <li>Salin <strong>Site Key</strong> &amp; <strong>Secret Key</strong> ke formulir di samping, ubah status menjadi <strong>AKTIF</strong>, lalu klik Simpan.</li>
+                </ol>
+                <div class="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold leading-relaxed">
+                    ✓ Widget Turnstile otomatis menyesuaikan ukuran layar HP maupun Desktop secara fleksibel (<code class="font-mono">size: flexible</code>) tanpa memotong tampilan formulir.
+                </div>
+            </div>
+        </div>
 
     @else
         <!-- ======================================================== -->

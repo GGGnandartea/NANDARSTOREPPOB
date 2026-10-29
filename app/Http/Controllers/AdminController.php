@@ -184,6 +184,13 @@ class AdminController extends Controller
             }
         }
 
+        // Cloudflare Turnstile Settings
+        $turnstileEnabled    = Setting::where('key', 'turnstile_enabled')->value('value') ?? '0';
+        $turnstileSiteKey    = Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '');
+        $turnstileSecretKey  = Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '');
+        $turnstileOnRegister = Setting::where('key', 'turnstile_on_register')->value('value') ?? '1';
+        $turnstileOnLogin    = Setting::where('key', 'turnstile_on_login')->value('value') ?? '0';
+
         return view('admin.settings', compact(
             'premkuApiKey', 'premkuApiSecret', 'premkuWebhookUrl', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
             'adminWhatsapp', 'botWhatsapp', 'whatsappGroupLink', 'premkuStatus', 'preflixStatus',
@@ -191,7 +198,8 @@ class AdminController extends Controller
             'kiosbankHost', 'kiosbankPort', 'kiosbankProtocol', 'kiosbankUsername', 'kiosbankPassword',
             'kiosbankMitra', 'kiosbankAccountId', 'kiosbankMerchantId', 'kiosbankMerchantName',
             'kiosbankCounterId', 'kiosbankMode', 'kiosbankMarkupType', 'kiosbankMarkupValue',
-            'kiosbankEnabled', 'kiosbankStatus', 'kiosbankPrivateKey', 'kiosbankPublicKey'
+            'kiosbankEnabled', 'kiosbankStatus', 'kiosbankPrivateKey', 'kiosbankPublicKey',
+            'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey', 'turnstileOnRegister', 'turnstileOnLogin'
         ));
     }
 
@@ -490,6 +498,24 @@ class AdminController extends Controller
             if ($request->has($field)) {
                 Setting::updateOrCreate(['key' => $field], ['value' => $request->input($field)]);
             }
+        }
+
+        // Cloudflare Turnstile Settings
+        if ($request->has('turnstile_form_submitted')) {
+            $tsSiteKey   = trim((string) $request->input('turnstile_site_key', ''));
+            $tsSecretKey = trim((string) $request->input('turnstile_secret_key', ''));
+            $tsEnabled   = ($request->input('turnstile_enabled') == '1' && $tsSiteKey !== '' && $tsSecretKey !== '') ? '1' : '0';
+
+            Setting::updateOrCreate(['key' => 'turnstile_enabled'], ['value' => $tsEnabled]);
+            Setting::updateOrCreate(['key' => 'turnstile_site_key'], ['value' => $tsSiteKey]);
+            Setting::updateOrCreate(['key' => 'turnstile_secret_key'], ['value' => $tsSecretKey]);
+            Setting::updateOrCreate(['key' => 'turnstile_on_register'], ['value' => $request->input('turnstile_on_register') == '1' ? '1' : '0']);
+            Setting::updateOrCreate(['key' => 'turnstile_on_login'], ['value' => $request->input('turnstile_on_login') == '1' ? '1' : '0']);
+
+            if ($request->input('turnstile_enabled') == '1' && ($tsSiteKey === '' || $tsSecretKey === '')) {
+                return back()->with('success', 'Key disimpan, namun status Turnstile otomatis dinonaktifkan karena Site Key atau Secret Key masih kosong.');
+            }
+            return back()->with('success', 'Pengaturan keamanan Cloudflare Turnstile berhasil disimpan.');
         }
 
         Cache::forget('promo_settings');

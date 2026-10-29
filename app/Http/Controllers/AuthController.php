@@ -16,13 +16,81 @@ use Inertia\Inertia;
 
 class AuthController extends Controller
 {
+    protected function getTurnstileConfig(): array
+    {
+        $enabled    = Setting::where('key', 'turnstile_enabled')->value('value') === '1';
+        $siteKey    = trim((string) (Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '')));
+        $secretKey  = trim((string) (Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '')));
+        $onRegister = (Setting::where('key', 'turnstile_on_register')->value('value') ?? '1') === '1';
+        $onLogin    = (Setting::where('key', 'turnstile_on_login')->value('value') ?? '0') === '1';
+
+        $isConfigured = $enabled && $siteKey !== '' && $secretKey !== '';
+
+        return [
+            'enabled'              => $isConfigured,
+            'site_key'             => $siteKey,
+            'secret_key'           => $secretKey,
+            'enabled_for_register' => $isConfigured && $onRegister,
+            'enabled_for_login'    => $isConfigured && $onLogin,
+        ];
+    }
+
+    protected function verifyTurnstileToken(Request $request, string $context = 'register'): void
+    {
+        $config = $this->getTurnstileConfig();
+        $shouldVerify = $context === 'login'
+            ? $config['enabled_for_login']
+            : $config['enabled_for_register'];
+
+        if (!$shouldVerify) {
+            return;
+        }
+
+        $token = trim((string) ($request->input('cf-turnstile-response') ?: $request->input('turnstile_token', '')));
+        if ($token === '') {
+            throw ValidationException::withMessages([
+                'turnstile' => 'Silakan selesaikan verifikasi keamanan Cloudflare terlebih dahulu.',
+            ]);
+        }
+
+        try {
+            $response = Http::asForm()
+                ->timeout(8)
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret'   => $config['secret_key'],
+                    'response' => $token,
+                    'remoteip' => $request->ip(),
+                ]);
+
+            $result = $response->json();
+            if (!$response->successful() || empty($result['success'])) {
+                throw ValidationException::withMessages([
+                    'turnstile' => 'Verifikasi keamanan Cloudflare gagal atau sudah kedaluwarsa. Silakan ulangi centang verifikasi.',
+                ]);
+            }
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('[Turnstile] Gagal menghubungi siteverify Cloudflare: ' . $e->getMessage());
+            throw ValidationException::withMessages([
+                'turnstile' => 'Gagal memvalidasi keamanan Cloudflare. Silakan periksa koneksi dan coba lagi.',
+            ]);
+        }
+    }
+
     public function session(Request $request) {
         return response()->json(['token' => $request->session()->token()])
             ->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
     public function showLoginForm() {
-        return Inertia::render('Login');
+        $ts = $this->getTurnstileConfig();
+        return Inertia::render('Login', [
+            'turnstile' => [
+                'enabled'  => $ts['enabled_for_login'],
+                'site_key' => $ts['site_key'],
+            ],
+        ]);
     }
 
     public function login(Request $request) {
@@ -30,6 +98,8 @@ class AuthController extends Controller
             'email' => 'required|email',
             'password' => 'required'
         ]);
+
+        $this->verifyTurnstileToken($request, 'login');
 
         $emailInput = trim($credentials['email']);
         $plainPassword = (string) $credentials['password'];
@@ -131,6 +201,7 @@ class AuthController extends Controller
         $promoTitle = Setting::where('key', 'reseller_promo_title')->value('value') ?: 'PROMO SPESIAL: DAFTAR RESELLER VIP GRATIS!';
         $promoMessage = Setting::where('key', 'reseller_promo_message')->value('value') ?: 'Nikmati harga modal termurah khusus mitra Reseller VIP langsung aktif tanpa biaya aktivasi!';
         $promoBadge = Setting::where('key', 'reseller_promo_badge')->value('value') ?: 'PROMO TERBATAS';
+        $ts = $this->getTurnstileConfig();
 
         return Inertia::render('Register', [
             'resellerSettings' => [
@@ -139,7 +210,11 @@ class AuthController extends Controller
                 'promo_title'   => $promoTitle,
                 'promo_message' => $promoMessage,
                 'promo_badge'   => $promoBadge,
-            ]
+            ],
+            'turnstile' => [
+                'enabled'  => $ts['enabled_for_register'],
+                'site_key' => $ts['site_key'],
+            ],
         ]);
     }
 
@@ -155,6 +230,8 @@ class AuthController extends Controller
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
             'password.min' => 'Password minimal 8 karakter.'
         ]);
+
+        $this->verifyTurnstileToken($request, 'register');
 
         $isReseller = $request->role === 'reseller';
         $isFree = Setting::where('key', 'reseller_registration_free')->value('value') == '1';

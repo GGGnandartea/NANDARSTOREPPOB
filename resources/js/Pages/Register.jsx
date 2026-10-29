@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { submitAuth, authErrors } from '../lib/authRequest';
+import TurnstileWidget from '../Components/TurnstileWidget';
 
 export default function Register() {
-    const { store, resellerSettings } = usePage().props;
+    const { store, resellerSettings, turnstile } = usePage().props;
     const isFreeReseller = Boolean(resellerSettings?.is_free);
     const resellerFee = Number(resellerSettings?.fee ?? 20000);
     const promoTitle = resellerSettings?.promo_title || 'PROMO RESELLER VIP GRATIS!';
     const promoMessage = resellerSettings?.promo_message || 'Daftar Reseller VIP sekarang dan nikmati harga modal termurah seumur hidup tanpa biaya aktivasi!';
     const promoBadge = resellerSettings?.promo_badge || 'PROMO VIP';
+    const turnstileEnabled = Boolean(turnstile?.enabled && turnstile?.site_key);
+    const turnstileSiteKey = turnstile?.site_key || '';
 
     const [role, setRole] = useState('user');
     const [name, setName] = useState('');
@@ -16,6 +19,8 @@ export default function Register() {
     const [whatsapp, setWhatsapp] = useState('');
     const [password, setPassword] = useState('');
     const [passwordConfirmation, setPasswordConfirmation] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
     
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
@@ -55,6 +60,12 @@ export default function Register() {
         e.preventDefault();
         if (processing) return;
         setErrors({});
+
+        if (turnstileEnabled && !turnstileToken) {
+            setErrors({ turnstile: 'Silakan selesaikan verifikasi keamanan Cloudflare terlebih dahulu.' });
+            return;
+        }
+
         setProcessing(true);
 
         const payload = {
@@ -64,6 +75,7 @@ export default function Register() {
             password,
             password_confirmation: passwordConfirmation,
             role,
+            'cf-turnstile-response': turnstileToken,
         };
 
         try {
@@ -77,6 +89,9 @@ export default function Register() {
             }
         } catch (error) {
             setErrors(authErrors(error));
+            if (turnstileEnabled) {
+                setTurnstileResetKey((prev) => prev + 1);
+            }
         } finally {
             setProcessing(false);
         }
@@ -304,6 +319,22 @@ export default function Register() {
                                 </div>
                                 {errors.password_confirmation && <p className="text-red-500 text-[10px] font-bold mt-1 px-1">{errors.password_confirmation}</p>}
                             </div>
+
+                            {/* Cloudflare Turnstile Widget */}
+                            {turnstileEnabled && (
+                                <TurnstileWidget
+                                    siteKey={turnstileSiteKey}
+                                    onVerify={(token) => {
+                                        setTurnstileToken(token);
+                                        if (token && errors.turnstile) {
+                                            setErrors((prev) => ({ ...prev, turnstile: undefined }));
+                                        }
+                                    }}
+                                    resetKey={turnstileResetKey}
+                                    theme="dark"
+                                    error={errors.turnstile}
+                                />
+                            )}
 
                             {/* Tombol Submit */}
                             <button 

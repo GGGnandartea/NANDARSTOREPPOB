@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { submitAuth, authErrors } from '../lib/authRequest';
+import TurnstileWidget from '../Components/TurnstileWidget';
 
 export default function Login({ status }) {
-    const { flash, store } = usePage().props;
+    const { flash, store, turnstile } = usePage().props;
+    const turnstileEnabled = Boolean(turnstile?.enabled && turnstile?.site_key);
+    const turnstileSiteKey = turnstile?.site_key || '';
     const { data, setData, errors, reset, setError, clearErrors } = useForm({
         email: '',
         password: '',
@@ -12,6 +15,8 @@ export default function Login({ status }) {
 
     const [showPassword, setShowPassword] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
     useEffect(() => {
         return () => {
@@ -23,12 +28,24 @@ export default function Login({ status }) {
         e.preventDefault();
         if (processing) return;
         clearErrors();
+
+        if (turnstileEnabled && !turnstileToken) {
+            setError({ turnstile: 'Silakan selesaikan verifikasi keamanan Cloudflare terlebih dahulu.' });
+            return;
+        }
+
         setProcessing(true);
         try {
-            const result = await submitAuth('/login', data);
+            const result = await submitAuth('/login', {
+                ...data,
+                'cf-turnstile-response': turnstileToken,
+            });
             window.location.assign(result.redirect);
         } catch (error) {
             setError(authErrors(error));
+            if (turnstileEnabled) {
+                setTurnstileResetKey((prev) => prev + 1);
+            }
         } finally {
             setProcessing(false);
         }
@@ -244,6 +261,22 @@ export default function Login({ status }) {
                                     </span>
                                 </label>
                             </div>
+
+                            {/* Cloudflare Turnstile Widget (Opsional jika diaktifkan di Admin) */}
+                            {turnstileEnabled && (
+                                <TurnstileWidget
+                                    siteKey={turnstileSiteKey}
+                                    onVerify={(token) => {
+                                        setTurnstileToken(token);
+                                        if (token && errors.turnstile) {
+                                            clearErrors('turnstile');
+                                        }
+                                    }}
+                                    resetKey={turnstileResetKey}
+                                    theme="dark"
+                                    error={errors.turnstile}
+                                />
+                            )}
 
                             {/* Tombol Submit */}
                             <button 
