@@ -3,6 +3,14 @@
 /* Baris ini memaksa Tailwind untuk HANYA mengaktifkan mode gelap jika ada class 'dark' */
 @variant dark (&:where(.dark, .dark *));
 
+/* Global mobile & desktop anti-horizontal-overflow and dynamic viewport safeguard */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 /* Keep the drawer mounted so both opening and closing can animate. */
 .profile-drawer {
   visibility: hidden;

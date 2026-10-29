@@ -33,7 +33,7 @@ export default function ProductDetail({ product, auth }) {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300">
+        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0f172a] font-jakarta pb-20 transition-colors duration-300 overflow-x-hidden">
             <Head title={`${product.name} - PremiumKita`} />
             <style dangerouslySetInnerHTML={{__html: `@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap'); .font-jakarta { font-family: 'Plus Jakarta Sans', sans-serif; }`}} />
 
@@ -53,8 +53,8 @@ export default function ProductDetail({ product, auth }) {
                 <div className="bg-white dark:bg-gray-800 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden flex flex-col md:flex-row">
                     
                     {/* Gambar Produk (Kiri) */}
-                    <div className="w-full md:w-2/5 lg:w-1/3 bg-gray-50 dark:bg-gray-900 p-8 flex items-center justify-center relative">
-                        <div className="w-48 h-48 sm:w-64 sm:h-64 rounded-3xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 relative group">
+                    <div className="w-full md:w-2/5 lg:w-1/3 bg-gray-50 dark:bg-gray-900 p-5 sm:p-8 flex items-center justify-center relative">
+                        <div className="w-40 h-40 sm:w-64 sm:h-64 rounded-3xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700 relative group">
                             {product.image ? (
                                 <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={product.name} />
                             ) : (
@@ -69,7 +69,7 @@ export default function ProductDetail({ product, auth }) {
                     </div>
 
                     {/* Informasi & Tombol Aksi (Kanan) */}
-                    <div className="w-full md:w-3/5 lg:w-2/3 p-6 sm:p-10 flex flex-col">
+                    <div className="w-full md:w-3/5 lg:w-2/3 p-4 sm:p-10 flex flex-col">
                         
                         {/* Label Tipe */}
                         <div className="mb-3 flex flex-wrap items-center gap-2">

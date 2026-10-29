@@ -53,7 +53,7 @@ export default function TopupModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-y-auto max-h-[92dvh] border border-gray-100 dark:border-gray-700">
         <div className="bg-gradient-to-br from-[#0b1121] to-[#1e3a5f] p-5 flex items-center justify-between">
           <div>
             <h3 className="text-white font-black text-lg">Top Up Saldo</h3>

@@ -269,7 +269,7 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
     activeMenu === 'orders';
 
   return (
-    <div className="profile-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors">
+    <div className="profile-ui min-h-[100dvh] bg-gray-50 dark:bg-[#0f172a] font-jakarta transition-colors overflow-x-hidden">
       <Head>
         <title>{isReseller ? 'Profil VIP Reseller - PremiumKita' : 'Profil Saya - PremiumKita'}</title>
         <link

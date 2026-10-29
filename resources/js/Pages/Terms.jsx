@@ -39,7 +39,7 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
+        <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-hidden">
             <Head>
                 <title>{`Syarat & Ketentuan Layanan - ${storeName}`}</title>
                 <meta name="description" content={`Syarat & Ketentuan, aturan transaksi, serta kebijakan garansi resmi di ${storeName}.`} />
@@ -47,30 +47,31 @@ export default function Terms({ store = {}, terms = '', adminWhatsapp = '0823174
 
             {/* TOP NAVIGATION BAR */}
             <header className="sticky top-0 z-40 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-gray-200/80 dark:border-white/5">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
+                <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <Link
                             href="/"
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-600 text-xs font-bold text-gray-700 dark:text-gray-300 transition-all shadow-sm"
+                            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-orange-500 hover:text-white dark:hover:bg-orange-600 text-xs font-bold text-gray-700 dark:text-gray-300 transition-all shadow-sm shrink-0"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                             </svg>
-                            <span>Beranda Toko</span>
+                            <span className="hidden sm:inline">Beranda Toko</span>
+                            <span className="sm:hidden text-[11px] font-extrabold">Beranda</span>
                         </Link>
                         <div className="h-5 w-px bg-gray-200 dark:bg-white/10 hidden sm:block"></div>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
                             {store?.logo ? (
-                                <img src={store.logo} alt={storeName} className="w-8 h-8 rounded-lg object-contain bg-orange-500/10 p-0.5" />
+                                <img src={store.logo} alt={storeName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain bg-orange-500/10 p-0.5 shrink-0" />
                             ) : (
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-sm">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-[10px] sm:text-xs shadow-sm shrink-0">
                                     PK
                                 </div>
                             )}
-                            <div>
-                                <span className="font-black text-sm tracking-tight text-gray-900 dark:text-white flex items-center gap-1.5">
-                                    {storeName}
-                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                            <div className="min-w-0">
+                                <span className="font-black text-xs sm:text-sm tracking-tight text-gray-900 dark:text-white flex items-center gap-1.5 truncate">
+                                    <span className="truncate">{storeName}</span>
+                                    <span className="hidden sm:inline-flex text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 shrink-0">
                                         LEGAL & TERMS
                                     </span>
                                 </span>

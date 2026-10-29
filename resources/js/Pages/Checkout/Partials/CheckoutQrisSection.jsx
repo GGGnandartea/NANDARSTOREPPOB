@@ -95,7 +95,7 @@ export default function CheckoutQrisSection({
       </div>
 
       <p className="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-1">Total Pembayaran</p>
-      <p className="text-4xl font-black text-gray-900 dark:text-white mb-4">{fmt.rp(totalNominal)}</p>
+      <p className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white mb-4">{fmt.rp(totalNominal)}</p>
       <p className="text-[11px] text-orange-600 font-bold bg-orange-50 dark:bg-orange-900/20 py-1.5 px-3 rounded-lg inline-block mb-5 border border-orange-100 dark:border-orange-800">
         ⚠️ Scan QRIS menggunakan E-Wallet / M-Banking Anda.
       </p>
@@ -104,7 +104,7 @@ export default function CheckoutQrisSection({
         <span className="text-orange-500 select-all font-mono">{orderId}</span>
       </div>
       <div className="bg-white dark:bg-gray-800 p-4 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-gray-600 inline-block mb-6">
-        <div className="w-56 h-56 sm:w-60 sm:h-60 overflow-hidden rounded-2xl mx-auto bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
+        <div className="w-48 h-48 sm:w-60 sm:h-60 overflow-hidden rounded-2xl mx-auto bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
           {qrisUrl ? (
             <img src={qrisUrl} alt="QRIS Code" className="w-full h-full object-contain" />
           ) : (

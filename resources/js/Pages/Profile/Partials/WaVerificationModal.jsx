@@ -113,7 +113,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-emerald-500/30 text-gray-900 dark:text-white">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-y-auto max-h-[92dvh] border border-emerald-500/30 text-gray-900 dark:text-white">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-600 to-green-600 p-5 flex items-center justify-between text-white">

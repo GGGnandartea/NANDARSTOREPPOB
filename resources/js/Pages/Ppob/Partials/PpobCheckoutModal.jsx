@@ -15,8 +15,8 @@ export default function PpobCheckoutModal({
   if (!isOpen || !selectedProduct) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
-      <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-3xl w-full max-w-md p-6 sm:p-7 shadow-2xl relative overflow-hidden space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-white/10 rounded-3xl w-full max-w-md p-4 sm:p-7 shadow-2xl relative overflow-y-auto max-h-[92dvh] space-y-4 sm:space-y-5">
         {/* Header Modal */}
         <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-white/5">
           <div className="flex items-center gap-3">

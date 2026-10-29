@@ -479,7 +479,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const canGoBack = !orderId && !balanceSuccess;
 
   return (
-    <div className="checkout-ui min-h-screen bg-gray-50 dark:bg-[#0f172a] flex items-center justify-center p-4 sm:p-6 font-jakarta">
+    <div className="checkout-ui min-h-[100dvh] bg-gray-50 dark:bg-[#0f172a] flex items-start sm:items-center justify-center py-3 px-3 sm:p-6 font-jakarta overflow-x-hidden">
       <Head>
         <title>{`Checkout - ${store?.name || 'PremiumKita'}`}</title>
         <link
@@ -489,7 +489,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         <style>{`.font-jakarta{font-family:'Plus Jakarta Sans',sans-serif}`}</style>
       </Head>
 
-      <div className="w-full max-w-[440px] bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="w-full max-w-[440px] my-auto bg-white dark:bg-gray-900 rounded-3xl sm:rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* HEADER */}
         <CheckoutHeader
           store={store}
@@ -498,7 +498,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
           canGoBack={canGoBack}
         />
 
-        <div className="p-6 sm:p-8">
+        <div className="p-4 sm:p-8">
           {trackingData && <OrderProgress order={trackingData} />}
           {/* ═══ FORM INPUT ═══ */}
           {!orderId && !balanceSuccess && (

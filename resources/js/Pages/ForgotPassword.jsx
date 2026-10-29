@@ -170,7 +170,7 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#0b1121] flex flex-col justify-center items-center p-4 sm:p-6 font-jakarta relative overflow-hidden">
+        <div className="min-h-[100dvh] bg-[#0b1121] flex flex-col justify-start sm:justify-center items-center py-3 px-3.5 sm:p-6 font-jakarta relative overflow-x-hidden overflow-y-auto">
             <Head>
                 <title>{`Lupa Kata Sandi - ${store?.name || 'PremiumKita'}`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -178,22 +178,38 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
             </Head>
 
             {/* Glowing background */}
-            <div className="absolute top-[-10%] left-[20%] w-[400px] h-[400px] bg-gradient-to-br from-orange-600/30 to-transparent rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[10%] w-[300px] h-[300px] bg-gradient-to-tl from-cyan-600/20 to-transparent rounded-full mix-blend-screen filter blur-[80px] pointer-events-none"></div>
+            <div className="absolute top-[-10%] left-[20%] w-[300px] sm:w-[400px] h-[300px] sm:h-[400px] bg-gradient-to-br from-orange-600/30 to-transparent rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] right-[10%] w-[240px] sm:w-[300px] h-[240px] sm:h-[300px] bg-gradient-to-tl from-cyan-600/20 to-transparent rounded-full mix-blend-screen filter blur-[80px] pointer-events-none"></div>
 
-            {/* Top Back Link */}
-            <div className="absolute top-6 left-6 z-50">
+            {/* Top Back Link (Desktop) */}
+            <div className="hidden sm:block absolute top-6 left-6 z-50">
                 <Link href="/login" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs sm:text-sm font-bold text-gray-300 hover:text-white backdrop-blur-md transition-all group">
                     <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                     Kembali ke Login
                 </Link>
             </div>
 
-            <div className="w-full max-w-[440px] relative z-10 animate-[fadeIn_0.5s_ease-out] mt-12 sm:mt-0">
+            <div className="w-full max-w-[440px] relative z-10 animate-[fadeIn_0.5s_ease-out] my-auto">
                 
+                {/* Top Bar Ringkas untuk Mobile (HP) */}
+                <div className="flex sm:hidden items-center justify-between gap-2 mb-2.5">
+                    <Link href="/login" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:text-white backdrop-blur-md transition-all">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        <span>Login</span>
+                    </Link>
+                    <div className="inline-flex items-center gap-2">
+                        {store?.logo ? (
+                            <img src={store.logo} alt={store?.name || 'Logo'} className="w-7 h-7 object-contain rounded-lg p-0.5 bg-white/10" />
+                        ) : (
+                            <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-xs shadow-md shadow-orange-500/30">PK</div>
+                        )}
+                        <span className="text-base font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
+                    </div>
+                </div>
+
                 {/* Header Logo */}
-                <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center gap-2.5 mb-3">
+                <div className="text-center mb-3.5 sm:mb-6">
+                    <div className="hidden sm:inline-flex items-center justify-center gap-2.5 mb-3">
                         {store?.logo ? (
                             <img src={store.logo} alt={store?.name || 'Logo'} className="w-9 h-9 object-contain rounded-xl p-0.5 bg-white/10" />
                         ) : (
@@ -201,10 +217,10 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                         )}
                         <span className="text-xl font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
                     </div>
-                    <h2 className="text-2xl font-black text-white tracking-tight mb-1.5">
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-1 sm:mb-1.5">
                         {isSuccess ? 'Reset Berhasil!' : (step === 'input_phone' ? 'Reset Kata Sandi' : 'Verifikasi OTP WhatsApp')}
                     </h2>
-                    <p className="text-gray-400 text-xs font-medium px-4">
+                    <p className="text-gray-400 text-[11px] sm:text-xs font-medium px-2 sm:px-4">
                         {isSuccess 
                             ? 'Kata sandi akun Anda telah berhasil diperbarui.' 
                             : (step === 'input_phone' 
@@ -214,9 +230,9 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                 </div>
 
                 {/* Card Container */}
-                <div className="bg-gray-800/60 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-gray-700/50 overflow-hidden">
+                <div className="bg-gray-800/60 backdrop-blur-xl rounded-3xl sm:rounded-[2rem] shadow-2xl border border-gray-700/50 overflow-hidden">
                     
-                    <div className="p-6 sm:p-8">
+                    <div className="p-4 sm:p-8">
 
                         {/* ═══ SUKSES RESET PASSWORD ═══ */}
                         {isSuccess ? (

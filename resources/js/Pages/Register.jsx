@@ -83,7 +83,7 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0b1121] flex flex-col justify-center items-center p-4 sm:p-6 font-jakarta relative overflow-hidden">
+        <div className="min-h-[100dvh] bg-[#0b1121] flex flex-col justify-start sm:justify-center items-center py-3 px-3.5 sm:p-6 font-jakarta relative overflow-x-hidden overflow-y-auto">
             <Head>
                 <title>{`Daftar Akun - ${store?.name || 'PremiumKita'}`}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -91,22 +91,38 @@ export default function Register() {
             </Head>
 
             {/* Efek Cahaya Latar Belakang */}
-            <div className="absolute top-[-10%] left-[20%] w-[400px] h-[400px] bg-gradient-to-br from-orange-600/30 to-transparent rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[10%] w-[300px] h-[300px] bg-gradient-to-tl from-amber-600/20 to-transparent rounded-full mix-blend-screen filter blur-[80px] pointer-events-none"></div>
+            <div className="absolute top-[-10%] left-[20%] w-[300px] sm:w-[400px] h-[300px] sm:h-[400px] bg-gradient-to-br from-orange-600/30 to-transparent rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] right-[10%] w-[240px] sm:w-[300px] h-[240px] sm:h-[300px] bg-gradient-to-tl from-amber-600/20 to-transparent rounded-full mix-blend-screen filter blur-[80px] pointer-events-none"></div>
 
-            {/* TOMBOL KEMBALI KE BERANDA */}
-            <div className="absolute top-6 left-6 z-50">
+            {/* TOMBOL KEMBALI KE BERANDA (DESKTOP) */}
+            <div className="hidden sm:block absolute top-6 left-6 z-50">
                 <Link href="/" className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-sm font-bold text-gray-300 hover:text-white backdrop-blur-md transition-all group">
                     <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                     Kembali ke Beranda
                 </Link>
             </div>
 
-            <div className="w-full max-w-[440px] relative z-10 animate-[fadeIn_0.5s_ease-out] mt-10 sm:mt-0">
+            <div className="w-full max-w-[440px] relative z-10 animate-[fadeIn_0.5s_ease-out] my-auto">
                 
+                {/* Top Bar Ringkas untuk Mobile (HP) */}
+                <div className="flex sm:hidden items-center justify-between gap-2 mb-2.5">
+                    <Link href="/" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:text-white backdrop-blur-md transition-all">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        <span>Beranda</span>
+                    </Link>
+                    <div className="inline-flex items-center gap-2">
+                        {store?.logo ? (
+                            <img src={store.logo} alt={store?.name || 'Logo'} className="w-7 h-7 object-contain rounded-lg p-0.5 bg-white/10" />
+                        ) : (
+                            <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-black text-xs shadow-md shadow-orange-500/30">PK</div>
+                        )}
+                        <span className="text-base font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
+                    </div>
+                </div>
+
                 {/* Logo & Judul */}
-                <div className="text-center mb-6">
-                    <div className="inline-flex items-center justify-center gap-2.5 mb-3">
+                <div className="text-center mb-3 sm:mb-6">
+                    <div className="hidden sm:inline-flex items-center justify-center gap-2.5 mb-3">
                         {store?.logo ? (
                             <img src={store.logo} alt={store?.name || 'Logo'} className="w-9 h-9 object-contain rounded-xl p-0.5 bg-white/10" />
                         ) : (
@@ -114,58 +130,59 @@ export default function Register() {
                         )}
                         <span className="text-xl font-black text-white tracking-tight">{store?.name || 'PremiumKita'}</span>
                     </div>
-                    <h2 className="text-2xl font-black text-white tracking-tight mb-2">Buat Akun Baru</h2>
-                    <p className="text-gray-400 text-xs font-medium px-4">Daftar sekarang dan nikmati penawaran produk digital terbaik.</p>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-1 sm:mb-2">Buat Akun Baru</h2>
+                    <p className="text-gray-400 text-[11px] sm:text-xs font-medium px-2 sm:px-4">Daftar sekarang dan nikmati penawaran produk digital terbaik.</p>
                 </div>
 
                 {/* Kotak Register Utama */}
-                <div className="bg-gray-800/60 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-gray-700/50 overflow-hidden">
+                <div className="bg-gray-800/60 backdrop-blur-xl rounded-3xl sm:rounded-[2rem] shadow-2xl border border-gray-700/50 overflow-hidden">
                     
                     {/* TAB PEMILIHAN ROLE (PELANGGAN vs RESELLER) */}
-                    <div className="flex p-2 bg-gray-900/50 border-b border-gray-700/50 gap-2">
+                    <div className="flex p-1.5 sm:p-2 bg-gray-900/50 border-b border-gray-700/50 gap-1.5 sm:gap-2">
                         <button 
                             type="button" 
                             onClick={() => setRole('user')} 
-                            className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${role === 'user' ? 'bg-gray-800 text-white shadow-md border border-gray-700' : 'text-gray-400 hover:text-white'}`}
+                            className={`flex-1 min-w-0 py-2 sm:py-3 px-2 text-[11px] sm:text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${role === 'user' ? 'bg-gray-800 text-white shadow-md border border-gray-700' : 'text-gray-400 hover:text-white'}`}
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            Pelanggan Biasa
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            <span className="truncate">Pelanggan Biasa</span>
                         </button>
                         <button 
                             type="button" 
                             onClick={() => setRole('reseller')} 
-                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${role === 'reseller' ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'text-amber-400 hover:text-amber-300'}`}
+                            className={`flex-1 min-w-0 py-2 sm:py-3 px-2 text-[11px] sm:text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 ${role === 'reseller' ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 shadow-lg shadow-amber-500/20' : 'text-amber-400 hover:text-amber-300'}`}
                         >
-                            <span>👑</span> Reseller VIP
+                            <span className="shrink-0">👑</span>
+                            <span className="truncate">Reseller VIP</span>
                             {isFreeReseller && (
-                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500 text-white animate-pulse">
+                                <span className="text-[8px] sm:text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500 text-white animate-pulse shrink-0">
                                     GRATIS
                                 </span>
                             )}
                         </button>
                     </div>
 
-                    <div className="p-6 sm:p-8">
+                    <div className="p-4 sm:p-8">
                         
                         {/* Notifikasi Khusus Reseller */}
                         {role === 'reseller' && (
-                            <div className={`p-4 rounded-2xl mb-5 animate-[fadeIn_0.3s_ease-out] border ${isFreeReseller ? 'bg-gradient-to-br from-emerald-500/15 via-amber-500/10 to-yellow-500/15 border-emerald-500/40 shadow-lg shadow-emerald-500/10' : 'bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border-amber-500/30'}`}>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-base">👑</span>
-                                        <h4 className="text-amber-400 text-xs font-black uppercase tracking-wider">
+                            <div className={`p-3 sm:p-4 rounded-2xl mb-3.5 sm:mb-5 animate-[fadeIn_0.3s_ease-out] border ${isFreeReseller ? 'bg-gradient-to-br from-emerald-500/15 via-amber-500/10 to-yellow-500/15 border-emerald-500/40 shadow-lg shadow-emerald-500/10' : 'bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border-amber-500/30'}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-sm sm:text-base shrink-0">👑</span>
+                                        <h4 className="text-amber-400 text-[11px] sm:text-xs font-black uppercase tracking-wider leading-tight">
                                             {isFreeReseller ? promoTitle : `Aktivasi Reseller VIP (Rp ${resellerFee.toLocaleString('id-ID')})`}
                                         </h4>
                                     </div>
-                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${isFreeReseller ? 'bg-emerald-500 text-white animate-pulse' : 'bg-amber-500/20 text-amber-300'}`}>
+                                    <span className={`text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0 ${isFreeReseller ? 'bg-emerald-500 text-white animate-pulse' : 'bg-amber-500/20 text-amber-300'}`}>
                                         {isFreeReseller ? promoBadge : `Rp ${resellerFee.toLocaleString('id-ID')}`}
                                     </span>
                                 </div>
                                 <p className="text-gray-300 text-[11px] leading-relaxed mb-2 font-medium">
                                     {isFreeReseller ? promoMessage : 'Nikmati Harga Modal Termurah untuk semua produk aplikasi premium & digital, margin cuan maksimal seumur hidup.'}
                                 </p>
-                                <div className={`px-3 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 ${isFreeReseller ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-black/30 text-amber-200/90'}`}>
-                                    <span className="text-sm">✓</span>
+                                <div className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 ${isFreeReseller ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-black/30 text-amber-200/90'}`}>
+                                    <span className="text-xs sm:text-sm shrink-0">✓</span>
                                     {isFreeReseller ? (
                                         <span><strong>Promo Aktif:</strong> Akun Reseller VIP Anda akan <strong>langsung aktif otomatis</strong> saat tombol daftar diklik!</span>
                                     ) : (
@@ -176,22 +193,22 @@ export default function Register() {
                         )}
 
                         {errors.general && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold p-3 rounded-xl mb-4">
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold p-2.5 sm:p-3 rounded-xl mb-3 sm:mb-4">
                                 {errors.general}
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-4">
                             {/* Input Nama */}
                             <div>
-                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Nama Lengkap</label>
+                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1 sm:mb-1.5 px-1">Nama Lengkap</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                     </div>
                                     <input 
                                         type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Misal: Budi Santoso"
-                                        className={`w-full pl-10 pr-4 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.name ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
+                                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 bg-gray-900/50 border rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.name ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
                                     />
                                 </div>
                                 {errors.name && <p className="text-red-500 text-[10px] font-bold mt-1 px-1">{errors.name}</p>}
@@ -199,14 +216,14 @@ export default function Register() {
 
                             {/* Input Email */}
                             <div>
-                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Alamat Email</label>
+                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1 sm:mb-1.5 px-1">Alamat Email</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path></svg>
                                     </div>
                                     <input 
                                         type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="email@contoh.com"
-                                        className={`w-full pl-10 pr-4 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.email ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
+                                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 bg-gray-900/50 border rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.email ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
                                     />
                                 </div>
                                 {errors.email && <p className="text-red-500 text-[10px] font-bold mt-1 px-1">{errors.email}</p>}
@@ -214,23 +231,23 @@ export default function Register() {
 
                             {/* Input WhatsApp */}
                             <div>
-                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 px-1">No. WhatsApp <span className="text-gray-500 font-normal lowercase">(notifikasi)</span></label>
+                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1 sm:mb-1.5 px-1">No. WhatsApp <span className="text-gray-500 font-normal lowercase">(notifikasi)</span></label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                                     </div>
                                     <input 
                                         type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="08xxxxxxxxxx"
-                                        className={`w-full pl-10 pr-4 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 border-gray-700 focus:border-orange-500 focus:ring-orange-500/20`}
+                                        className={`w-full pl-10 pr-4 py-2.5 sm:py-3 bg-gray-900/50 border rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 border-gray-700 focus:border-orange-500 focus:ring-orange-500/20`}
                                     />
                                 </div>
                             </div>
 
                             {/* Input Password */}
                             <div>
-                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Kata Sandi (Min. 8 Karakter)</label>
+                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1 sm:mb-1.5 px-1">Kata Sandi (Min. 8 Karakter)</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                     </div>
                                     <input 
@@ -239,7 +256,7 @@ export default function Register() {
                                         onChange={(e) => setPassword(e.target.value)} 
                                         required 
                                         placeholder="••••••••"
-                                        className={`w-full pl-10 pr-11 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.password ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
+                                        className={`w-full pl-10 pr-11 py-2.5 sm:py-3 bg-gray-900/50 border rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.password ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
                                     />
                                     <button
                                         type="button"
@@ -259,9 +276,9 @@ export default function Register() {
 
                             {/* Input Konfirmasi Password */}
                             <div>
-                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 px-1">Ulangi Kata Sandi</label>
+                                <label className="block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1 sm:mb-1.5 px-1">Ulangi Kata Sandi</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                     <input 
@@ -270,7 +287,7 @@ export default function Register() {
                                         onChange={(e) => setPasswordConfirmation(e.target.value)} 
                                         required 
                                         placeholder="••••••••"
-                                        className={`w-full pl-10 pr-11 py-3 bg-gray-900/50 border rounded-2xl text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.password_confirmation ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
+                                        className={`w-full pl-10 pr-11 py-2.5 sm:py-3 bg-gray-900/50 border rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white focus:ring-2 focus:outline-none transition-all placeholder-gray-600 ${errors.password_confirmation ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-orange-500 focus:ring-orange-500/20'}`}
                                     />
                                     <button
                                         type="button"
@@ -292,7 +309,7 @@ export default function Register() {
                             <button 
                                 type="submit" 
                                 disabled={processing} 
-                                className={`w-full font-black py-4 rounded-2xl shadow-lg transition-all transform active:scale-[0.98] mt-4 flex justify-center items-center gap-2 disabled:opacity-70 cursor-pointer ${
+                                className={`w-full font-black py-3 sm:py-4 px-4 rounded-xl sm:rounded-2xl shadow-lg transition-all transform active:scale-[0.98] mt-2 sm:mt-4 flex justify-center items-center gap-2 disabled:opacity-70 cursor-pointer text-xs sm:text-sm ${
                                     role === 'reseller' 
                                         ? 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-gray-950 shadow-amber-500/20 hover:brightness-110' 
                                         : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white shadow-orange-500/20'
@@ -302,19 +319,19 @@ export default function Register() {
                                     <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memproses...</>
                                 ) : role === 'reseller' ? (
                                     isFreeReseller ? (
-                                        <>🎉 Daftar Reseller VIP Gratis (Rp 0) <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                        <>🎉 Daftar Reseller VIP Gratis (Rp 0) <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
                                     ) : (
-                                        <>Daftar &amp; Bayar Biaya Reseller (Rp {resellerFee.toLocaleString('id-ID')}) <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                        <>Daftar &amp; Bayar Reseller (Rp {resellerFee.toLocaleString('id-ID')}) <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
                                     )
                                 ) : (
-                                    <>Daftar Sebagai Pelanggan <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
+                                    <>Daftar Sebagai Pelanggan <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></>
                                 )}
                             </button>
                         </form>
                     </div>
 
                     {/* Footer Box */}
-                    <div className="bg-gray-900/50 p-5 border-t border-gray-700/50 flex flex-col items-center justify-center gap-2">
+                    <div className="bg-gray-900/50 p-3.5 sm:p-5 border-t border-gray-700/50 flex flex-col items-center justify-center gap-2">
                         <p className="text-xs text-gray-400 font-medium">
                             Sudah punya akun?{' '}
                             <Link href="/login" className="font-extrabold text-orange-500 hover:text-orange-400 hover:underline transition-colors">
@@ -328,8 +345,8 @@ export default function Register() {
 
             {/* MODAL QRIS PEMBAYARAN RESELLER */}
             {showQrisModal && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-[fadeIn_0.3s_ease-out]">
-                    <div className="w-full max-w-sm bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-amber-500/30 text-white">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-[fadeIn_0.3s_ease-out] overflow-y-auto">
+                    <div className="w-full max-w-sm bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-amber-500/30 text-white max-h-[92dvh] overflow-y-auto">
                         
                         {/* Header Modal */}
                         <div className="bg-gradient-to-r from-amber-600 to-yellow-600 p-5 flex items-center justify-between text-gray-950">

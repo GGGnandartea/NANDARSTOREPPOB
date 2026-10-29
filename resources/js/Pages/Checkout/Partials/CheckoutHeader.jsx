@@ -7,7 +7,7 @@ export default function CheckoutHeader({
   canGoBack,
 }) {
   return (
-    <div className="bg-[#0b1121] p-6 sm:p-8 text-center relative overflow-hidden">
+    <div className="bg-[#0b1121] p-4 sm:p-8 text-center relative overflow-hidden">
       <div className="absolute -top-10 -right-10 w-40 h-40 bg-orange-500 rounded-full blur-[60px] opacity-20 pointer-events-none"></div>
 
       {canGoBack && (
@@ -49,7 +49,7 @@ export default function CheckoutHeader({
         )}
       </button>
 
-      <h2 className="text-xl sm:text-2xl font-black text-white mt-8 tracking-tight">Selesaikan Pembayaran</h2>
+      <h2 className="text-lg sm:text-2xl font-black text-white mt-6 sm:mt-8 tracking-tight">Selesaikan Pembayaran</h2>
       <p className="text-orange-500 text-xs mt-1.5 font-bold tracking-widest uppercase">Sistem Cepat &amp; Aman</p>
     </div>
   );

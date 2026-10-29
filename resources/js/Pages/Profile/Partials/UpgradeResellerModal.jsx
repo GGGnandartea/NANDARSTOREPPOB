@@ -82,7 +82,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-sm bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-amber-500/40 text-white">
+      <div className="w-full max-w-sm bg-gray-900 rounded-3xl shadow-2xl overflow-y-auto max-h-[92dvh] border border-amber-500/40 text-white">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 p-5 flex items-center justify-between text-gray-950">

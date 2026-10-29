@@ -646,7 +646,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
+    <div className="min-h-[100dvh] bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200 overflow-x-hidden">
       <Head title="Dashboard Layanan PPOB & Pulsa - PremiumKita" />
 
       {/* TOP HEADER */}
