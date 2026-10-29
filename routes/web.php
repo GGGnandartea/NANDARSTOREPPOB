@@ -177,8 +177,8 @@ Route::post('/api/check-voucher', [\App\Http\Controllers\FrontController::class,
 
 // Route API untuk Produk Paling Banyak Dibeli Hari Ini (Realtime Harian)
 Route::get('/api/top-selling-today', function() {
-    $apiData = \Illuminate\Support\Facades\Cache::get('api_full_data', []);
     $controller = app(\App\Http\Controllers\FrontController::class);
+    $apiData = $controller->getApiStockData();
     return response()->json([
         'status' => 'success',
         'data' => $controller->getTopSellingTodayProducts($apiData),

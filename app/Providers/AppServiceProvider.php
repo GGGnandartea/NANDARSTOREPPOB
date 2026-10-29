@@ -19,19 +19,19 @@ class AppServiceProvider extends ServiceProvider
         $uidSuffix = function_exists('posix_geteuid') ? (string) posix_geteuid() : 'app';
         $tempBase = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR);
 
-        $safeCacheDir = $tempBase . DIRECTORY_SEPARATOR . 'pk_cache_' . $uidSuffix;
+        $safeCacheDir = $tempBase . DIRECTORY_SEPARATOR . 'pk_cache_v2_' . $uidSuffix;
         if (!is_dir($safeCacheDir)) {
             @mkdir($safeCacheDir, 0777, true);
         }
 
         // Self-healing cache & rate limiter: hindari fopen Permission denied di storage/framework/cache/data
-        // akibat perbedaan user root (CLI/cron) vs www (web server)
+        // akibat perbedaan user root (CLI/cron) vs www (web server).
+        // Jangan set 'permission' => 0666 karena FileStore::ensurePermissionsAreCorrect juga men-chmod direktori cache!
         config([
             'cache.stores.file_safe' => [
                 'driver' => 'file',
                 'path' => $safeCacheDir,
                 'lock_path' => $safeCacheDir,
-                'permission' => 0666,
             ],
             'cache.stores.failover' => [
                 'driver' => 'failover',

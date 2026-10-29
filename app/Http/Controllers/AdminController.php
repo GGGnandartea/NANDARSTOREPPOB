@@ -840,6 +840,7 @@ class AdminController extends Controller
                 $count++;
             }
         }
+        Cache::forget('api_full_data');
         return back()->with('success', $count . ' Produk API, Logo, dan Status Promo berhasil diperbarui ke Database!');
     }
 

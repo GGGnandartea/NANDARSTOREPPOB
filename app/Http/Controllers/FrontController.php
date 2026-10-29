@@ -95,30 +95,10 @@ class FrontController extends Controller
 
         $products = $query->get();
 
-        $apiData = Cache::remember('api_full_data', 60, function() use ($premkuService, $disabledPremku, $disabledPreflix) {
-            $data = [];
-            try {
-                $resPremku = $disabledPremku ? [] : $premkuService->getProducts(3);
-                if(isset($resPremku['products'])) { foreach($resPremku['products'] as $p) { $data['PREMKU-' . $p['id']] = ['stock' => $p['stock'] ?? 0]; } }
-            } catch (\Exception $e) {}
-
-            try {
-                $idUser = Setting::where('key', 'preflix_id_user')->value('value');
-                $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-                $resPreflix = (!$disabledPreflix && $idUser && $keyUser)
-                    ? Http::connectTimeout(2)->timeout(3)->asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_all_product', 'id_user' => $idUser, 'key_user' => $keyUser])->json()
-                    : [];
-                if(isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data'])) {
-                    foreach($resPreflix['data'] as $kategori) {
-                        foreach($kategori['produk'] as $p) { $data['PREFLIX-' . $p['id_produk']] = ['stock' => $p['stok'] ?? 0]; }
-                    }
-                }
-            } catch (\Exception $e) {}
-            return $data;
-        });
+        $apiData = $this->getApiStockData();
 
         $products->transform(function($product) use ($apiData) {
-            if($product->type === 'api') { $product->stock = isset($apiData[$product->api_product_id]) ? $apiData[$product->api_product_id]['stock'] : 0; }
+            $this->resolveProductStock($product, $apiData);
             return $product;
         });
 
@@ -188,9 +168,114 @@ class FrontController extends Controller
     }
 
     /**
+     * Ambil & sinkronkan data stok live produk API (Premku & Preflix) secara konsisten di semua halaman.
+     * Menyimpan cadangan stok terakhir (api_last_known_stock) agar jika API provider sempat lambat/timeout,
+     * stok tidak tiba-tiba berubah menjadi 0.
+     */
+    public function getApiStockData(bool $forceRefresh = false): array
+    {
+        if ($forceRefresh) {
+            Cache::forget('api_full_data');
+        }
+
+        $cached = Cache::get('api_full_data');
+        if (is_array($cached) && !empty($cached) && !$forceRefresh) {
+            return $cached;
+        }
+
+        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+
+        $lastKnown = Cache::get('api_last_known_stock', []);
+        $data = is_array($lastKnown) ? $lastKnown : [];
+
+        try {
+            if (!$disabledPremku) {
+                $premkuService = app(PremkuApiService::class);
+                $resPremku = $premkuService->getProducts(5);
+                if (isset($resPremku['products']) && is_array($resPremku['products'])) {
+                    foreach ($resPremku['products'] as $p) {
+                        if (isset($p['id'])) {
+                            $data['PREMKU-' . $p['id']] = ['stock' => max(0, (int) ($p['stock'] ?? 0))];
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $idUser = Setting::where('key', 'preflix_id_user')->value('value');
+            $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
+            if (!$disabledPreflix && $idUser && $keyUser) {
+                $resPreflix = Http::withoutVerifying()
+                    ->connectTimeout(3)
+                    ->timeout(5)
+                    ->asForm()
+                    ->post('https://h2h.preflix.my.id/app/', [
+                        'koneksi'  => 'get_all_product',
+                        'id_user'  => $idUser,
+                        'key_user' => $keyUser,
+                    ])
+                    ->json();
+
+                if (isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data']) && is_array($resPreflix['data'])) {
+                    foreach ($resPreflix['data'] as $kategori) {
+                        if (!isset($kategori['produk']) || !is_array($kategori['produk'])) {
+                            continue;
+                        }
+                        foreach ($kategori['produk'] as $p) {
+                            if (isset($p['id_produk'])) {
+                                $data['PREFLIX-' . $p['id_produk']] = ['stock' => max(0, (int) ($p['stok'] ?? 0))];
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        if (!empty($data)) {
+            Cache::put('api_full_data', $data, 60);
+            Cache::put('api_last_known_stock', $data, 86400);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Pastikan nilai stok produk (API maupun Lokal) konsisten di Beranda, Detail Produk, Checkout, dan Profil.
+     */
+    public function resolveProductStock(Product $product, ?array $apiData = null): int
+    {
+        if ($product->type === 'api') {
+            $apiData = $apiData ?? $this->getApiStockData();
+            $apiId = (string) ($product->api_product_id ?? '');
+
+            if ($apiId !== '' && isset($apiData[$apiId])) {
+                $liveStock = max(0, (int) ($apiData[$apiId]['stock'] ?? 0));
+                if ((int) $product->getRawOriginal('stock') !== $liveStock && $product->exists) {
+                    try {
+                        Product::whereKey($product->id)->update(['stock' => $liveStock]);
+                    } catch (\Throwable $e) {}
+                }
+                $product->stock = $liveStock;
+                return $liveStock;
+            }
+
+            $fallbackStock = max(0, (int) $product->getRawOriginal('stock'));
+            $product->stock = $fallbackStock;
+            return $fallbackStock;
+        }
+
+        return $product->stock;
+    }
+
+    /**
      * Mengambil produk paling banyak dibeli hari ini secara realtime harian (termasuk PPOB)
      */
     public function getTopSellingTodayProducts(array $apiData = []) {
+        if (empty($apiData)) {
+            $apiData = $this->getApiStockData();
+        }
         $todayStart = now()->startOfDay();
 
         // 1. Hitung jumlah pembelian sukses/lunas hari ini per produk standar
@@ -270,9 +355,7 @@ class FrontController extends Controller
                 $todayCount = (int) ($todaySalesMap[$pId] ?? 0);
                 $totalCount = (int) ($allTimeSalesMap[$pId] ?? 0);
 
-                if ($p->type === 'api') {
-                    $p->stock = isset($apiData[$p->api_product_id]) ? $apiData[$p->api_product_id]['stock'] : 0;
-                }
+                $this->resolveProductStock($p, $apiData);
 
                 $p->today_sales = $todayCount;
                 $p->total_sales = $totalCount;
@@ -302,9 +385,7 @@ class FrontController extends Controller
                 ->get();
 
             foreach ($moreProducts as $p) {
-                if ($p->type === 'api') {
-                    $p->stock = isset($apiData[$p->api_product_id]) ? $apiData[$p->api_product_id]['stock'] : 0;
-                }
+                $this->resolveProductStock($p, $apiData);
                 $p->today_sales = 0;
                 $p->total_sales = 0;
                 $p->sales_label = 'Spesial Hari Ini';
@@ -392,7 +473,7 @@ class FrontController extends Controller
         if (!is_numeric($id) || (int) $id <= 0) {
             abort(404);
         }
-        $product = Product::find((int) $id);
+        $product = Product::withAvailableAccountStock()->find((int) $id);
         if (!$product) {
             abort(404);
         }
@@ -411,10 +492,16 @@ class FrontController extends Controller
         }
 
         if ($product->type === 'api') {
-            $apiData = Cache::get('api_full_data', []); $product->stock = $apiData[$product->api_product_id]['stock'] ?? 0;
+            $apiData = $this->getApiStockData();
+            $apiId = (string) ($product->api_product_id ?? '');
+            if ($apiId !== '' && !isset($apiData[$apiId])) {
+                $apiData = $this->getApiStockData(true);
+            }
+            $this->resolveProductStock($product, $apiData);
             $manualDesc = trim(strip_tags($product->description));
             if (empty($manualDesc)) { $product->description = "Layanan Premium: " . $product->name . "\n\nKeunggulan Layanan:\n- Proses Pengisian Instan (Otomatis).\n- 100% Legal, Aman, dan Bergaransi Resmi.\n- Layanan Aktif 24 Jam Non-Stop tanpa hari libur.\n\nCatatan Penting:\nPastikan Anda memasukkan data tujuan dengan benar."; }
         } else {
+            $this->resolveProductStock($product);
             $manualDesc = trim(strip_tags($product->description));
             if (empty($manualDesc)) { $product->description = "Layanan digital eksklusif dari PremiumKita.\nProses dilakukan manual oleh Admin setelah pembayaran berhasil dikonfirmasi. Harap tunggu notifikasi via WhatsApp."; }
         }
@@ -425,7 +512,7 @@ class FrontController extends Controller
         if (!is_numeric($id) || (int) $id <= 0) {
             abort(404);
         }
-        $product = Product::find((int) $id);
+        $product = Product::withAvailableAccountStock()->find((int) $id);
         if (!$product) {
             abort(404);
         }
@@ -438,6 +525,8 @@ class FrontController extends Controller
             || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))) {
             return redirect()->route('home')->with('error', 'Produk ini sedang dinonaktifkan.');
         }
+
+        $this->resolveProductStock($product);
 
         $paymentChannels = [['code' => 'QRIS_CUSTOM', 'name' => 'QRIS Otomatis (All E-Wallet)', 'fee' => 0, 'type' => 'qris', 'icon' => 'https://tripay.co.id/images/payment-channel/H3zP71b7sU1631525949.png']];
         $initialQty = max(1, (int) request()->query('qty', 1));
@@ -490,12 +579,12 @@ class FrontController extends Controller
             'whatsapp'   => 'nullable|string',
             'buyer_name' => 'nullable|string|max:100',
         ]);
-        $product = Product::findOrFail($request->product_id);
+        $product = Product::withAvailableAccountStock()->findOrFail($request->product_id);
         $qty = max(1, (int) $request->input('quantity', 1));
 
-        // Cek stok lokal sebelum memproses transaksi
-        if ($product->type === 'local' && ($product->process_type ?? 'auto') !== 'manual') {
-            $availableStock = $product->stock;
+        // Cek stok sebelum memproses transaksi
+        if ($product->type === 'api' || ($product->type === 'local' && ($product->process_type ?? 'auto') !== 'manual')) {
+            $availableStock = $this->resolveProductStock($product);
             if ($availableStock < $qty) {
                 return response()->json([
                     'status'  => 'error',
@@ -921,7 +1010,17 @@ class FrontController extends Controller
         $expenseCount = max(0, $grossExpenseCount - $refundCount);
 
         return Inertia::render('Profile', [
-            'favoriteProducts' => fn () => $user->favoriteProducts()->orderByPivot('created_at', 'desc')->get(['products.id', 'products.name', 'products.image', 'products.price', 'products.stock', 'products.status', 'products.type', 'products.process_type']),
+            'favoriteProducts' => function () use ($user) {
+                $apiData = $this->getApiStockData();
+                return $user->favoriteProducts()
+                    ->withAvailableAccountStock()
+                    ->orderByPivot('created_at', 'desc')
+                    ->get(['products.id', 'products.name', 'products.image', 'products.price', 'products.stock', 'products.status', 'products.type', 'products.process_type', 'products.api_product_id'])
+                    ->map(function ($fp) use ($apiData) {
+                        $this->resolveProductStock($fp, $apiData);
+                        return $fp;
+                    });
+            },
             'orders'    => $orders,
             'topups'    => $mutations,
             'mutations' => $mutations,
@@ -994,7 +1093,7 @@ class FrontController extends Controller
             ], 403);
         }
 
-        $product = Product::findOrFail($request->product_id);
+        $product = Product::withAvailableAccountStock()->findOrFail($request->product_id);
 
         $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
         $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
@@ -1005,9 +1104,9 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Produk ini sedang dinonaktifkan untuk sementara waktu.']);
         }
 
-        // Cek stok lokal sebelum memotong saldo untuk mencegah race condition
-        if ($product->type === 'local' && $product->process_type !== 'manual') {
-            $availableStock = $product->stock;
+        // Cek stok sebelum memotong saldo untuk mencegah race condition
+        if ($product->type === 'api' || ($product->type === 'local' && $product->process_type !== 'manual')) {
+            $availableStock = $this->resolveProductStock($product);
 
             if ($availableStock < $qty) {
                 return response()->json([

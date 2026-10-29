@@ -51,9 +51,8 @@ return [
 
         'file_safe' => [
             'driver' => 'file',
-            'path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
-            'lock_path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
-            'permission' => 0666,
+            'path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_v2_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
+            'lock_path' => rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'pk_cache_v2_' . (function_exists('posix_geteuid') ? posix_geteuid() : 'app'),
         ],
 
         'file' => [

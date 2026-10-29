@@ -20,8 +20,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const user = auth?.user;
   const userBalance = user?.balance ?? 0;
 
-  const maxStock = product.type === 'local' && (product.process_type !== 'manual' || product.stock > 0)
-    ? Math.min(100, Math.max(0, Number(product.stock) || 0)) : 100;
+  const maxStock = product.stock > 0 ? Math.min(100, Math.max(1, Number(product.stock) || 1)) : (product.type === 'local' && product.process_type !== 'manual' ? 0 : 100);
 
   const [quantity, setQuantity] = useState(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
