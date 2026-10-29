@@ -18,29 +18,35 @@ class AuthController extends Controller
 {
     protected function getTurnstileConfig(): array
     {
-        $enabled    = Setting::where('key', 'turnstile_enabled')->value('value') === '1';
-        $siteKey    = trim((string) (Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '')));
-        $secretKey  = trim((string) (Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '')));
-        $onRegister = (Setting::where('key', 'turnstile_on_register')->value('value') ?? '1') === '1';
-        $onLogin    = (Setting::where('key', 'turnstile_on_login')->value('value') ?? '0') === '1';
+        $enabled          = Setting::where('key', 'turnstile_enabled')->value('value') === '1';
+        $siteKey          = trim((string) (Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '')));
+        $secretKey        = trim((string) (Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '')));
+        $onRegister       = (Setting::where('key', 'turnstile_on_register')->value('value') ?? '1') === '1';
+        $onLogin          = (Setting::where('key', 'turnstile_on_login')->value('value') ?? '0') === '1';
+        $onForgotPassword = (Setting::where('key', 'turnstile_on_forgot_password')->value('value') ?? '1') === '1';
 
         $isConfigured = $enabled && $siteKey !== '' && $secretKey !== '';
 
         return [
-            'enabled'              => $isConfigured,
-            'site_key'             => $siteKey,
-            'secret_key'           => $secretKey,
-            'enabled_for_register' => $isConfigured && $onRegister,
-            'enabled_for_login'    => $isConfigured && $onLogin,
+            'enabled'                     => $isConfigured,
+            'site_key'                    => $siteKey,
+            'secret_key'                  => $secretKey,
+            'enabled_for_register'        => $isConfigured && $onRegister,
+            'enabled_for_login'           => $isConfigured && $onLogin,
+            'enabled_for_forgot_password' => $isConfigured && $onForgotPassword,
         ];
     }
 
     protected function verifyTurnstileToken(Request $request, string $context = 'register'): void
     {
         $config = $this->getTurnstileConfig();
-        $shouldVerify = $context === 'login'
-            ? $config['enabled_for_login']
-            : $config['enabled_for_register'];
+        if ($context === 'login') {
+            $shouldVerify = $config['enabled_for_login'];
+        } elseif ($context === 'forgot_password') {
+            $shouldVerify = $config['enabled_for_forgot_password'];
+        } else {
+            $shouldVerify = $config['enabled_for_register'];
+        }
 
         if (!$shouldVerify) {
             return;
@@ -346,8 +352,14 @@ class AuthController extends Controller
 
     // --- FITUR RESET PASSWORD VIA WHATSAPP OTP ---
     public function showForgotPasswordForm() {
+        $ts = $this->getTurnstileConfig();
+        $botNumber = Setting::where('key', 'bot_whatsapp')->value('value') ?: '08990738216';
         return Inertia::render('ForgotPassword', [
-            'botNumber' => '08990738216',
+            'botNumber' => $botNumber,
+            'turnstile' => [
+                'enabled'  => $ts['enabled_for_forgot_password'],
+                'site_key' => $ts['site_key'],
+            ],
         ]);
     }
 
@@ -357,6 +369,8 @@ class AuthController extends Controller
         ], [
             'whatsapp.required' => 'Nomor WhatsApp terdaftar wajib diisi.',
         ]);
+
+        $this->verifyTurnstileToken($request, 'forgot_password');
 
         $cleanPhone = preg_replace('/[^0-9]/', '', $request->whatsapp);
         if (str_starts_with($cleanPhone, '628')) {

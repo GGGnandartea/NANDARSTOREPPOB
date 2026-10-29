@@ -216,6 +216,11 @@
                                 <input type="checkbox" name="turnstile_on_login" value="1" @checked(($turnstileOnLogin ?? '0') === '1') class="w-4 h-4 rounded text-orange-500 focus:ring-orange-500">
                                 <span>Halaman Masuk / Login (<code class="text-orange-500 font-mono">/login</code>)</span>
                             </label>
+                            <label class="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-gray-800 dark:text-gray-200">
+                                <input type="hidden" name="turnstile_on_forgot_password" value="0">
+                                <input type="checkbox" name="turnstile_on_forgot_password" value="1" @checked(($turnstileOnForgotPassword ?? '1') === '1') class="w-4 h-4 rounded text-orange-500 focus:ring-orange-500">
+                                <span>Halaman Lupa Sandi OTP WA (<code class="text-orange-500 font-mono">/forgot-password</code>)</span>
+                            </label>
                         </div>
                     </div>
                 </div>

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
+import TurnstileWidget from '../Components/TurnstileWidget';
 
 export default function ForgotPassword({ botNumber = '08990738216' }) {
-    const { flash, store } = usePage().props;
+    const { flash, store, turnstile } = usePage().props;
+    const turnstileEnabled = Boolean(turnstile?.enabled && turnstile?.site_key);
+    const turnstileSiteKey = turnstile?.site_key || '';
 
     // State Multi-Step
     const [step, setStep] = useState(flash?.step || 'input_phone'); // 'input_phone' | 'awaiting_otp'
-    const [whatsapp, setWhatsapp] = useState(flash?.whatsapp || '082116847292');
+    const [whatsapp, setWhatsapp] = useState(flash?.whatsapp || '');
     const [savedWhatsapp, setSavedWhatsapp] = useState(flash?.whatsapp || '');
     const [triggerCode, setTriggerCode] = useState(flash?.trigger_code || '');
     const [botWaUrl, setBotWaUrl] = useState(flash?.bot_wa_url || '');
@@ -16,6 +19,8 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
     // State Form Step 2
     const [otpCode, setOtpCode] = useState('');
@@ -71,6 +76,11 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
             return;
         }
 
+        if (turnstileEnabled && !turnstileToken) {
+            setErrorMsg('Silakan selesaikan verifikasi keamanan Cloudflare terlebih dahulu.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -82,7 +92,10 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': getCsrf(),
                 },
-                body: JSON.stringify({ whatsapp: whatsapp.trim() }),
+                body: JSON.stringify({
+                    whatsapp: whatsapp.trim(),
+                    'cf-turnstile-response': turnstileToken,
+                }),
             });
 
             const data = await res.json();
@@ -95,16 +108,24 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                 setUserName(data.user_name || '');
                 setSuccessMsg('Kode verifikasi berhasil dibuat! Silakan hubungi Bot WhatsApp.');
             } else {
+                const rawErr = data.errors ? Object.values(data.errors)[0] : null;
+                const firstErr = Array.isArray(rawErr) ? rawErr[0] : rawErr;
                 setErrorMsg(
+                    firstErr ||
                     data.message || 
                     data.error || 
-                    (data.errors ? Object.values(data.errors)[0]?.[0] : null) || 
                     'Nomor WhatsApp tidak terdaftar di sistem kami.'
                 );
+                if (turnstileEnabled) {
+                    setTurnstileResetKey((prev) => prev + 1);
+                }
             }
         } catch (err) {
             console.error(err);
             setErrorMsg('Gagal terhubung ke server. Pastikan koneksi internet aktif.');
+            if (turnstileEnabled) {
+                setTurnstileResetKey((prev) => prev + 1);
+            }
         } finally {
             setLoading(false);
         }
@@ -297,6 +318,20 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
                                 <div className="p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-300 font-medium leading-relaxed">
                                     💡 <strong>Info:</strong> Kami akan memvalidasi nomor ini dengan akun Anda. Selanjutnya Anda akan mengirim pesan cepat ke WhatsApp Bot resmi kami untuk mengklaim kode OTP.
                                 </div>
+
+                                {turnstileEnabled && (
+                                    <TurnstileWidget
+                                        siteKey={turnstileSiteKey}
+                                        onVerify={(token) => {
+                                            setTurnstileToken(token);
+                                            if (token && errorMsg.includes('Cloudflare')) {
+                                                setErrorMsg('');
+                                            }
+                                        }}
+                                        resetKey={turnstileResetKey}
+                                        theme="dark"
+                                    />
+                                )}
 
                                 <button 
                                     type="submit" 

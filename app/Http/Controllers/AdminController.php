@@ -185,11 +185,12 @@ class AdminController extends Controller
         }
 
         // Cloudflare Turnstile Settings
-        $turnstileEnabled    = Setting::where('key', 'turnstile_enabled')->value('value') ?? '0';
-        $turnstileSiteKey    = Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '');
-        $turnstileSecretKey  = Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '');
-        $turnstileOnRegister = Setting::where('key', 'turnstile_on_register')->value('value') ?? '1';
-        $turnstileOnLogin    = Setting::where('key', 'turnstile_on_login')->value('value') ?? '0';
+        $turnstileEnabled          = Setting::where('key', 'turnstile_enabled')->value('value') ?? '0';
+        $turnstileSiteKey          = Setting::where('key', 'turnstile_site_key')->value('value') ?: env('TURNSTILE_SITE_KEY', '');
+        $turnstileSecretKey        = Setting::where('key', 'turnstile_secret_key')->value('value') ?: env('TURNSTILE_SECRET_KEY', '');
+        $turnstileOnRegister       = Setting::where('key', 'turnstile_on_register')->value('value') ?? '1';
+        $turnstileOnLogin          = Setting::where('key', 'turnstile_on_login')->value('value') ?? '0';
+        $turnstileOnForgotPassword = Setting::where('key', 'turnstile_on_forgot_password')->value('value') ?? '1';
 
         return view('admin.settings', compact(
             'premkuApiKey', 'premkuApiSecret', 'premkuWebhookUrl', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
@@ -199,7 +200,7 @@ class AdminController extends Controller
             'kiosbankMitra', 'kiosbankAccountId', 'kiosbankMerchantId', 'kiosbankMerchantName',
             'kiosbankCounterId', 'kiosbankMode', 'kiosbankMarkupType', 'kiosbankMarkupValue',
             'kiosbankEnabled', 'kiosbankStatus', 'kiosbankPrivateKey', 'kiosbankPublicKey',
-            'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey', 'turnstileOnRegister', 'turnstileOnLogin'
+            'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey', 'turnstileOnRegister', 'turnstileOnLogin', 'turnstileOnForgotPassword'
         ));
     }
 
@@ -511,6 +512,7 @@ class AdminController extends Controller
             Setting::updateOrCreate(['key' => 'turnstile_secret_key'], ['value' => $tsSecretKey]);
             Setting::updateOrCreate(['key' => 'turnstile_on_register'], ['value' => $request->input('turnstile_on_register') == '1' ? '1' : '0']);
             Setting::updateOrCreate(['key' => 'turnstile_on_login'], ['value' => $request->input('turnstile_on_login') == '1' ? '1' : '0']);
+            Setting::updateOrCreate(['key' => 'turnstile_on_forgot_password'], ['value' => $request->input('turnstile_on_forgot_password') == '1' ? '1' : '0']);
 
             if ($request->input('turnstile_enabled') == '1' && ($tsSiteKey === '' || $tsSecretKey === '')) {
                 return back()->with('success', 'Key disimpan, namun status Turnstile otomatis dinonaktifkan karena Site Key atau Secret Key masih kosong.');
