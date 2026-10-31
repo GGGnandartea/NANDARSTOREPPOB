@@ -5,8 +5,10 @@ export default function FooterSection({
     store,
     effectiveAdminWa,
     setShowTrackModal,
+    onOpenPpob,
 }) {
     const storeName = store?.name || 'PremiumKita';
+    const isPpobOff = Boolean(store?.ppob_status?.is_cutoff);
 
     return (
         <footer className="bg-white dark:bg-[#0b1121] border-t border-gray-200/80 dark:border-white/5 mt-auto py-7 sm:py-8 transition-colors z-20 relative">
@@ -38,7 +40,16 @@ export default function FooterSection({
                         <Link href="/" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">
                             Beranda
                         </Link>
-                        <Link href="/ppob" className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors">
+                        <Link
+                            href="/ppob"
+                            onClick={(e) => {
+                                if (isPpobOff && onOpenPpob) {
+                                    e.preventDefault();
+                                    onOpenPpob('/ppob');
+                                }
+                            }}
+                            className="hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
+                        >
                             Layanan PPOB
                         </Link>
                         <button

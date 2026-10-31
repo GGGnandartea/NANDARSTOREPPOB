@@ -285,3 +285,49 @@ html.dark *,
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   TOP RUNNING ANNOUNCEMENT BAR (MARQUEE)
+   ========================================================================== */
+@keyframes announcement-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.announcement-marquee-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation-name: announcement-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.announcement-marquee-track:hover,
+.announcement-marquee-track:active,
+.announcement-marquee-track:focus-within {
+  animation-play-state: paused;
+}
+
+.announcement-marquee-slow {
+  animation-duration: 38s;
+}
+
+.announcement-marquee-normal {
+  animation-duration: 26s;
+}
+
+.announcement-marquee-fast {
+  animation-duration: 17s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-marquee-track {
+    animation: none !important;
+    transform: none !important;
+  }
+}

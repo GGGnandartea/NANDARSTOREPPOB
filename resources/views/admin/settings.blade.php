@@ -7,6 +7,7 @@
         'whatsapp' => 'Kontak & CS',
         'promo' => 'Harga Coret',
         'turnstile' => 'Cloudflare Turnstile',
+        'announcement' => 'Pengumuman & Notifikasi Geser',
     ];
 @endphp
 
@@ -290,6 +291,193 @@
                 </ol>
                 <div class="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/40 text-[11px] text-emerald-800 dark:text-emerald-300 font-semibold leading-relaxed">
                     ✓ Widget Turnstile otomatis menyesuaikan ukuran layar HP maupun Desktop secara fleksibel (<code class="font-mono">size: flexible</code>) tanpa memotong tampilan formulir.
+                </div>
+            </div>
+        </div>
+
+    @elseif($activeSection === 'announcement')
+        <!-- ======================================================== -->
+        <!-- SECTION: PENGUMUMAN & NOTIFIKASI ATAS GESER (MARQUEE)    -->
+        <!-- ======================================================== -->
+        <div x-data="{
+            enabled: @js($announcementEnabled ?? '0'),
+            badge: @js($announcementBadge ?? 'INFO'),
+            theme: @js($announcementTheme ?? 'promo'),
+            speed: @js($announcementSpeed ?? 'normal'),
+            text: @js($announcementText ?? ''),
+            link: @js($announcementLink ?? ''),
+            applyPreset(badgeVal, themeVal, textVal) {
+                this.enabled = '1';
+                this.badge = badgeVal;
+                this.theme = themeVal;
+                this.text = textVal;
+            }
+        }" class="space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5 flex-wrap">
+                        <span>Notifikasi &amp; Pengumuman Atas Geser</span>
+                        <span x-show="enabled === '1'" class="text-xs font-black px-2.5 py-0.5 rounded-full gradient-green text-white shadow-sm shadow-emerald-500/20">
+                            TAMPIL DI ATAS WEB
+                        </span>
+                        <span x-show="enabled !== '1'" style="display: none;" class="text-xs font-black px-2.5 py-0.5 rounded-full bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300">
+                            NONAKTIF
+                        </span>
+                    </h1>
+                    <p class="text-xs font-semibold text-gray-400 mt-1">Tampilkan teks pengumuman berjalan (running text) di bagian paling atas halaman pengguna untuk HP maupun Desktop.</p>
+                </div>
+                <a href="{{ route('admin.ppob.settings', ['section' => 'cutoff']) }}" class="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-300 hover:border-orange-500 transition flex items-center gap-2 self-start sm:self-auto">
+                    <span>Atur Status Layanan PPOB</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </a>
+            </div>
+
+            <!-- Live Preview Bar -->
+            <div class="admin-card p-5 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-[11px] font-black uppercase tracking-wider text-gray-400">Pratinjau Langsung (Live Preview di HP &amp; Desktop)</span>
+                    <span class="text-[11px] font-bold" :class="enabled === '1' ? 'text-emerald-500' : 'text-gray-400'" x-text="enabled === '1' ? '● Aktif Ditampilkan' : '○ Disembunyikan'"></span>
+                </div>
+
+                <div class="rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-sm">
+                    <div class="px-3.5 py-2 flex items-center gap-2.5 text-xs font-bold text-white transition-colors"
+                         :class="{
+                            'bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600': theme === 'promo',
+                            'bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600': theme === 'info',
+                            'bg-gradient-to-r from-rose-600 via-red-600 to-rose-600': theme === 'warning',
+                            'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600': theme === 'success'
+                         }">
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-xs text-[10px] font-black uppercase tracking-wider">
+                            <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                            <span x-text="badge || 'INFO'">INFO</span>
+                        </span>
+                        <div class="flex-1 overflow-hidden whitespace-nowrap">
+                            <div class="inline-block animate-pulse" x-text="text || 'Ketik teks pengumuman di bawah untuk melihat pratinjau berjalan di bagian atas toko...'"></div>
+                        </div>
+                        <span x-show="link" class="shrink-0 text-[10px] font-black underline opacity-90">Buka →</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <form action="{{ route('admin.settings.save') }}" method="POST" class="admin-card p-6 sm:p-8 space-y-6 lg:col-span-2">
+                    @csrf
+                    <input type="hidden" name="announcement_form_submitted" value="1">
+
+                    <div class="flex items-center gap-3 pb-4 border-b border-gray-100 dark:border-white/5">
+                        <div class="w-10 h-10 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-sm shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="font-black text-base text-gray-900 dark:text-white">Pengaturan Teks Pengumuman Atas</h3>
+                            <p class="text-[11px] font-semibold text-gray-400">Bar notifikasi ramping yang otomatis bergeser halus di bagian atas layar pengguna</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Status Tampilan</label>
+                            <select name="announcement_enabled" x-model="enabled" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="1">🟢 AKTIF (Tampilkan di Atas Website)</option>
+                                <option value="0">⚪ NONAKTIF (Sembunyikan)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Warna Tema Bar</label>
+                            <select name="announcement_theme" x-model="theme" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="promo">🟠 Promo / Flash Sale (Oranye Emas)</option>
+                                <option value="info">🔵 Informasi Umum (Biru Cyan)</option>
+                                <option value="warning">🔴 Penting / Gangguan / Maintenance (Merah Rose)</option>
+                                <option value="success">🟢 Layanan Normal / Restock (Hijau Emerald)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Label Badge Kiri</label>
+                            <input type="text" name="announcement_badge" x-model="badge" maxlength="30" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black uppercase tracking-wider dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="INFO / PROMO / PENTING">
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                <button type="button" @click="badge = 'INFO'" class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-[10px] font-black text-gray-700 dark:text-gray-300">INFO</button>
+                                <button type="button" @click="badge = 'PROMO'" class="px-2 py-0.5 rounded-md bg-orange-500/15 text-[10px] font-black text-orange-600 dark:text-orange-400">PROMO</button>
+                                <button type="button" @click="badge = 'PENTING'" class="px-2 py-0.5 rounded-md bg-rose-500/15 text-[10px] font-black text-rose-600 dark:text-rose-400">PENTING</button>
+                                <button type="button" @click="badge = 'RESTOCK'" class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-[10px] font-black text-emerald-600 dark:text-emerald-400">RESTOCK</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Kecepatan Geser (Marquee)</label>
+                            <select name="announcement_speed" x-model="speed" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black dark:text-white outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="slow">Santai (38 detik per putaran)</option>
+                                <option value="normal">Normal &amp; Nyaman Dibaca (26 detik)</option>
+                                <option value="fast">Cepat &amp; Dinamis (17 detik)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Isi Teks Pengumuman Berjalan</label>
+                        <textarea name="announcement_text" x-model="text" rows="3" maxlength="500" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Contoh: Selamat datang di PremiumKita! Seluruh layanan Akun Premium &amp; PPOB aktif otomatis 24 jam..."></textarea>
+                        <p class="text-[11px] text-gray-400 mt-1.5">
+                            Tips: Teks akan otomatis bergeser menyamping tanpa putus (infinite marquee) dan berhenti sejenak saat disentuh/di-hover pengguna.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Tautan Klik Opsional (URL)</label>
+                        <input type="text" name="announcement_link" x-model="link" maxlength="255" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Kosongkan jika tidak perlu diklik, atau isi misal: https://chat.whatsapp.com/...">
+                    </div>
+
+                    <div class="pt-3 border-t border-gray-100 dark:border-white/5 flex justify-end">
+                        <button type="submit" class="gradient-orange text-white font-black py-3.5 px-8 rounded-xl shadow-lg shadow-orange-500/20 transition-all hover:opacity-90 flex items-center gap-2 cursor-pointer text-xs">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Simpan Pengumuman Atas</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Template Cepat 1-Klik -->
+                <div class="admin-card p-6 space-y-4">
+                    <div class="flex items-center gap-2.5 pb-3 border-b border-gray-100 dark:border-white/5">
+                        <div class="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center font-black text-sm">
+                            ★
+                        </div>
+                        <div>
+                            <h4 class="font-black text-sm text-gray-900 dark:text-white">Template Cepat 1-Klik</h4>
+                            <p class="text-[11px] text-gray-400 font-semibold">Klik untuk mengisi otomatis lalu Simpan</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5">
+                        <button type="button"
+                                @click="applyPreset('PROMO', 'promo', 'Promo Spesial Hari Ini! Diskon produk aplikasi premium & bebas biaya admin QRIS untuk semua transaksi. Yuk checkout sekarang sebelum kehabisan!')"
+                                class="w-full text-left p-3 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-orange-50 dark:hover:bg-orange-950/30 border border-gray-200 dark:border-white/10 hover:border-orange-500/40 transition group">
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-orange-500 text-white">PROMO FLASH SALE</span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1.5 line-clamp-2">Promo Spesial Hari Ini! Diskon produk aplikasi premium &amp; bebas biaya admin QRIS...</p>
+                        </button>
+
+                        <button type="button"
+                                @click="applyPreset('RESTOCK', 'success', 'Stok Produk Aplikasi Premium (Canva, CapCut, ChatGPT, Netflix, Spotify) baru saja di-restock penuh! Transaksi otomatis diproses instan 24 jam.')"
+                                class="w-full text-left p-3 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-gray-200 dark:border-white/10 hover:border-emerald-500/40 transition group">
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500 text-white">INFO RESTOCK STOK</span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1.5 line-clamp-2">Stok Produk Aplikasi Premium baru saja di-restock penuh! Transaksi otomatis 24 jam...</p>
+                        </button>
+
+                        <button type="button"
+                                @click="applyPreset('PENTING', 'warning', 'Pengumuman: Layanan PPOB (Pulsa, Token PLN & Tagihan) sedang dalam pemeliharaan sementara. Pembelian Produk Aplikasi Premium tetap buka & normal 24 jam.')"
+                                class="w-full text-left p-3 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-gray-200 dark:border-white/10 hover:border-rose-500/40 transition group">
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-500 text-white">INFO MAINTENANCE PPOB</span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1.5 line-clamp-2">Layanan PPOB sedang dalam pemeliharaan sementara. Produk Aplikasi Premium tetap normal...</p>
+                        </button>
+
+                        <button type="button"
+                                @click="applyPreset('INFO', 'info', 'Jangan lupa gabung ke Grup Komunitas WhatsApp resmi kami untuk info restock produk, bagi-bagi voucher diskon, dan update layanan terbaru setiap hari!')"
+                                class="w-full text-left p-3 rounded-xl bg-gray-50 dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-gray-200 dark:border-white/10 hover:border-blue-500/40 transition group">
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-500 text-white">KOMUNITAS &amp; VOUCHER</span>
+                            <p class="text-xs font-bold text-gray-700 dark:text-gray-300 mt-1.5 line-clamp-2">Jangan lupa gabung ke Grup Komunitas WhatsApp resmi kami untuk info restock &amp; voucher...</p>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

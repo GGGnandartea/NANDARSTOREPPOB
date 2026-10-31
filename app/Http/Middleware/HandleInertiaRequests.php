@@ -23,6 +23,8 @@ class HandleInertiaRequests extends Middleware
             $adminWaClean = '62' . substr($adminWaClean, 1);
         }
 
+        $ppobStatus = (new \App\Services\KiosbankService())->getCutoffStatus();
+
         return [
             ...parent::share($request),
             'favoriteProductIds' => fn () => $request->user()?->favoriteProducts()->pluck('products.id')->all() ?? [],
@@ -32,6 +34,15 @@ class HandleInertiaRequests extends Middleware
                 'tagline'             => \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis',
                 'admin_whatsapp'      => $adminWaClean,
                 'whatsapp_group_link' => \App\Models\Setting::where('key', 'whatsapp_group_link')->value('value') ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H',
+                'announcement'        => [
+                    'enabled' => \App\Models\Setting::where('key', 'announcement_enabled')->value('value') === '1',
+                    'text'    => \App\Models\Setting::where('key', 'announcement_text')->value('value') ?: '',
+                    'badge'   => \App\Models\Setting::where('key', 'announcement_badge')->value('value') ?: 'INFO',
+                    'theme'   => \App\Models\Setting::where('key', 'announcement_theme')->value('value') ?: 'promo',
+                    'speed'   => \App\Models\Setting::where('key', 'announcement_speed')->value('value') ?: 'normal',
+                    'link'    => \App\Models\Setting::where('key', 'announcement_link')->value('value') ?: '',
+                ],
+                'ppob_status'         => $ppobStatus,
             ],
             'auth' => [
                 'user' => $request->user() ? [

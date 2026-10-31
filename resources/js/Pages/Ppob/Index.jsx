@@ -15,11 +15,13 @@ import PpobCheckoutModal from './Partials/PpobCheckoutModal';
 import PpobQrisModal from './Partials/PpobQrisModal';
 import PpobSuccessModal from './Partials/PpobSuccessModal';
 import PpobMobileNav from './Partials/PpobMobileNav';
+import PpobOfflineModal from '../../Components/PpobOfflineModal';
 
 export default function PpobIndex({ store, initialPulsa, cutoff }) {
   const { auth } = usePage().props;
   const user = auth?.user;
   const [userBalance, setUserBalance] = useState(user?.balance ?? 0);
+  const [offlineModalOpen, setOfflineModalOpen] = useState(Boolean(cutoff?.is_cutoff));
 
   useEffect(() => {
     if (user?.balance !== undefined) {
@@ -277,6 +279,10 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
 
   // Tagihan Inquiry (PDAM, PLN Pascabayar / Non-Taglis / Prabayar, BPJS)
   const handleTagihanInquiry = async () => {
+    if (cutoff?.is_cutoff) {
+      setOfflineModalOpen(true);
+      return;
+    }
     if (activeBillService.id === 'pdam' && !tagihanPdamRegion) {
       Swal.fire({ icon: 'warning', title: 'Pilih Wilayah', text: 'Pilih wilayah PDAM Anda terlebih dahulu.', confirmButtonColor: '#10b981' });
       return;
@@ -393,14 +399,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
     }
 
     if (cutoff?.is_cutoff) {
-      Swal.fire({
-        icon: 'warning',
-        title: cutoff.title || 'Jam Cut-Off / Pemeliharaan PPOB',
-        text:
-          cutoff.message ||
-          `Layanan PPOB sedang dalam jam rekonsiliasi harian (${cutoff.cutoff_start || '23:50'} - ${cutoff.cutoff_end || '00:10'} WIB). Silakan transaksi kembali setelah jam cut-off berakhir agar saldo Anda tetap aman.`,
-        confirmButtonColor: '#10b981',
-      });
+      setOfflineModalOpen(true);
       return;
     }
 
@@ -680,35 +679,44 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
           {cutoff?.is_cutoff && (
             <div
               role="alert"
-              className="relative overflow-hidden rounded-2xl border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-r from-amber-50 via-orange-50/90 to-amber-50 dark:from-amber-950/60 dark:via-orange-950/40 dark:to-amber-950/60 p-4 sm:p-5 shadow-lg shadow-amber-500/10"
+              className="relative overflow-hidden rounded-2xl border border-rose-300/80 dark:border-rose-500/40 bg-gradient-to-r from-rose-50 via-amber-50/90 to-rose-50 dark:from-rose-950/60 dark:via-amber-950/40 dark:to-rose-950/60 p-4 sm:p-5 shadow-lg shadow-rose-500/10"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                 <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-md shadow-amber-500/30">
-                    ⏰
+                  <div className="w-11 h-11 rounded-2xl bg-rose-500 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-md shadow-rose-500/30">
+                    OFF
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950">
-                        {cutoff.mode === 'maintenance' ? 'Maintenance Layanan' : `Cut-Off Harian ${cutoff.cutoff_start} - ${cutoff.cutoff_end} WIB`}
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-rose-500 text-white">
+                        {cutoff.status_badge || 'SEDANG OFFLINE'}
                       </span>
-                      <span className="text-xs font-extrabold text-amber-800 dark:text-amber-300">
+                      <span className="text-xs font-extrabold text-rose-800 dark:text-rose-300">
                         • Pengaman Saldo Pelanggan Aktif
                       </span>
                     </div>
                     <h2 className="text-sm sm:text-base font-black text-gray-900 dark:text-white">
-                      {cutoff.title || 'Jam Rekonsiliasi & Cut-Off Harian PPOB'}
+                      {cutoff.status_title || cutoff.title || 'Layanan PPOB Sedang Offline Sementara'}
                     </h2>
                     <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 leading-relaxed max-w-3xl">
                       {cutoff.message}
                     </p>
                   </div>
                 </div>
-                <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-1 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-black/30 border border-amber-200/70 dark:border-white/10">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Jam Operasional</span>
-                  <span className="text-xs font-black font-mono text-emerald-600 dark:text-emerald-400">
-                    Aktif Pukul {cutoff.cutoff_end || '00:10'} WIB
-                  </span>
+                <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-white/80 dark:bg-black/30 border border-rose-200/70 dark:border-white/10">
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Estimasi / Status</span>
+                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                      {cutoff.status_eta || `Aktif Pukul ${cutoff.cutoff_end || '00:10'} WIB`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOfflineModalOpen(true)}
+                    className="!min-h-0 px-3 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-black transition cursor-pointer"
+                  >
+                    Info Detail
+                  </button>
                 </div>
               </div>
             </div>
@@ -852,6 +860,15 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
 
       {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) */}
       <PpobMobileNav user={user} />
+
+      {/* MODAL STATUS PPOB OFFLINE / MAINTENANCE / GANGGUAN */}
+      <PpobOfflineModal
+        open={offlineModalOpen}
+        onClose={() => setOfflineModalOpen(false)}
+        status={cutoff || store?.ppob_status}
+        targetHref="/ppob"
+        isOnPpobPage={true}
+      />
     </div>
   );
 }

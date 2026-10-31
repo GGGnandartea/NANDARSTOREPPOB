@@ -166,11 +166,31 @@ class KiosbankService
 
     /**
      * Cek status Jam Cut-Off Harian Otomatis (default 23:50 - 00:10 WIB)
-     * dan Sakelar Maintenance Manual Layanan PPOB.
+     * serta Mode Status Layanan PPOB (Online, Offline, Maintenance, Gangguan Pusat, Restock).
      */
     public function getCutoffStatus(): array
     {
+        $kiosbankEnabled = Setting::where('key', 'kiosbank_enabled')->value('value') !== '0';
         $maintenanceEnabled = Setting::where('key', 'ppob_maintenance_enabled')->value('value') === '1';
+        $statusModeRaw = trim((string) (Setting::where('key', 'ppob_status_mode')->value('value') ?? ''));
+
+        // Sinkronisasi mode status manual
+        if (in_array($statusModeRaw, ['online', 'offline', 'maintenance', 'gangguan', 'restock'], true)) {
+            $statusMode = $statusModeRaw;
+        } elseif (!$kiosbankEnabled) {
+            $statusMode = 'offline';
+        } elseif ($maintenanceEnabled) {
+            $statusMode = 'maintenance';
+        } else {
+            $statusMode = 'online';
+        }
+
+        if (!$kiosbankEnabled && $statusMode === 'online') {
+            $statusMode = 'offline';
+        }
+
+        $isManualOff = $statusMode !== 'online';
+
         $cutoffEnabledRaw = Setting::where('key', 'ppob_cutoff_enabled')->value('value');
         $cutoffEnabled = $cutoffEnabledRaw === null ? true : ($cutoffEnabledRaw === '1');
 
@@ -194,26 +214,78 @@ class KiosbankService
             $inWindow = ($currentHm >= $cutoffStart || $currentHm <= $cutoffEnd);
         }
 
-        $isCutoffActive = $maintenanceEnabled || ($cutoffEnabled && $inWindow);
-        $defaultMsg = "Layanan PPOB sedang dalam jam rekonsiliasi / cut-off harian pusat ({$cutoffStart} - {$cutoffEnd} WIB). Transaksi dihentikan sementara agar saldo Anda tidak terpotong di jam rawan gangguan pusat, dan akan aktif kembali secara otomatis setelah pukul {$cutoffEnd} WIB.";
-        $customMsg = trim((string) (Setting::where('key', 'ppob_cutoff_message')->value('value') ?? ''));
+        $isCutoffActive = $isManualOff || ($cutoffEnabled && $inWindow);
+        $effectiveMode = $isManualOff ? $statusMode : (($cutoffEnabled && $inWindow) ? 'scheduled_cutoff' : 'normal');
 
-        $message = $customMsg !== '' ? $customMsg : $defaultMsg;
-        $title = $maintenanceEnabled
-            ? 'Pemeliharaan Layanan PPOB Sedang Berlangsung'
-            : "Jam Cut-Off & Rekonsiliasi Harian PPOB ({$cutoffStart} - {$cutoffEnd} WIB)";
+        $presets = [
+            'offline' => [
+                'badge'   => 'SEDANG OFFLINE',
+                'title'   => 'Layanan PPOB Sedang Offline Sementara',
+                'message' => 'Mohon maaf, layanan transaksi PPOB (Pulsa, Paket Data, Token PLN, E-Wallet & Tagihan) saat ini sedang dinonaktifkan sementara oleh Admin. Silakan coba kembali beberapa saat lagi atau belanja produk Aplikasi Premium yang tetap buka 24 jam.',
+                'eta'     => 'Segera Aktif Kembali',
+            ],
+            'maintenance' => [
+                'badge'   => 'SEDANG MAINTENANCE',
+                'title'   => 'Pemeliharaan Sistem PPOB Sedang Berlangsung',
+                'message' => 'Kami sedang melakukan pemeliharaan dan peningkatan sistem layanan PPOB agar transaksi Anda semakin cepat dan stabil. Selama proses ini berlangsung, transaksi PPOB dihentikan sementara agar saldo Anda tetap aman.',
+                'eta'     => 'Estimasi 15 - 60 Menit',
+            ],
+            'gangguan' => [
+                'badge'   => 'GANGGUAN JARINGAN PUSAT',
+                'title'   => 'Gangguan Koneksi Server Operator Pusat',
+                'message' => 'Saat ini sedang terjadi kendala jaringan pada jalur koneksi provider/operator pusat. Untuk mencegah transaksi tertunda (Pending) atau saldo terpotong, layanan PPOB kami kunci sementara hingga jalur kembali normal.',
+                'eta'     => 'Menunggu Normalisasi Pusat',
+            ],
+            'restock' => [
+                'badge'   => 'RESTOCK & REKONSILIASI',
+                'title'   => 'Optimalisasi & Pengisian Kuota Saluran PPOB',
+                'message' => 'Tim kami sedang melakukan sinkronisasi kuota dan pengisian ulang saldo deposit utama saluran PPOB. Layanan akan segera dibuka kembali secara otomatis setelah proses selesai.',
+                'eta'     => 'Aktif Dalam Beberapa Saat',
+            ],
+            'scheduled_cutoff' => [
+                'badge'   => "CUT-OFF HARIAN {$cutoffStart} - {$cutoffEnd} WIB",
+                'title'   => "Jam Cut-Off & Rekonsiliasi Harian PPOB ({$cutoffStart} - {$cutoffEnd} WIB)",
+                'message' => "Layanan PPOB sedang dalam jam rekonsiliasi / cut-off harian pusat ({$cutoffStart} - {$cutoffEnd} WIB). Transaksi dihentikan sementara agar saldo Anda tidak terpotong di jam rawan gangguan pusat, dan akan aktif kembali secara otomatis setelah pukul {$cutoffEnd} WIB.",
+                'eta'     => "Aktif Pukul {$cutoffEnd} WIB",
+            ],
+            'normal' => [
+                'badge'   => 'ONLINE OTOMATIS 24 JAM',
+                'title'   => 'Layanan PPOB Aktif Normal',
+                'message' => 'Seluruh layanan Pulsa, Paket Data, Token PLN, E-Wallet, Voucher Game, dan Tagihan siap diproses otomatis detik ini juga.',
+                'eta'     => 'Online Otomatis',
+            ],
+        ];
+
+        $currentPreset = $presets[$effectiveMode] ?? $presets['maintenance'];
+
+        $customTitle = trim((string) (Setting::where('key', 'ppob_status_title')->value('value') ?? ''));
+        $customMsg   = trim((string) (Setting::where('key', 'ppob_cutoff_message')->value('value') ?? ''));
+        $customEta   = trim((string) (Setting::where('key', 'ppob_status_eta')->value('value') ?? ''));
+        $allowBrowseRaw = Setting::where('key', 'ppob_allow_catalog_browse')->value('value');
+        $allowBrowse = $allowBrowseRaw === null ? true : ($allowBrowseRaw === '1');
+
+        $title   = ($isCutoffActive && $customTitle !== '') ? $customTitle : $currentPreset['title'];
+        $message = ($isCutoffActive && $customMsg !== '') ? $customMsg : $currentPreset['message'];
+        $eta     = ($isCutoffActive && $customEta !== '') ? $customEta : $currentPreset['eta'];
 
         return [
-            'is_cutoff'           => $isCutoffActive,
-            'mode'                => $maintenanceEnabled ? 'maintenance' : (($cutoffEnabled && $inWindow) ? 'scheduled_cutoff' : 'normal'),
-            'maintenance_enabled' => $maintenanceEnabled,
-            'cutoff_enabled'      => $cutoffEnabled,
-            'cutoff_start'        => $cutoffStart,
-            'cutoff_end'          => $cutoffEnd,
-            'in_schedule_window'  => $inWindow,
-            'current_time_wib'    => $currentHm,
-            'title'               => $title,
-            'message'             => $message,
+            'is_cutoff'            => $isCutoffActive,
+            'mode'                 => $effectiveMode,
+            'status_mode'          => $statusMode,
+            'badge'                => $currentPreset['badge'],
+            'maintenance_enabled'  => $isManualOff,
+            'cutoff_enabled'       => $cutoffEnabled,
+            'cutoff_start'         => $cutoffStart,
+            'cutoff_end'           => $cutoffEnd,
+            'in_schedule_window'   => $inWindow,
+            'current_time_wib'     => $currentHm,
+            'title'                => $title,
+            'message'              => $message,
+            'eta'                  => $eta,
+            'allow_catalog_browse' => $allowBrowse,
+            'custom_title'         => $customTitle,
+            'custom_message'       => $customMsg,
+            'custom_eta'           => $customEta,
         ];
     }
 

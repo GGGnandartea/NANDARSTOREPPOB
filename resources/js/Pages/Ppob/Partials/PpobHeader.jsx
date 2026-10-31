@@ -1,10 +1,13 @@
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { fmt } from './PpobConstants';
+import TopAnnouncementBar from '../../../Components/TopAnnouncementBar';
 
 export default function PpobHeader({ store, user, userBalance, isDark, toggleDarkMode }) {
   return (
-    <header className="sticky top-0 z-40 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-gray-200/80 dark:border-white/5">
+    <>
+      <TopAnnouncementBar announcement={store?.announcement} />
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-gray-200/80 dark:border-white/5">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
@@ -84,6 +87,7 @@ export default function PpobHeader({ store, user, userBalance, isDark, toggleDar
         </div>
       </div>
     </header>
+    </>
   );
 }
 

@@ -17,6 +17,7 @@ import TrackOrderModal from './Partials/TrackOrderModal';
 import TermsModal from './Partials/TermsModal';
 import CategoryModal from './Partials/CategoryModal';
 import MobileBottomNav from './Partials/MobileBottomNav';
+import PpobOfflineModal from '../../Components/PpobOfflineModal';
 
 export default function Home({
     products = [],
@@ -53,6 +54,17 @@ export default function Home({
     }, [showTrackModal]);
 
     const [showFabMenu, setShowFabMenu] = useState(false);
+    const [ppobModalOpen, setPpobModalOpen] = useState(false);
+    const [ppobTargetHref, setPpobTargetHref] = useState('/ppob');
+
+    const handleOpenPpob = (href = '/ppob') => {
+        if (store?.ppob_status?.is_cutoff) {
+            setPpobTargetHref(href || '/ppob');
+            setPpobModalOpen(true);
+            return;
+        }
+        router.visit(href || '/ppob');
+    };
 
     const [currentBanner, setCurrentBanner] = useState(0);
     const [isHoveredBanner, setIsHoveredBanner] = useState(false);
@@ -181,6 +193,10 @@ export default function Home({
 
     const handleBannerClick = (banner) => {
         if (!banner.link_url) return;
+        if (banner.link_url.startsWith('/ppob') && store?.ppob_status?.is_cutoff) {
+            handleOpenPpob(banner.link_url);
+            return;
+        }
         if (banner.link_url.startsWith('http://') || banner.link_url.startsWith('https://')) {
             window.open(banner.link_url, '_blank');
         } else {
@@ -362,6 +378,7 @@ export default function Home({
                 showProfileMenu={showProfileMenu}
                 setShowProfileMenu={setShowProfileMenu}
                 setShowTrackModal={setShowTrackModal}
+                onOpenPpob={handleOpenPpob}
             />
 
             {/* HERO CAROUSEL & SEARCH SECTION */}
@@ -387,7 +404,7 @@ export default function Home({
 
             {/* LIVE NOTIFICATION TOAST */}
             <RecentPurchaseToast
-                showNotif={showNotif && !showFabMenu && !showTrackModal && !showCategoryModal}
+                showNotif={showNotif && !showFabMenu && !showTrackModal && !showCategoryModal && !ppobModalOpen}
                 activeNotif={activeNotif}
             />
 
@@ -400,10 +417,15 @@ export default function Home({
                     setShowTrackModal={setShowTrackModal}
                     effectiveAdminWa={effectiveAdminWa}
                     store={store}
+                    onOpenPpob={handleOpenPpob}
                 />
 
                 {/* PUSAT LAYANAN PPOB & PULSA */}
-                <PpobBanner filters={filters} />
+                <PpobBanner
+                    filters={filters}
+                    store={store}
+                    onOpenPpob={handleOpenPpob}
+                />
 
                 {/* FLASH SALE / PALING BANYAK DIBELI (REALTIME HARIAN) */}
                 <TopSellingSection
@@ -412,6 +434,8 @@ export default function Home({
                     filters={filters}
                     topSellingContainerRef={topSellingContainerRef}
                     scrollSlider={scrollSlider}
+                    store={store}
+                    onOpenPpob={handleOpenPpob}
                 />
 
                 {/* SLIDER KATEGORI & PRODUK */}
@@ -443,6 +467,7 @@ export default function Home({
                 store={store}
                 effectiveAdminWa={effectiveAdminWa}
                 setShowTrackModal={setShowTrackModal}
+                onOpenPpob={handleOpenPpob}
             />
 
             {/* FLOATING ACTION BUTTON */}
@@ -482,6 +507,15 @@ export default function Home({
                 handleCategoryBrand={handleCategoryBrand}
             />
 
+            {/* MODAL STATUS PPOB OFFLINE / MAINTENANCE / GANGGUAN */}
+            <PpobOfflineModal
+                open={ppobModalOpen}
+                onClose={() => setPpobModalOpen(false)}
+                status={store?.ppob_status}
+                targetHref={ppobTargetHref}
+                isOnPpobPage={false}
+            />
+
             {/* BOTTOM NAVIGATION BAR FOR MOBILE (HP) - PERSISTENT & SLEEK */}
             <MobileBottomNav
                 auth={auth}
@@ -489,6 +523,8 @@ export default function Home({
                 setShowTrackModal={setShowTrackModal}
                 showCategoryModal={showCategoryModal}
                 setShowCategoryModal={setShowCategoryModal}
+                store={store}
+                onOpenPpob={handleOpenPpob}
             />
 
         </div>

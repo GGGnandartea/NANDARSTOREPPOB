@@ -192,6 +192,14 @@ class AdminController extends Controller
         $turnstileOnLogin          = Setting::where('key', 'turnstile_on_login')->value('value') ?? '0';
         $turnstileOnForgotPassword = Setting::where('key', 'turnstile_on_forgot_password')->value('value') ?? '1';
 
+        // Pengumuman / Notifikasi Geser Atas (Running Text)
+        $announcementEnabled = Setting::where('key', 'announcement_enabled')->value('value') ?? '0';
+        $announcementText    = Setting::where('key', 'announcement_text')->value('value') ?? '';
+        $announcementBadge   = Setting::where('key', 'announcement_badge')->value('value') ?: 'INFO';
+        $announcementTheme   = Setting::where('key', 'announcement_theme')->value('value') ?: 'promo';
+        $announcementSpeed   = Setting::where('key', 'announcement_speed')->value('value') ?: 'normal';
+        $announcementLink    = Setting::where('key', 'announcement_link')->value('value') ?? '';
+
         return view('admin.settings', compact(
             'premkuApiKey', 'premkuApiSecret', 'premkuWebhookUrl', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
             'adminWhatsapp', 'botWhatsapp', 'whatsappGroupLink', 'premkuStatus', 'preflixStatus',
@@ -200,7 +208,8 @@ class AdminController extends Controller
             'kiosbankMitra', 'kiosbankAccountId', 'kiosbankMerchantId', 'kiosbankMerchantName',
             'kiosbankCounterId', 'kiosbankMode', 'kiosbankMarkupType', 'kiosbankMarkupValue',
             'kiosbankEnabled', 'kiosbankStatus', 'kiosbankPrivateKey', 'kiosbankPublicKey',
-            'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey', 'turnstileOnRegister', 'turnstileOnLogin', 'turnstileOnForgotPassword'
+            'turnstileEnabled', 'turnstileSiteKey', 'turnstileSecretKey', 'turnstileOnRegister', 'turnstileOnLogin', 'turnstileOnForgotPassword',
+            'announcementEnabled', 'announcementText', 'announcementBadge', 'announcementTheme', 'announcementSpeed', 'announcementLink'
         ));
     }
 
@@ -518,6 +527,32 @@ class AdminController extends Controller
                 return back()->with('success', 'Key disimpan, namun status Turnstile otomatis dinonaktifkan karena Site Key atau Secret Key masih kosong.');
             }
             return back()->with('success', 'Pengaturan keamanan Cloudflare Turnstile berhasil disimpan.');
+        }
+
+        // Pengumuman / Notifikasi Geser Atas (Running Text)
+        if ($request->has('announcement_form_submitted')) {
+            $annText    = trim((string) $request->input('announcement_text', ''));
+            $annBadge   = trim((string) $request->input('announcement_badge', 'INFO')) ?: 'INFO';
+            $annTheme   = in_array($request->input('announcement_theme'), ['promo', 'info', 'warning', 'success'], true)
+                ? $request->input('announcement_theme')
+                : 'promo';
+            $annSpeed   = in_array($request->input('announcement_speed'), ['slow', 'normal', 'fast'], true)
+                ? $request->input('announcement_speed')
+                : 'normal';
+            $annLink    = trim((string) $request->input('announcement_link', ''));
+            $annEnabled = ($request->input('announcement_enabled') == '1' && $annText !== '') ? '1' : '0';
+
+            Setting::updateOrCreate(['key' => 'announcement_enabled'], ['value' => $annEnabled]);
+            Setting::updateOrCreate(['key' => 'announcement_text'], ['value' => $annText]);
+            Setting::updateOrCreate(['key' => 'announcement_badge'], ['value' => strtoupper(substr($annBadge, 0, 24))]);
+            Setting::updateOrCreate(['key' => 'announcement_theme'], ['value' => $annTheme]);
+            Setting::updateOrCreate(['key' => 'announcement_speed'], ['value' => $annSpeed]);
+            Setting::updateOrCreate(['key' => 'announcement_link'], ['value' => $annLink]);
+
+            if ($request->input('announcement_enabled') == '1' && $annText === '') {
+                return back()->with('success', 'Pengaturan disimpan, namun notifikasi geser dinonaktifkan karena isi teks pengumuman masih kosong.');
+            }
+            return back()->with('success', 'Pengaturan Notifikasi / Pengumuman Atas berhasil disimpan!');
         }
 
         Cache::forget('promo_settings');

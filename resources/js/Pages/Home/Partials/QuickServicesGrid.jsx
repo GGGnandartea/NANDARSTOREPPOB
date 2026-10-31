@@ -6,24 +6,55 @@ export default function QuickServicesGrid({
     setShowTrackModal,
     effectiveAdminWa,
     store,
+    onOpenPpob,
 }) {
     if (filters.category || filters.tipe || filters.search) {
         return null;
     }
 
+    const ppobStatus = store?.ppob_status;
+    const isPpobOff = Boolean(ppobStatus?.is_cutoff);
+    const shortBadge = isPpobOff
+        ? ppobStatus?.reason === 'maintenance'
+            ? 'Maint'
+            : ppobStatus?.reason === 'gangguan'
+              ? 'Gangguan'
+              : ppobStatus?.reason === 'restock'
+                ? 'Restock'
+                : 'Off'
+        : null;
+
+    const handlePpobLinkClick = (e, href) => {
+        if (isPpobOff && onOpenPpob) {
+            e.preventDefault();
+            onOpenPpob(href);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-[#131b2e] rounded-2xl sm:rounded-3xl border border-gray-200/80 dark:border-white/5 shadow-sm p-3.5 sm:p-5 mb-5 md:mb-6 animate-fade-in-up">
-            <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center justify-between mb-3 px-1 gap-2">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-orange-500"></span>
                     <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-gray-900 dark:text-white">
                         Layanan &amp; Kategori Favorit
                     </h3>
                 </div>
-                <span className="text-[11px] sm:text-xs font-medium text-gray-400 dark:text-gray-300 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Online Otomatis
-                </span>
+                {isPpobOff ? (
+                    <button
+                        type="button"
+                        onClick={() => onOpenPpob?.('/ppob')}
+                        className="!min-h-0 px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-[10px] sm:text-xs font-extrabold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 cursor-pointer hover:bg-rose-500/25 transition"
+                    >
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                        <span>PPOB: {ppobStatus?.status_badge || 'Sedang Offline'}</span>
+                    </button>
+                ) : (
+                    <span className="text-[11px] sm:text-xs font-medium text-gray-400 dark:text-gray-300 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Online Otomatis
+                    </span>
+                )}
             </div>
 
             {/* Tujuh layanan: empat kolom di HP, satu baris di desktop. */}
@@ -31,11 +62,14 @@ export default function QuickServicesGrid({
                 {/* 1. Pulsa & Data */}
                 <Link
                     href="/ppob?tab=pulsa"
+                    onClick={(e) => handlePpobLinkClick(e, '/ppob?tab=pulsa')}
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-emerald-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/80 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-emerald-500 text-white text-[7px] font-black uppercase">Auto</span>
+                        <span className={`absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-white text-[7px] font-black uppercase ${isPpobOff ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                            {shortBadge || 'Auto'}
+                        </span>
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Pulsa &amp; Data</span>
                 </Link>
@@ -43,11 +77,14 @@ export default function QuickServicesGrid({
                 {/* 2. Listrik PLN */}
                 <Link
                     href="/ppob?tab=pln"
+                    onClick={(e) => handlePpobLinkClick(e, '/ppob?tab=pln')}
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-amber-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.75V17h8v-2.25A7 7 0 0 0 12 2z"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[7px] font-black uppercase">PLN</span>
+                        <span className={`absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-white text-[7px] font-black uppercase ${isPpobOff ? 'bg-rose-500' : 'bg-amber-500'}`}>
+                            {shortBadge || 'PLN'}
+                        </span>
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-amber-600 dark:group-hover:text-amber-400">PLN</span>
                 </Link>
@@ -55,11 +92,14 @@ export default function QuickServicesGrid({
                 {/* 3. Top Up E-Wallet */}
                 <Link
                     href="/ppob?tab=ewallet"
+                    onClick={(e) => handlePpobLinkClick(e, '/ppob?tab=ewallet')}
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-sky-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200/80 dark:border-sky-800/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="14" r="1.5" fill="currentColor"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-sky-500 text-white text-[7px] font-black uppercase">DANA</span>
+                        <span className={`absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-white text-[7px] font-black uppercase ${isPpobOff ? 'bg-rose-500' : 'bg-sky-500'}`}>
+                            {shortBadge || 'DANA'}
+                        </span>
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-sky-600 dark:group-hover:text-sky-400">E-Wallet</span>
                 </Link>
@@ -67,11 +107,14 @@ export default function QuickServicesGrid({
                 {/* 4. Voucher Game */}
                 <Link
                     href="/ppob?tab=game"
+                    onClick={(e) => handlePpobLinkClick(e, '/ppob?tab=game')}
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-purple-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
                     <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/40 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="6"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15.5" cy="12" r="1" fill="currentColor"/><circle cx="18.5" cy="12" r="1" fill="currentColor"/></svg>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-purple-500 text-white text-[7px] font-black uppercase">Game</span>
+                        <span className={`absolute -top-1 -right-1 px-1 py-0.2 rounded-full text-white text-[7px] font-black uppercase ${isPpobOff ? 'bg-rose-500' : 'bg-purple-500'}`}>
+                            {shortBadge || 'Game'}
+                        </span>
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-purple-600 dark:group-hover:text-purple-400">Game Topup</span>
                 </Link>
@@ -79,10 +122,16 @@ export default function QuickServicesGrid({
                 {/* 5. Tagihan Air PDAM */}
                 <Link
                     href="/ppob?tab=pdam"
+                    onClick={(e) => handlePpobLinkClick(e, '/ppob?tab=pdam')}
                     className="flex flex-col items-center group cursor-pointer p-1.5 sm:p-2 rounded-2xl hover:bg-cyan-50/60 dark:hover:bg-white/5 transition-all text-center"
                 >
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200/80 dark:border-cyan-800/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200/80 dark:border-cyan-800/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:shadow-md transition-all relative">
                         <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                        {shortBadge && (
+                            <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-full bg-rose-500 text-white text-[7px] font-black uppercase">
+                                {shortBadge}
+                            </span>
+                        )}
                     </div>
                     <span className="text-[11px] sm:text-xs font-extrabold text-gray-800 dark:text-gray-200 mt-1.5 leading-tight group-hover:text-cyan-600 dark:group-hover:text-cyan-400">Air PDAM</span>
                 </Link>
@@ -115,4 +164,3 @@ export default function QuickServicesGrid({
         </div>
     );
 }
-

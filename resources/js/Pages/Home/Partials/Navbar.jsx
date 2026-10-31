@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, router } from '@inertiajs/react';
+import TopAnnouncementBar from '../../../Components/TopAnnouncementBar';
 
 export default function Navbar({
     auth,
@@ -16,11 +17,33 @@ export default function Navbar({
     showProfileMenu,
     setShowProfileMenu,
     setShowTrackModal,
+    onOpenPpob,
 }) {
     const hasCategoryFilter = Boolean(filters?.category || filters?.tipe);
+    const ppobStatus = store?.ppob_status;
+    const isPpobOff = Boolean(ppobStatus?.is_cutoff);
+    const ppobShortBadge = isPpobOff
+        ? ppobStatus?.reason === 'maintenance'
+            ? 'MAINT'
+            : ppobStatus?.reason === 'gangguan'
+              ? 'GANGGUAN'
+              : ppobStatus?.reason === 'restock'
+                ? 'RESTOCK'
+                : 'OFF'
+        : 'HOT';
+
+    const handlePpobClick = (e) => {
+        if (isPpobOff && onOpenPpob) {
+            e.preventDefault();
+            onOpenPpob('/ppob');
+        }
+    };
 
     return (
         <>
+            {/* TOP RUNNING ANNOUNCEMENT BAR */}
+            <TopAnnouncementBar announcement={store?.announcement} />
+
             {/* ADMIN MONITOR BAR */}
             {auth?.user?.role === 'admin' && (
                 <div className="bg-slate-900 text-slate-200 text-xs py-2 px-4 border-b border-slate-800 shrink-0 sticky top-0 z-50">
@@ -118,12 +141,19 @@ export default function Navbar({
                         {/* PPOB DASHBOARD LINK BUTTON */}
                         <Link
                             href="/ppob"
-                            className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-[11px] sm:text-xs shadow-sm shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Buka Layanan PPOB & Pulsa"
+                            onClick={handlePpobClick}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full text-white font-extrabold text-[11px] sm:text-xs shadow-sm hover:scale-105 transition-all cursor-pointer shrink-0 ${
+                                isPpobOff
+                                    ? 'bg-gradient-to-r from-amber-500 to-rose-600 shadow-rose-500/20'
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/20'
+                            }`}
+                            title={isPpobOff ? (ppobStatus?.status_title || 'Status Layanan PPOB') : 'Buka Layanan PPOB & Pulsa'}
                         >
                             <span>PPOB</span>
                             <span className="hidden sm:inline">&amp; Pulsa</span>
-                            <span className="hidden sm:inline-block text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">HOT</span>
+                            <span className="text-[9px] sm:text-[10px] bg-black/25 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider ml-0.5">
+                                {ppobShortBadge}
+                            </span>
                         </Link>
 
                         <button

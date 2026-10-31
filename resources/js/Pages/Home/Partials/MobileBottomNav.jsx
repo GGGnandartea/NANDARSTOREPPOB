@@ -7,6 +7,8 @@ export default function MobileBottomNav({
     setShowTrackModal,
     showCategoryModal,
     setShowCategoryModal,
+    store,
+    onOpenPpob,
 }) {
     const [activeSection, setActiveSection] = useState(() =>
         typeof window !== 'undefined' && window.location.hash === '#katalog-produk' ? 'apps' : 'home');
@@ -16,6 +18,7 @@ export default function MobileBottomNav({
         return () => window.removeEventListener('hashchange', syncHash);
     }, []);
     const activeItem = showTrackModal ? 'track' : showCategoryModal ? 'apps' : activeSection;
+    const isPpobOff = Boolean(store?.ppob_status?.is_cutoff);
     const itemClass = (item) => `min-h-12 flex flex-col items-center justify-center py-1 transition-colors duration-200 cursor-pointer ${activeItem === item ? 'text-orange-500 dark:text-orange-400' : 'text-gray-500 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400'}`;
     return (
         <div className="store-bottom-nav sm:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/95 dark:bg-[#0b1121]/95 backdrop-blur-xl border-t border-gray-200/90 dark:border-white/10 px-1 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
@@ -63,9 +66,21 @@ export default function MobileBottomNav({
                 </button>
 
                 {/* 3. PPOB */}
-                <Link href="/ppob" className="min-h-12 flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 relative transition-colors">
+                <Link
+                    href="/ppob"
+                    onClick={(e) => {
+                        if (isPpobOff && onOpenPpob) {
+                            e.preventDefault();
+                            onOpenPpob('/ppob');
+                        }
+                    }}
+                    className="min-h-12 flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 relative transition-colors"
+                >
                     <div className="relative">
                         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg>
+                        {isPpobOff && (
+                            <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#0b1121]" />
+                        )}
                     </div>
                     <span className="text-[11px] font-medium mt-1 tracking-tight">PPOB</span>
                 </Link>
@@ -90,4 +105,3 @@ export default function MobileBottomNav({
         </div>
     );
 }
-

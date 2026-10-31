@@ -191,6 +191,21 @@
                     </span>
                 </a>
 
+                <a href="{{ route('admin.settings', ['section' => 'announcement']) }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.settings') && $currentSection === 'announcement' ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Pengumuman Atas</span>
+                        @php
+                            $isAnnouncementSidebar = \App\Models\Setting::where('key', 'announcement_enabled')->value('value') === '1';
+                        @endphp
+                        @if($isAnnouncementSidebar)
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500 text-white">ON</span>
+                        @endif
+                    </span>
+                </a>
+
                 <!-- Kiosbank PPOB Section -->
                 <div class="pt-2.5 pb-1">
                     <p :class="(sidebarOpen || window.innerWidth < 1024) ? 'block' : 'hidden'" class="px-3 text-[10px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Kiosbank PPOB</p>
@@ -211,12 +226,30 @@
                    class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && $currentSection === 'cutoff' ? 'active' : '' }}">
                     <svg class="w-5 h-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
-                        <span class="whitespace-nowrap">Cut-Off PPOB</span>
+                        <span class="whitespace-nowrap">Status &amp; Cut-Off</span>
                         @php
+                            $ppobModeSidebar = \App\Models\Setting::where('key', 'ppob_status_mode')->value('value');
                             $isMaintSidebar = \App\Models\Setting::where('key', 'ppob_maintenance_enabled')->value('value') === '1';
+                            $isKiosEnabledSidebar = (\App\Models\Setting::where('key', 'kiosbank_enabled')->value('value') ?? '1') === '1';
+                            $sidebarPpobBadge = null;
+                            if ($ppobModeSidebar && $ppobModeSidebar !== 'online') {
+                                $sidebarPpobBadge = match($ppobModeSidebar) {
+                                    'offline' => 'OFF',
+                                    'maintenance' => 'MAINT',
+                                    'gangguan' => 'GANGGUAN',
+                                    'restock' => 'RESTOCK',
+                                    default => 'OFF',
+                                };
+                            } elseif ($isMaintSidebar) {
+                                $sidebarPpobBadge = 'MAINT';
+                            } elseif (!$isKiosEnabledSidebar) {
+                                $sidebarPpobBadge = 'OFF';
+                            }
                         @endphp
-                        @if($isMaintSidebar)
-                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-500 text-white">MAINT</span>
+                        @if($sidebarPpobBadge)
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-500 text-white">{{ $sidebarPpobBadge }}</span>
+                        @else
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">ON</span>
                         @endif
                     </span>
                 </a>
@@ -378,7 +411,7 @@
 
                 <a href="{{ route('admin.settings', ['section' => 'api']) }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
-                   class="sidebar-link {{ request()->routeIs('admin.settings') && !in_array($currentSection, ['whatsapp', 'promo', 'turnstile'], true) ? 'active' : '' }}">
+                   class="sidebar-link {{ request()->routeIs('admin.settings') && !in_array($currentSection, ['whatsapp', 'promo', 'turnstile', 'announcement'], true) ? 'active' : '' }}">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
                         <span class="whitespace-nowrap">Provider API</span>

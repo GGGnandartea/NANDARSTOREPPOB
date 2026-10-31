@@ -7,6 +7,8 @@ export default function TopSellingSection({
     filters,
     topSellingContainerRef,
     scrollSlider,
+    store,
+    onOpenPpob,
 }) {
     if (filters.category || filters.tipe || filters.search) {
         return null;
@@ -16,6 +18,7 @@ export default function TopSellingSection({
         return null;
     }
 
+    const isPpobOff = Boolean(store?.ppob_status?.is_cutoff);
     const itemsToDisplay = (liveTopSelling && liveTopSelling.length > 0 ? liveTopSelling : productList).slice(0, 4);
 
     return (
@@ -70,10 +73,18 @@ export default function TopSellingSection({
                 {itemsToDisplay.map((product, idx) => {
                     const rankNumber = idx + 1;
 
+                    const targetHref = product.is_ppob ? (product.ppob_url || '/ppob') : `/product/${product.id}`;
+
                     return (
                         <Link
                             key={`top-selling-${product.id}-${idx}`}
-                            href={product.is_ppob ? (product.ppob_url || '/ppob') : `/product/${product.id}`}
+                            href={targetHref}
+                            onClick={(e) => {
+                                if (product.is_ppob && isPpobOff && onOpenPpob) {
+                                    e.preventDefault();
+                                    onOpenPpob(targetHref);
+                                }
+                            }}
                             className="flex items-center gap-2.5 bg-gray-50 dark:bg-[#0b1121]/80 hover:bg-orange-50/50 dark:hover:bg-white/[0.06] border border-gray-200/70 dark:border-white/5 hover:border-orange-500/40 rounded-xl px-2.5 py-2 min-w-[165px] sm:min-w-[195px] flex-1 transition-all duration-200 group cursor-pointer shrink-0 snap-start"
                         >
                             {/* Compact Icon + Rank */}
