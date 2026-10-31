@@ -97,6 +97,77 @@ Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa da
     return 0;
 })->purpose('Batalkan otomatis tagihan QRIS (Pesanan, Top Up, Reseller) yang belum dibayar lebih dari 30 menit');
 
+/**
+ * CLI Command: Reset Seluruh Data Testing ke 0 untuk Persiapan Launching Publik
+ */
+Artisan::command('store:reset-launch {--keep-users : Hanya reset saldo user ke 0 tanpa menghapus user testing} {--keep-vouchers : Pertahankan kode voucher yang ada}', function () {
+    $keepUsers = (bool) $this->option('keep-users');
+    $keepVouchers = (bool) $this->option('keep-vouchers');
+
+    $this->warn('Memulai proses Reset Data Testing ke 0 (Mode Siap Launching Publik)...');
+
+    try {
+        \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
+
+        $tablesToTruncate = [
+            'orders'                 => 'Riwayat Pesanan & Pendapatan (orders)',
+            'transaction_logs'       => 'Riwayat Mutasi Saldo & Testing (transaction_logs)',
+            'topup_requests'         => 'Riwayat Deposit / Top Up Saldo (topup_requests)',
+            'reseller_registrations' => 'Riwayat Pendaftaran Reseller (reseller_registrations)',
+            'kiosbank_deposits'      => 'Riwayat Tiket Deposit Kiosbank (kiosbank_deposits)',
+            'local_accounts'         => 'Stok Akun Produk Lokal (local_accounts)',
+            'product_favorites'      => 'Produk Favorit User (product_favorites)',
+        ];
+
+        foreach ($tablesToTruncate as $table => $label) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                \Illuminate\Support\Facades\DB::table($table)->truncate();
+                $this->line(" ✓ Dikosongkan: {$label}");
+            }
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('products')) {
+            $deletedProducts = \App\Models\Product::whereIn('type', ['local', 'api'])->delete();
+            $this->line(" ✓ Dihapus {$deletedProducts} Produk Lokal & Produk API (siap dipanggil ulang dari Admin)");
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('vouchers')) {
+            if ($keepVouchers) {
+                \App\Models\Voucher::query()->update(['used_count' => 0]);
+                $this->line(' ✓ Kuota pemakaian Voucher direset ke 0');
+            } else {
+                \Illuminate\Support\Facades\DB::table('vouchers')->truncate();
+                $this->line(' ✓ Dikosongkan: Daftar Voucher Testing (vouchers)');
+            }
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('users')) {
+            if ($keepUsers) {
+                \App\Models\User::where('role', '!=', 'admin')->update([
+                    'balance' => 0,
+                    'role'    => 'member',
+                ]);
+                $this->line(' ✓ Seluruh saldo User direset menjadi Rp 0');
+            } else {
+                $deletedUsers = \App\Models\User::where('role', '!=', 'admin')->delete();
+                $this->line(" ✓ Dihapus {$deletedUsers} Akun User/Reseller Testing (Akun Admin tetap aman)");
+            }
+            \App\Models\User::where('role', 'admin')->update(['balance' => 0]);
+            $this->line(' ✓ Saldo Akun Admin direset ke Rp 0');
+        }
+
+        \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $this->info('BERHASIL! Seluruh pendapatan, riwayat order, riwayat testing, produk lokal & produk API telah kembali ke 0.');
+        return 0;
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
+        $this->error('Gagal mereset database: ' . $e->getMessage());
+        return 1;
+    }
+})->purpose('Kosongkan seluruh data testing (order, pendapatan, mutasi, produk lokal & API) kembali ke 0 untuk persiapan launching');
+
 Schedule::command('orders:expire-unpaid')->everyMinute()->withoutOverlapping();
 Schedule::command('ppob:sync-pending')->everyThreeMinutes()->withoutOverlapping();
 Schedule::command('ppob:check-low-balance')->everyThirtyMinutes()->withoutOverlapping();

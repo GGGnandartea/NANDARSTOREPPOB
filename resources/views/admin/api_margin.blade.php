@@ -23,6 +23,13 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">✕</div>
+            <div>{{ session('error') }}</div>
+        </div>
+    @endif
+
     <!-- Header Banner dengan Alat Untung Massal -->
     <div class="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-gray-900 via-slate-800 to-gray-900 text-white shadow-xl border border-white/10 flex flex-col xl:flex-row items-center justify-between gap-6">
         <div class="text-center xl:text-left w-full xl:w-auto">
@@ -50,6 +57,50 @@
                 <span>Terapkan Massal</span>
             </button>
         </div>
+    </div>
+
+    <!-- PANEL PANGGIL & SINKRONKAN PRODUK API LANGSUNG DARI SERVER PUSAT KE DATABASE -->
+    <div class="admin-card p-5 sm:p-6 bg-white dark:bg-[#111827] border border-blue-200 dark:border-blue-500/20 rounded-3xl shadow-sm">
+        <form action="{{ route('admin.products.api.sync_provider') }}" method="POST" class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+            @csrf
+            <div class="space-y-1 max-w-xl">
+                <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider border border-blue-200 dark:border-blue-800/40">
+                    <span>Import & Panggil Otomatis dari Server Pusat</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-black text-gray-900 dark:text-white">
+                    Panggil Produk API ke Database ({{ count($dbMarkups) }} Tersimpan di Database)
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Setelah database dikosongkan ke 0, gunakan tombol ini untuk langsung memanggil dan mengaktifkan seluruh katalog produk live dari <strong>Premku</strong> & <strong>Preflix</strong> ke etalase toko Anda dalam 1 klik.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 w-full lg:w-auto shrink-0 items-end">
+                <div>
+                    <label class="block text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Provider</label>
+                    <select name="provider" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">Semua (Premku & Preflix)</option>
+                        <option value="premku">Hanya Premku</option>
+                        <option value="preflix">Hanya Preflix</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Untung Member (Rp)</label>
+                    <input type="number" name="default_margin" value="3000" min="0" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="3000">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">Untung Reseller (Rp)</label>
+                    <input type="number" name="reseller_margin" value="1500" min="0" class="w-full px-3 py-2.5 rounded-xl bg-amber-50/40 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="1500">
+                </div>
+                <div>
+                    <input type="hidden" name="auto_activate" value="1">
+                    <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-lg shadow-blue-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span>Panggil & Simpan API</span>
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 
     <!-- MASTER SWITCH KONTROL SAKELAR PROVIDER API -->
@@ -239,6 +290,8 @@
                                         </div>
                                         
                                         <input type="hidden" id="img_{{ $item['api_id'] }}" name="products[{{ $item['api_id'] }}][image]" value="{{ $savedImage }}">
+                                        <input type="hidden" name="products[{{ $item['api_id'] }}][original_price]" value="{{ $item['original_price'] }}">
+                                        <input type="hidden" name="products[{{ $item['api_id'] }}][stock]" value="{{ $item['stock'] ?? 0 }}">
                                         
                                         <div class="flex flex-col min-w-0 w-52 sm:w-64">
                                             <div class="flex items-center gap-1.5 mb-1">

@@ -73,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
 // Area Admin Panel
 Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::post('/system/reset-launch', [AdminController::class, 'resetForLaunch'])->name('system.reset_launch');
     Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
     Route::post('/orders/{id}/status', [AdminController::class, 'updateOrderStatus'])->name('orders.update_status');
     Route::post('/orders/{id}/retry-api', [AdminController::class, 'retryApiOrder'])->name('orders.retry_api');
@@ -100,6 +101,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/terms', [AdminController::class, 'saveTerms'])->name('terms.save');
     
     Route::get('/products/api', [AdminController::class, 'apiMargin'])->name('products.api');
+    Route::post('/products/api/sync-provider', [AdminController::class, 'syncApiProductsFromProvider'])->name('products.api.sync_provider');
     Route::post('/api-markup/{api_id}', [AdminController::class, 'updateApiMarkup'])->name('products.api.markup');
     Route::post('/api-markup-bulk', [AdminController::class, 'bulkUpdateApiMarkup'])->name('products.api.bulk_markup');
     Route::post('/products/api/toggle-provider', [AdminController::class, 'toggleProviderProducts'])->name('products.api.toggle_provider');

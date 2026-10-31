@@ -4,6 +4,20 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+
+    @if(session('success'))
+        <div class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs sm:text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black shrink-0">✓</div>
+            <div>{{ session('success') }}</div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-xs sm:text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">✕</div>
+            <div>{{ session('error') }}</div>
+        </div>
+    @endif
     
     <!-- Welcome Banner with Ambient Gradient Glow -->
     <div class="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 text-white shadow-xl shadow-orange-600/15">
@@ -346,9 +360,75 @@
                         <p class="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-1">Verifikasi WA</p>
                     </a>
                 </div>
+
+                <!-- Tombol Reset Data Testing ke 0 (Siap Launching Publik) -->
+                <div class="mt-4 pt-4 border-t border-gray-100 dark:border-white/5">
+                    <button type="button" onclick="document.getElementById('resetLaunchModal').classList.remove('hidden'); document.getElementById('resetLaunchModal').classList.add('flex');" class="w-full py-2.5 px-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800/40 text-rose-600 dark:text-rose-400 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>Reset Semua Data ke 0 (Launching)</span>
+                    </button>
+                </div>
             </div>
         </div>
 
+    </div>
+
+    <!-- Modal Konfirmasi Reset Database ke 0 untuk Launching -->
+    <div id="resetLaunchModal" class="fixed inset-0 z-[100] bg-black/70 hidden items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-[#111827] rounded-3xl w-full max-w-lg p-6 sm:p-7 border border-gray-200 dark:border-white/10 shadow-2xl space-y-4">
+            <div class="flex items-start justify-between gap-3 pb-3 border-b border-gray-100 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 flex items-center justify-center shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-black text-gray-900 dark:text-white">Reset Database ke 0 (Siap Launching)</h3>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Bersihkan seluruh data testing sebelum dibuka ke publik</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('resetLaunchModal').classList.add('hidden'); document.getElementById('resetLaunchModal').classList.remove('flex');" class="text-gray-400 hover:text-gray-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <form action="{{ route('admin.system.reset_launch') }}" method="POST" class="space-y-4">
+                @csrf
+                <div class="p-3.5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/70 dark:border-rose-800/40 text-xs text-rose-800 dark:text-rose-200 space-y-1.5 leading-relaxed">
+                    <p class="font-black">Tindakan ini akan mengosongkan kembali ke 0:</p>
+                    <ul class="list-disc list-inside space-y-0.5 text-[11px] font-medium">
+                        <li>Total Pendapatan, Grafik Penjualan & Riwayat Order (<code class="font-bold">0</code>)</li>
+                        <li>Riwayat Mutasi Saldo, Top Up, Registrasi Reseller & Tiket Deposit (<code class="font-bold">0</code>)</li>
+                        <li>Seluruh Produk Lokal, Stok Akun Lokal & Produk API lama (siap dipanggil ulang dari menu Admin)</li>
+                        <li>Akun Admin tetap aman (saldo Admin direset ke <code class="font-bold">Rp 0</code>)</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2.5 text-xs font-bold text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" name="delete_test_users" value="1" checked class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500">
+                        <span>Hapus semua akun User/Member testing (kecuali Admin)</span>
+                    </label>
+                    <label class="flex items-center gap-2.5 text-xs font-bold text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" name="delete_vouchers" value="1" checked class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500">
+                        <span>Kosongkan juga daftar kode Voucher testing</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Ketik <span class="text-rose-500 font-mono">RESET</span> untuk konfirmasi:
+                    </label>
+                    <input type="text" name="confirm_text" required placeholder="Ketik RESET" autocomplete="off" class="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs sm:text-sm font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500">
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100 dark:border-white/10">
+                    <button type="button" onclick="document.getElementById('resetLaunchModal').classList.add('hidden'); document.getElementById('resetLaunchModal').classList.remove('flex');" class="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-lg shadow-rose-600/25 transition cursor-pointer">
+                        Kosongkan ke 0 Sekarang
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
 </div>
@@ -377,8 +457,8 @@
             orangeGradient.addColorStop(1, 'rgba(249, 115, 22, 0.00)');
 
             const labels = {!! json_encode($days ?? ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']) !!};
-            const apiData = {!! json_encode($apiDaily ?? [120000, 190000, 150000, 220000, 180000, 250000, 310000]) !!};
-            const localData = {!! json_encode($localDaily ?? [80000, 110000, 95000, 130000, 140000, 190000, 210000]) !!};
+            const apiData = {!! json_encode($apiDaily ?? [0, 0, 0, 0, 0, 0, 0]) !!};
+            const localData = {!! json_encode($localDaily ?? [0, 0, 0, 0, 0, 0, 0]) !!};
 
             if (chartInstance) {
                 chartInstance.destroy();

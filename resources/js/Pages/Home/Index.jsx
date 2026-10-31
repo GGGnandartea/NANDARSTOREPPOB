@@ -77,9 +77,7 @@ export default function Home({
     const [liveTopSelling, setLiveTopSelling] = useState(topSellingToday || []);
 
     useEffect(() => {
-        if (topSellingToday && topSellingToday.length > 0) {
-            setLiveTopSelling(topSellingToday);
-        }
+        setLiveTopSelling(Array.isArray(topSellingToday) ? topSellingToday : []);
     }, [topSellingToday]);
 
     const defaultBanners = [
@@ -141,7 +139,7 @@ export default function Home({
                 const res = await fetch('/api/top-selling-today');
                 if (res.ok) {
                     const json = await res.json();
-                    if (isMounted && json?.status === 'success' && Array.isArray(json?.data) && json.data.length > 0) {
+                    if (isMounted && json?.status === 'success' && Array.isArray(json?.data)) {
                         setLiveTopSelling(json.data);
                     }
                 }
@@ -204,15 +202,7 @@ export default function Home({
         }
     };
 
-    const purchaseList = (recentPurchases && recentPurchases.length > 0)
-        ? recentPurchases
-        : [
-            { name: 'Budi Santoso', product: 'Netflix Premium 1 Bulan', time_ago: 'Baru saja' },
-            { name: 'Rian Pratama', product: 'Spotify Premium Individual', time_ago: '5 menit yang lalu' },
-            { name: 'Sisca Dewi', product: 'Canva Pro 1 Tahun', time_ago: '12 menit yang lalu' },
-            { name: 'Dimas Kurnia', product: 'YouTube Premium 1 Bulan', time_ago: '25 menit yang lalu' },
-            { name: 'Anisa Rahma', product: 'CapCut Pro 1 Bulan', time_ago: '35 menit yang lalu' },
-        ];
+    const purchaseList = Array.isArray(recentPurchases) ? recentPurchases : [];
 
     const purchaseIndexRef = useRef(0);
 

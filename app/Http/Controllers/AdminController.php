@@ -55,13 +55,6 @@ class AdminController extends Controller
                 ->sum('total_amount');
         }
 
-        // Jika data masih kosong di awal, sediakan sampel representatif agar grafik tetap estetik
-        $hasChartData = array_sum($apiDaily) > 0 || array_sum($localDaily) > 0;
-        if (!$hasChartData) {
-            $apiDaily = [120000, 190000, 150000, 220000, 180000, 250000, 310000];
-            $localDaily = [80000, 110000, 95000, 130000, 140000, 190000, 210000];
-        }
-
         $recentOrders = Order::orderBy('created_at', 'desc')->limit(6)->get();
 
         return view('admin.dashboard', compact(
@@ -838,6 +831,286 @@ class AdminController extends Controller
 
     public function updateApiMarkup(Request $request, $api_id) {}
 
+    /**
+     * Panggil & Sinkronkan Langsung Produk API dari Server Pusat (Premku & Preflix) ke Database
+     */
+    public function syncApiProductsFromProvider(Request $request, PremkuApiService $premkuService)
+    {
+        set_time_limit(180);
+        $request->validate([
+            'provider'          => 'nullable|in:all,premku,preflix',
+            'default_margin'    => 'nullable|integer|min:0|max:500000',
+            'reseller_margin'   => 'nullable|integer|min:0|max:500000',
+            'overwrite_price'   => 'nullable|boolean',
+            'default_category'  => 'nullable|string|max:100',
+        ]);
+
+        $provider = $request->input('provider', 'all');
+        $defaultMargin = (int) $request->input('default_margin', 3000);
+        $resellerMargin = (int) $request->input('reseller_margin', 1500);
+        $overwritePrice = $request->boolean('overwrite_price');
+        $defaultCategory = trim((string) $request->input('default_category', 'Aplikasi Premium')) ?: 'Aplikasi Premium';
+
+        Cache::forget('preflix_extra_data');
+        Cache::forget('api_full_data');
+        Cache::forget('api_last_known_stock');
+
+        $mojibake = ['â€¢', 'â€œ', 'â€ ', 'â€™', 'â€“', 'â€”', 'â€‹', '&bull;'];
+        $fixed    = ['•', '"', '"', "'", '-', '-', '', '•'];
+
+        $fetched = [];
+
+        // 1. Panggil produk dari Premku
+        if (in_array($provider, ['all', 'premku'], true)) {
+            try {
+                $resPremku = $premkuService->getProducts(15);
+                if (isset($resPremku['products']) && is_array($resPremku['products'])) {
+                    foreach ($resPremku['products'] as $p) {
+                        if (!isset($p['id'])) continue;
+                        $desc = $p['description'] ?? $p['catatan'] ?? null;
+                        if ($desc) {
+                            $desc = str_replace($mojibake, $fixed, $desc);
+                        }
+                        $fetched['PREMKU-' . $p['id']] = [
+                            'name'           => trim((string) ($p['name'] ?? 'Produk Premku')),
+                            'original_price' => max(0, (int) ($p['price'] ?? 0)),
+                            'stock'          => max(0, (int) ($p['stock'] ?? 0)),
+                            'image'          => $p['image'] ?? null,
+                            'description'    => $desc,
+                            'provider'       => 'Premku',
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Panggil produk dari Preflix
+        if (in_array($provider, ['all', 'preflix'], true)) {
+            try {
+                $idUser = Setting::where('key', 'preflix_id_user')->value('value');
+                $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
+                if ($idUser && $keyUser) {
+                    $extraData = [];
+                    try {
+                        $katRes = Http::withoutVerifying()->timeout(10)->asForm()->post('https://h2h.preflix.my.id/app/', [
+                            'koneksi' => 'get_kategori',
+                            'id_user' => $idUser,
+                            'key_user' => $keyUser,
+                        ])->json();
+                        if (is_array($katRes)) {
+                            foreach ($katRes as $k) {
+                                if (!isset($k['id_kategori'])) continue;
+                                $prodRes = Http::withoutVerifying()->timeout(10)->asForm()->post('https://h2h.preflix.my.id/app/', [
+                                    'koneksi' => 'get_produk',
+                                    'id_kategori' => $k['id_kategori'],
+                                    'id_user' => $idUser,
+                                    'key_user' => $keyUser,
+                                ])->json();
+                                if (is_array($prodRes)) {
+                                    foreach ($prodRes as $p) {
+                                        if (!isset($p['id_produk'])) continue;
+                                        $desc = $p['deskripsi'] ?? null;
+                                        if ($desc) {
+                                            $desc = str_replace(['\r\n', '\n'], "\n", $desc);
+                                            $desc = str_replace($mojibake, $fixed, $desc);
+                                        }
+                                        $extraData['PREFLIX-' . $p['id_produk']] = [
+                                            'icon' => $p['icon'] ?? null,
+                                            'deskripsi' => $desc,
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+
+                    $resPreflix = Http::withoutVerifying()->timeout(12)->asForm()->post('https://h2h.preflix.my.id/app/', [
+                        'koneksi'  => 'get_all_product',
+                        'id_user'  => $idUser,
+                        'key_user' => $keyUser,
+                    ])->json();
+
+                    if (isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data']) && is_array($resPreflix['data'])) {
+                        foreach ($resPreflix['data'] as $kategori) {
+                            if (!isset($kategori['produk']) || !is_array($kategori['produk'])) continue;
+                            foreach ($kategori['produk'] as $p) {
+                                if (!isset($p['id_produk'])) continue;
+                                $apiId = 'PREFLIX-' . $p['id_produk'];
+                                $fetched[$apiId] = [
+                                    'name'           => trim((string) ($p['nama_produk'] ?? 'Produk Preflix')),
+                                    'original_price' => max(0, (int) ($p['harga'] ?? 0)),
+                                    'stock'          => max(0, (int) ($p['stok'] ?? 0)),
+                                    'image'          => $extraData[$apiId]['icon'] ?? null,
+                                    'description'    => $extraData[$apiId]['deskripsi'] ?? null,
+                                    'provider'       => 'Preflix',
+                                ];
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        if (empty($fetched)) {
+            return back()->with('error', 'Tidak ada produk yang berhasil dipanggil dari provider API. Pastikan API Key Premku / Preflix sudah terisi dengan benar di menu Provider API.');
+        }
+
+        $importedCount = 0;
+        $updatedCount = 0;
+        $liveStockCache = [];
+
+        foreach ($fetched as $apiId => $item) {
+            $product = Product::firstOrNew(['api_product_id' => $apiId, 'type' => 'api']);
+            $isNew = !$product->exists;
+
+            if ($isNew || empty($product->name)) {
+                $product->name = $item['name'];
+            }
+            if (Schema::hasColumn('products', 'api_price')) {
+                $product->api_price = $item['original_price'];
+            }
+            $product->stock = $item['stock'];
+
+            if ($isNew || $overwritePrice || (int) $product->price <= 0) {
+                $product->price = $item['original_price'] + $defaultMargin;
+                $product->reseller_price = $resellerMargin > 0 ? ($item['original_price'] + $resellerMargin) : null;
+            }
+
+            if ($isNew || empty($product->category)) {
+                $product->category = $defaultCategory;
+            }
+            if ($isNew || empty($product->description)) {
+                $product->description = $item['description'];
+            }
+            if (($isNew || empty($product->image)) && !empty($item['image'])) {
+                $product->image = $item['image'];
+            }
+            if ($isNew) {
+                $product->status = 'available';
+                if (Schema::hasColumn('products', 'is_promo')) {
+                    $product->is_promo = 1;
+                }
+                $importedCount++;
+            } else {
+                $updatedCount++;
+            }
+
+            $product->save();
+            $liveStockCache[$apiId] = ['stock' => $item['stock']];
+        }
+
+        if (!empty($liveStockCache)) {
+            Cache::put('api_full_data', $liveStockCache, 60);
+            Cache::put('api_last_known_stock', $liveStockCache, 86400);
+        }
+
+        return back()->with(
+            'success',
+            "Sinkronisasi pusat berhasil! {$importedCount} produk API baru ditambahkan dan {$updatedCount} produk diperbarui (Total: " . count($fetched) . " produk live)."
+        );
+    }
+
+    /**
+     * Reset Data Testing / Development menjadi 0 (Siap Launching ke Publik)
+     */
+    public function resetForLaunch(Request $request)
+    {
+        $resetOrders = $request->boolean('reset_orders', true);
+        $resetLocalProducts = $request->boolean('reset_local_products', true);
+        $resetApiProducts = $request->boolean('reset_api_products', true);
+        $resetTestUsers = $request->boolean('reset_test_users', true);
+        $resetVouchers = $request->boolean('reset_vouchers', false);
+
+        $summary = [];
+
+        try {
+            Schema::disableForeignKeyConstraints();
+
+            if ($resetOrders) {
+                if (Schema::hasTable('orders')) {
+                    DB::table('orders')->truncate();
+                }
+                if (Schema::hasTable('transaction_logs')) {
+                    DB::table('transaction_logs')->truncate();
+                }
+                if (Schema::hasTable('topup_requests')) {
+                    DB::table('topup_requests')->truncate();
+                }
+                if (Schema::hasTable('reseller_registrations')) {
+                    DB::table('reseller_registrations')->truncate();
+                }
+                if (Schema::hasTable('kiosbank_deposits')) {
+                    DB::table('kiosbank_deposits')->truncate();
+                }
+                $summary[] = 'Pendapatan, Riwayat Order, PPOB, Top-Up & Mutasi (0)';
+            }
+
+            if ($resetLocalProducts && $resetApiProducts) {
+                if (Schema::hasTable('local_accounts')) {
+                    DB::table('local_accounts')->truncate();
+                }
+                if (Schema::hasTable('product_favorites')) {
+                    DB::table('product_favorites')->truncate();
+                }
+                if (Schema::hasTable('products')) {
+                    DB::table('products')->truncate();
+                }
+                $summary[] = 'Semua Produk Lokal, Stok Akun & Produk API (0)';
+            } else {
+                if ($resetLocalProducts) {
+                    $localIds = Product::where('type', 'local')->pluck('id')->toArray();
+                    if (!empty($localIds)) {
+                        if (Schema::hasTable('local_accounts')) {
+                            DB::table('local_accounts')->whereIn('product_id', $localIds)->delete();
+                        }
+                        if (Schema::hasTable('product_favorites')) {
+                            DB::table('product_favorites')->whereIn('product_id', $localIds)->delete();
+                        }
+                    }
+                    Product::where('type', 'local')->delete();
+                    $summary[] = 'Produk Lokal & Stok Akun Lokal (0)';
+                }
+
+                if ($resetApiProducts) {
+                    $apiIds = Product::where('type', 'api')->pluck('id')->toArray();
+                    if (!empty($apiIds) && Schema::hasTable('product_favorites')) {
+                        DB::table('product_favorites')->whereIn('product_id', $apiIds)->delete();
+                    }
+                    Product::where('type', 'api')->delete();
+                    $summary[] = 'Katalog Produk API (0)';
+                }
+            }
+
+            if ($resetTestUsers) {
+                User::where('role', '!=', 'admin')->delete();
+                User::where('role', 'admin')->update(['balance' => 0]);
+                $summary[] = 'Akun Testing Dihapus (Akun Admin Tetap Aman, Saldo Rp 0)';
+            } else {
+                User::query()->update(['balance' => 0]);
+                $summary[] = 'Saldo Semua User Di-reset ke Rp 0';
+            }
+
+            if ($resetVouchers && Schema::hasTable('vouchers')) {
+                DB::table('vouchers')->truncate();
+                $summary[] = 'Voucher Diskon (0)';
+            } elseif (Schema::hasTable('vouchers') && Schema::hasColumn('vouchers', 'used_count')) {
+                DB::table('vouchers')->update(['used_count' => 0]);
+            }
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+
+        Cache::forget('api_full_data');
+        Cache::forget('api_last_known_stock');
+        Cache::forget('preflix_extra_data');
+        Cache::forget('promo_settings');
+
+        return back()->with(
+            'success',
+            'Database berhasil di-reset ke 0 untuk persiapan Launching Publik! (' . implode(' • ', $summary) . ')'
+        );
+    }
+
     public function bulkUpdateApiMarkup(Request $request) {
         try { DB::statement('ALTER TABLE products MODIFY image LONGTEXT'); } catch (\Exception $e) {}
         try { DB::statement('ALTER TABLE products MODIFY description LONGTEXT'); } catch (\Exception $e) {}
@@ -857,6 +1130,12 @@ class AdminController extends Controller
                 
                 $product->name = $data['name'];
                 $product->price = $data['markup_price'];
+                if (isset($data['original_price']) && Schema::hasColumn('products', 'api_price')) {
+                    $product->api_price = (int) $data['original_price'];
+                }
+                if (isset($data['stock'])) {
+                    $product->stock = max(0, (int) $data['stock']);
+                }
                 $product->reseller_price = !empty($data['reseller_price']) ? (int)$data['reseller_price'] : null;
                 $product->category = $data['category'] ?? null;
                 $product->status = isset($data['is_active']) ? 'available' : 'unavailable';
@@ -1724,7 +2003,7 @@ class AdminController extends Controller
         $totalOrdersCount = (clone $ordersQuery)->count();
 
         $avgOrderValue = $successOrdersCount > 0 ? round($totalRevenue / $successOrdersCount) : 0;
-        $successRate = $totalOrdersCount > 0 ? round(($successOrdersCount / $totalOrdersCount) * 100, 1) : 100;
+        $successRate = $totalOrdersCount > 0 ? round(($successOrdersCount / $totalOrdersCount) * 100, 1) : 0;
 
         // Distribusi Tipe Produk (API vs Local vs PPOB)
         $apiRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'api')->sum('total_amount');

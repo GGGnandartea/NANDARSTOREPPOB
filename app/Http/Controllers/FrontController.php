@@ -395,71 +395,48 @@ class FrontController extends Controller
             }
         }
 
-        // 4. Masukkan Produk PPOB Populer ke dalam Top Selling Hari Ini
-        $popularPpobItems = [
-            [
-                'id' => 'ppob-pln-20',
-                'name' => 'Token Listrik PLN 20.000',
-                'price' => 21500,
+        // 4. Masukkan Produk PPOB yang benar-benar terjual hari ini (tanpa angka dummy)
+        $popularPpobItems = [];
+        foreach ($todayPpobOrders->take(3) as $idx => $ppobOrd) {
+            $nameLower = strtolower((string) $ppobOrd->product_name);
+            $iconType = str_contains($nameLower, 'pln') || str_contains($nameLower, 'listrik')
+                ? 'pln'
+                : (str_contains($nameLower, 'dana') || str_contains($nameLower, 'ovo') || str_contains($nameLower, 'gopay') || str_contains($nameLower, 'shopee')
+                    ? 'ewallet'
+                    : (str_contains($nameLower, 'diamond') || str_contains($nameLower, 'mobile legends') || str_contains($nameLower, 'free fire')
+                        ? 'game'
+                        : 'pulsa'));
+            $tab = $iconType === 'pln' ? 'pln' : ($iconType === 'ewallet' ? 'ewallet' : ($iconType === 'game' ? 'game' : 'pulsa'));
+            $countToday = (int) ($ppobOrd->count_today ?? 0);
+
+            $popularPpobItems[] = [
+                'id' => 'ppob-live-' . $idx,
+                'name' => $ppobOrd->product_name,
+                'price' => (int) round((float) ($ppobOrd->avg_price ?: 0)),
                 'image' => null,
                 'type' => 'ppob',
                 'stock' => 999,
-                'today_sales' => max(18, (int) ($todayPpobOrders->firstWhere('product_name', 'Token PLN 20.000')->count_today ?? 0)),
-                'total_sales' => 342,
-                'sales_label' => '18 dibeli hari ini',
-                'is_hot_today' => true,
+                'today_sales' => $countToday,
+                'total_sales' => $countToday,
+                'sales_label' => $countToday . ' dibeli hari ini',
+                'is_hot_today' => $countToday > 0,
                 'is_ppob' => true,
-                'ppob_url' => '/ppob?tab=pln',
-                'ppob_tab' => 'pln',
-                'ppob_icon_type' => 'pln',
-            ],
-            [
-                'id' => 'ppob-tsel-10',
-                'name' => 'Pulsa Telkomsel 10.000',
-                'price' => 11500,
-                'image' => null,
-                'type' => 'ppob',
-                'stock' => 999,
-                'today_sales' => max(14, (int) ($todayPpobOrders->firstWhere('product_name', 'Telkomsel 10.000')->count_today ?? 0)),
-                'total_sales' => 285,
-                'sales_label' => '14 dibeli hari ini',
-                'is_hot_today' => true,
-                'is_ppob' => true,
-                'ppob_url' => '/ppob?tab=pulsa',
-                'ppob_tab' => 'pulsa',
-                'ppob_icon_type' => 'pulsa',
-            ],
-            [
-                'id' => 'ppob-dana-50',
-                'name' => 'Top Up Saldo DANA 50.000',
-                'price' => 51500,
-                'image' => null,
-                'type' => 'ppob',
-                'stock' => 999,
-                'today_sales' => max(11, (int) ($todayPpobOrders->firstWhere('product_name', 'DANA 50.000')->count_today ?? 0)),
-                'total_sales' => 197,
-                'sales_label' => '11 dibeli hari ini',
-                'is_hot_today' => true,
-                'is_ppob' => true,
-                'ppob_url' => '/ppob?tab=ewallet',
-                'ppob_tab' => 'ewallet',
-                'ppob_icon_type' => 'ewallet',
-            ],
-        ];
+                'ppob_url' => '/ppob?tab=' . $tab,
+                'ppob_tab' => $tab,
+                'ppob_icon_type' => $iconType,
+            ];
+        }
 
         // Sisipkan item PPOB secara proporsional ke dalam deretan produk
-        // Posisi 2 dan 4 agar berbaur rapi antara produk digital dan PPOB
         $blended = collect();
         $pIndex = 0;
         $ppobIndex = 0;
 
         while ($blended->count() < 8 && ($pIndex < $topSelling->count() || $ppobIndex < count($popularPpobItems))) {
-            // Masukkan produk standar
             if ($pIndex < $topSelling->count()) {
                 $blended->push($topSelling->get($pIndex));
                 $pIndex++;
             }
-            // Selipkan 1 item PPOB
             if ($ppobIndex < count($popularPpobItems) && $blended->count() < 8) {
                 $blended->push((object) $popularPpobItems[$ppobIndex]);
                 $ppobIndex++;

@@ -197,3 +197,4 @@ export default function TopAnnouncementBar({ announcement: propAnnouncement }) {
         </div>
     );
 }
+
