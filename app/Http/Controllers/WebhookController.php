@@ -421,6 +421,28 @@ class WebhookController extends Controller
             // 2. CEK VERIFIKASI AKUN WHATSAPP
             $user = \App\Models\User::where('wa_verification_code', $code)->first();
 
+            // Fallback A: Cari berdasarkan Email yang tertulis di pesan ("Email: xxx@gmail.com")
+            if (!$user && !empty($message) && preg_match('/\*?Email\*?:\*?\s*([^\s\r\n*]+)/i', $message, $emailMatch)) {
+                $extractedEmail = trim($emailMatch[1]);
+                if (!empty($extractedEmail)) {
+                    $user = \App\Models\User::where('email', $extractedEmail)->first();
+                }
+            }
+
+            // Fallback B: Cari berdasarkan Nomor WA yang tertulis di pesan ("Nomor WA: 08xxx")
+            if (!$user && !empty($message) && preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $waMatch)) {
+                $cleanWa = preg_replace('/[^0-9]/', '', $waMatch[1]);
+                if (str_starts_with($cleanWa, '628')) {
+                    $cleanWa = '08' . substr($cleanWa, 3);
+                } elseif (str_starts_with($cleanWa, '8')) {
+                    $cleanWa = '08' . substr($cleanWa, 1);
+                }
+                if (!empty($cleanWa)) {
+                    $user = \App\Models\User::where('whatsapp', $cleanWa)->first();
+                }
+            }
+
+            // Fallback C: Cari berdasarkan nomor pengirim (sender JID)
             if (!$user && !empty($sender)) {
                 $cleanSender = preg_replace('/[^0-9]/', '', $sender);
                 $altSender = str_starts_with($cleanSender, '62') ? '0' . substr($cleanSender, 2) : ('62' . substr($cleanSender, 1));
@@ -439,7 +461,7 @@ class WebhookController extends Controller
 
                 if ($isInvalidLid) {
                     // Coba cari nomor asli yang tertulis di format pesan chat ("*Nomor WA:* 08xxx")
-                    if (preg_match('/\*Nomor WA:\*\s*([0-9+]+)/i', $message, $phoneMatch)) {
+                    if (preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $phoneMatch)) {
                         $cleanExtracted = preg_replace('/[^0-9]/', '', $phoneMatch[1]);
                         if (str_starts_with($cleanExtracted, '628')) {
                             $cleanExtracted = '08' . substr($cleanExtracted, 3);

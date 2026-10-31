@@ -1,3 +1,5 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const express = require('express');
 const cors = require('cors');
 const QRCode = require('qrcode');
@@ -17,9 +19,33 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
 
-function resolveLaravelWebhookUrl() {
+// Simpan kode verifikasi yang baru masuk di memori (selama 60 menit)
+// agar Laravel juga bisa melakukan pull check via GET /api/check-code/:code
+const recentDetectedCodes = new Map();
+
+function rememberDetectedCode(code, payload = {}) {
+    if (!code) return;
+    const upper = String(code).trim().toUpperCase();
+    recentDetectedCodes.set(upper, {
+        code: upper,
+        sender: payload.sender || '',
+        raw_sender: payload.raw_sender || '',
+        message: payload.message || '',
+        timestamp: Date.now()
+    });
+    // Bersihkan entri lebih dari 60 menit
+    const cutoff = Date.now() - (60 * 60 * 1000);
+    for (const [k, v] of recentDetectedCodes.entries()) {
+        if (v.timestamp < cutoff) {
+            recentDetectedCodes.delete(k);
+        }
+    }
+}
+
+function getCandidateWebhookUrls() {
+    const urls = [];
     if (process.env.LARAVEL_WEBHOOK_URL) {
-        return process.env.LARAVEL_WEBHOOK_URL;
+        urls.push(process.env.LARAVEL_WEBHOOK_URL.trim());
     }
     try {
         const envPath = path.join(__dirname, '..', '.env');
@@ -29,15 +55,20 @@ function resolveLaravelWebhookUrl() {
             if (match && match[1]) {
                 const appUrl = match[1].trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
                 if (appUrl && appUrl !== 'http://localhost') {
-                    return `${appUrl}/api/webhook/wa-incoming`;
+                    urls.push(`${appUrl}/api/webhook/wa-incoming`);
                 }
             }
         }
     } catch (e) {}
-    return 'http://127.0.0.1:8000/api/webhook/wa-incoming';
+
+    urls.push('https://v2.premiumkita.com/api/webhook/wa-incoming');
+    urls.push('http://127.0.0.1:8000/api/webhook/wa-incoming');
+    urls.push('http://127.0.0.1/api/webhook/wa-incoming');
+
+    return [...new Set(urls)];
 }
 
-const LARAVEL_WEBHOOK_URL = resolveLaravelWebhookUrl();
+const LARAVEL_WEBHOOK_URL = getCandidateWebhookUrls()[0];
 const SESSION_DIR = path.join(__dirname, 'session');
 
 let sock = null;
@@ -59,24 +90,69 @@ function formatToJid(number) {
 
 function extractMessageText(m) {
     if (!m) return '';
-    if (m.conversation) return m.conversation;
+    if (typeof m.conversation === 'string' && m.conversation) return m.conversation;
     if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
     if (m.imageMessage?.caption) return m.imageMessage.caption;
     if (m.videoMessage?.caption) return m.videoMessage.caption;
     if (m.documentMessage?.caption) return m.documentMessage.caption;
+    if (m.documentWithCaptionMessage?.message) return extractMessageText(m.documentWithCaptionMessage.message);
     if (m.ephemeralMessage?.message) return extractMessageText(m.ephemeralMessage.message);
     if (m.viewOnceMessage?.message) return extractMessageText(m.viewOnceMessage.message);
     if (m.viewOnceMessageV2?.message) return extractMessageText(m.viewOnceMessageV2.message);
+    if (m.viewOnceMessageV2Extension?.message) return extractMessageText(m.viewOnceMessageV2Extension.message);
+    if (m.deviceSentMessage?.message) return extractMessageText(m.deviceSentMessage.message);
+    if (m.editedMessage?.message?.protocolMessage?.editedMessage) {
+        return extractMessageText(m.editedMessage.message.protocolMessage.editedMessage);
+    }
+    if (m.editedMessage?.message) return extractMessageText(m.editedMessage.message);
+    if (m.buttonsResponseMessage?.selectedDisplayText) return m.buttonsResponseMessage.selectedDisplayText;
+    if (m.templateButtonReplyMessage?.selectedDisplayText) return m.templateButtonReplyMessage.selectedDisplayText;
+    try {
+        const rawJson = JSON.stringify(m);
+        const match = rawJson.match(/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i);
+        if (match) return rawJson;
+    } catch (e) {}
     return '';
 }
 
 function formatFromJid(jid) {
     if (!jid) return '';
-    let clean = jid.split('@')[0];
+    let clean = jid.split('@')[0].split(':')[0];
     if (clean.startsWith('62')) {
         return '0' + clean.slice(2);
     }
     return clean;
+}
+
+async function postToLaravelWebhook(payload) {
+    const candidates = getCandidateWebhookUrls();
+    let lastError = null;
+    for (const url of candidates) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': 'PremiumKita-WA-Gateway/2.0'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                const resData = await response.json();
+                if (resData && resData.status && resData.status !== 'ignored') {
+                    return { url, resData };
+                }
+                // Simpan sebagai fallback jika semua kandidat mengembalikan ignored
+                if (!lastError) {
+                    lastError = { url, resData };
+                }
+            }
+        } catch (err) {
+            // Lanjut ke kandidat URL berikutnya
+        }
+    }
+    return lastError;
 }
 
 // Inisialisasi WhatsApp Socket dengan Baileys
@@ -155,14 +231,21 @@ async function startWhatsAppBot() {
 
     // Event Listener Pesan Masuk (Upsert)
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
+        if (type !== 'notify' && type !== 'append') return;
 
         for (const msg of messages) {
             try {
-                // Abaikan pesan dari diri sendiri atau status broadcast
-                if (msg.key.fromMe) continue;
-                const remoteJid = msg.key.remoteJid || '';
+                const remoteJid = msg.key?.remoteJid || '';
                 if (remoteJid.includes('@broadcast') || remoteJid.includes('@g.us')) continue;
+
+                const text = extractMessageText(msg.message);
+                if (!text) continue;
+
+                // Abaikan pesan dari bot sendiri KECUALI pesan format request verifikasi user
+                if (msg.key?.fromMe) {
+                    const isUserVerificationRequest = /ingin verifikasi nomor WhatsApp|Permintaan Kode:/i.test(text) && !/VERIFIKASI NOMOR BERHASIL|KODE OTP RESET PASSWORD/i.test(text);
+                    if (!isUserVerificationRequest) continue;
+                }
 
                 // Cegah pemrosesan duplikat ID pesan yang sama
                 const msgId = msg.key?.id;
@@ -177,12 +260,10 @@ async function startWhatsAppBot() {
                     }
                 }
 
-                const text = extractMessageText(msg.message);
-
                 const senderJid = remoteJid;
                 const isLid = senderJid.includes('@lid');
                 let senderPhone = '';
-                const textPhoneMatch = text.match(/\*Nomor WA:\*\s*([0-9+]+)/i);
+                const textPhoneMatch = text.match(/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i);
                 if (textPhoneMatch) {
                     senderPhone = textPhoneMatch[1].replace(/[^0-9]/g, '');
                 } else if (!isLid) {
@@ -190,29 +271,32 @@ async function startWhatsAppBot() {
                 }
                 const rawSender = senderJid.split('@')[0];
 
-                console.log(`[WA-BOT] 📥 Pesan masuk dari ${senderPhone || senderJid} (${rawSender}): "${text.trim()}"`);
+                console.log(`[WA-BOT] 📥 Pesan masuk dari ${senderPhone || senderJid} (${rawSender}): "${text.trim().slice(0, 120)}"`);
 
-                // Deteksi Kode Verifikasi PK-XXXXX / PK-XXXXX, VERIF-XXXXX, OTP-XXXXX, atau RESET-XXXXX
+                // Deteksi Kode Verifikasi PK-XXXXX, NS-XXXXX, VERIF-XXXXX, OTP-XXXXX, atau RESET-XXXXX
                 const match = text.match(/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i);
                 if (match) {
                     const code = match[1].toUpperCase();
                     console.log(`[WA-BOT] 🔍 Terdeteksi kode: ${code} dari ${senderPhone || senderJid}`);
 
+                    // Simpan ke memori lokal agar Laravel bisa pull-check kapan saja
+                    rememberDetectedCode(code, {
+                        sender: senderPhone,
+                        raw_sender: rawSender,
+                        message: text
+                    });
+
                     // Teruskan ke Laravel Webhook
                     try {
-                        const response = await fetch(LARAVEL_WEBHOOK_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                message: text,
-                                code: code,
-                                sender: senderPhone,
-                                raw_sender: rawSender
-                            })
+                        const webhookResult = await postToLaravelWebhook({
+                            message: text,
+                            code: code,
+                            sender: senderPhone,
+                            raw_sender: rawSender
                         });
 
-                        const resData = await response.json();
-                        console.log('[WA-BOT] Respon Webhook Laravel:', resData);
+                        const resData = webhookResult?.resData || { status: 'ignored' };
+                        console.log(`[WA-BOT] Respon Webhook Laravel (${webhookResult?.url || 'none'}):`, resData);
 
                         // Helper pengiriman balasan HANYA 1 KALI (tidak dobel)
                         const sendSingleReply = async (replyMsg) => {
@@ -281,16 +365,13 @@ async function startWhatsAppBot() {
                                                  `• Notifikasi pesanan instan ke WhatsApp\n` +
                                                  `• Detail akun premium (Email & Password) otomatis dikirim ke chat ini\n` +
                                                  `• Akses promo khusus reseller\n\n` +
-                                                 `Terima kasih telah berbelanja di PremiumKita! 🛒✨`;
+                                                 `Terima kasih telah berbelanja di PremiumKita!`;
 
                             await sendSingleReply(replyMessage);
                             console.log(`[WA-BOT] ✅ Balasan verifikasi berhasil dikirim (1x) ke ${confirmedPhone}`);
                         } else if (resData.status === 'already_verified') {
                             const alreadyMessage = `ℹ️ *INFORMASI*\n\nNomor WhatsApp Anda sudah berstatus terverifikasi di PremiumKita.\nJika butuh bantuan, silakan hubungi admin kami.`;
                             await sendSingleReply(alreadyMessage);
-                        } else {
-                            const notFoundMessage = `⚠️ *KODE TIDAK DITEMUKAN / HANGUS*\n\nKode *${code}* tidak ditemukan, sudah kadaluarsa, atau sudah hangus. Silakan periksa kembali instruksi di website PremiumKita.`;
-                            await sendSingleReply(notFoundMessage);
                         }
                     } catch (webhookErr) {
                         console.error('[WA-BOT] Gagal menghubungi Webhook Laravel:', webhookErr.message);
@@ -314,6 +395,23 @@ app.get('/api/status', (req, res) => {
         connected: connectionStatus === 'connected',
         phone: botPhoneNumber,
         qr: latestQrDataUrl
+    });
+});
+
+// 1b. Cek Apakah Kode Verifikasi Sudah Diterima oleh Bot (Pull Fallback)
+app.get('/api/check-code/:code', (req, res) => {
+    const code = String(req.params.code || '').trim().toUpperCase();
+    const found = recentDetectedCodes.get(code);
+    if (found) {
+        return res.json({
+            status: 'success',
+            found: true,
+            data: found
+        });
+    }
+    return res.json({
+        status: 'waiting',
+        found: false
     });
 });
 
@@ -376,8 +474,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================================`);
     console.log(`🤖 PREMIUMKITA WHATSAPP GATEWAY SERVICE AKTIF!`);
     console.log(`📡 Port API      : http://127.0.0.1:${PORT}`);
-    console.log(`🔗 Webhook Tujuan : ${LARAVEL_WEBHOOK_URL}`);
+    console.log(`🔗 Webhook Tujuan : ${getCandidateWebhookUrls().join(' | ')}`);
     console.log(`=================================================`);
     startWhatsAppBot();
 });
-

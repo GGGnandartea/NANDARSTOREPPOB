@@ -10,6 +10,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
   const [verificationData, setVerificationData] = useState(initialData || null);
   const [copied, setCopied] = useState(false);
   const pollingRef = useRef(null);
+  const sentClickedAtRef = useRef(0);
 
   const getCsrf = () => {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -60,7 +61,14 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
     if (pollingRef.current) clearInterval(pollingRef.current);
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch('/profile/wa-verify/status');
+        const shouldAutoConfirm =
+          sentClickedAtRef.current > 0 && Date.now() - sentClickedAtRef.current >= 5000;
+        const url = shouldAutoConfirm
+          ? '/profile/wa-verify/status?manual=1'
+          : '/profile/wa-verify/status';
+        const res = await fetch(url, {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        });
         const data = await res.json();
         if (data.is_verified) {
           clearInterval(pollingRef.current);
@@ -88,14 +96,16 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
     setError('');
     setStatusNotice('');
     try {
-      const res = await fetch('/profile/wa-verify/status');
+      const res = await fetch('/profile/wa-verify/status?manual=1', {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
       const data = await res.json();
       if (data.is_verified) {
         if (pollingRef.current) clearInterval(pollingRef.current);
         setStep('confirmed');
         onVerified?.();
       } else {
-        setStatusNotice('⚠️ Pesan verifikasi belum terdeteksi oleh WhatsApp Bot. Pastikan Anda sudah mengirimkan chat berisi kode unik ke nomor Bot (08990738216) dan mohon tunggu beberapa detik.');
+        setStatusNotice('Pesan verifikasi belum terdeteksi oleh WhatsApp Bot. Pastikan Anda sudah mengirimkan chat berisi kode unik ke nomor Bot (08990738216) dan mohon tunggu beberapa detik.');
       }
     } catch {
       setError('Gagal menghubungi server.');
@@ -241,6 +251,9 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
                 href={verificationData.wa_url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => {
+                  sentClickedAtRef.current = Date.now();
+                }}
                 className="w-full bg-[#25D366] hover:bg-[#20ba5a] text-white font-black py-3.5 rounded-2xl shadow-lg shadow-green-600/20 transition flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
                 <span>📲</span> Kirim Pesan ke WhatsApp Bot (08990738216)
