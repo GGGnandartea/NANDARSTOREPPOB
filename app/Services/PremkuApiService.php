@@ -16,28 +16,37 @@ class PremkuApiService
         $this->apiKey = Setting::where('key', 'premku_api_key')->value('value');
     }
 
+    protected function resolveApiKey()
+    {
+        if (!$this->apiKey) {
+            $this->apiKey = Setting::where('key', 'premku_api_key')->value('value');
+        }
+        return $this->apiKey;
+    }
+
     public function profile()
     {
-        return Http::post($this->baseUrl . 'profile', [
-            'api_key' => $this->apiKey
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(15)->post($this->baseUrl . 'profile', [
+            'api_key' => $this->resolveApiKey()
         ])->json();
     }
 
     public function getProducts(int $timeout = 30)
     {
-        if (!$this->apiKey) {
+        $key = $this->resolveApiKey();
+        if (!$key) {
             return [];
         }
 
-        return Http::connectTimeout(min(3, $timeout))->timeout($timeout)->post($this->baseUrl . 'products', [
-            'api_key' => $this->apiKey
+        return Http::withoutVerifying()->connectTimeout(min(4, $timeout))->timeout($timeout)->post($this->baseUrl . 'products', [
+            'api_key' => $key
         ])->json();
     }
 
     public function createOrder($productId, $qty, $refId)
     {
-        return Http::post($this->baseUrl . 'order', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(30)->post($this->baseUrl . 'order', [
+            'api_key' => $this->resolveApiKey(),
             'product_id' => $productId,
             'qty' => $qty,
             'ref_id' => $refId
@@ -46,40 +55,40 @@ class PremkuApiService
 
     public function checkStatus($invoice)
     {
-        return Http::post($this->baseUrl . 'status', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(15)->post($this->baseUrl . 'status', [
+            'api_key' => $this->resolveApiKey(),
             'invoice' => $invoice
         ])->json();
     }
 
     public function checkStock($productId)
     {
-        return Http::post($this->baseUrl . 'stock', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(15)->post($this->baseUrl . 'stock', [
+            'api_key' => $this->resolveApiKey(),
             'product_id' => $productId
         ])->json();
     }
 
     public function createDeposit($amount)
     {
-        return Http::post($this->baseUrl . 'pay', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(20)->post($this->baseUrl . 'pay', [
+            'api_key' => $this->resolveApiKey(),
             'amount' => (int) $amount
         ])->json();
     }
 
     public function checkDepositStatus($invoice)
     {
-        return Http::post($this->baseUrl . 'pay_status', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(15)->post($this->baseUrl . 'pay_status', [
+            'api_key' => $this->resolveApiKey(),
             'invoice' => $invoice
         ])->json();
     }
 
     public function cancelDeposit($invoice)
     {
-        return Http::post($this->baseUrl . 'cancel_pay', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(15)->post($this->baseUrl . 'cancel_pay', [
+            'api_key' => $this->resolveApiKey(),
             'invoice' => $invoice
         ])->json();
     }
@@ -90,7 +99,7 @@ class PremkuApiService
     public function amBuyBulk($qty, $refId = null)
     {
         $payload = [
-            'api_key' => $this->apiKey,
+            'api_key' => $this->resolveApiKey(),
             'action'  => 'buy_bulk',
             'qty'     => (int) $qty,
         ];
@@ -98,7 +107,7 @@ class PremkuApiService
             $payload['ref_id'] = $refId;
         }
 
-        return Http::post($this->baseUrl . 'am', $payload)->json();
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(30)->post($this->baseUrl . 'am', $payload)->json();
     }
 
     /**
@@ -106,8 +115,8 @@ class PremkuApiService
      */
     public function amBuySingle($email)
     {
-        return Http::post($this->baseUrl . 'am', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(30)->post($this->baseUrl . 'am', [
+            'api_key' => $this->resolveApiKey(),
             'action'  => 'buy_single',
             'email'   => $email,
         ])->json();
@@ -118,8 +127,8 @@ class PremkuApiService
      */
     public function amVerifySingle($invoice, $email, $link)
     {
-        return Http::post($this->baseUrl . 'am', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(30)->post($this->baseUrl . 'am', [
+            'api_key' => $this->resolveApiKey(),
             'action'  => 'verify_single',
             'invoice' => $invoice,
             'email'   => $email,
@@ -132,8 +141,8 @@ class PremkuApiService
      */
     public function amCancelSingle($invoice)
     {
-        return Http::post($this->baseUrl . 'am', [
-            'api_key' => $this->apiKey,
+        return Http::withoutVerifying()->connectTimeout(5)->timeout(20)->post($this->baseUrl . 'am', [
+            'api_key' => $this->resolveApiKey(),
             'action'  => 'cancel_single',
             'invoice' => $invoice,
         ])->json();

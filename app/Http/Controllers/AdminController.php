@@ -690,84 +690,267 @@ class AdminController extends Controller
         return back()->with('success', 'Syarat & Ketentuan berhasil diperbarui!');
     }
 
-    public function apiMargin(Request $request, PremkuApiService $premkuService, PreflixApiService $preflixService) {
-        set_time_limit(120); 
-        $search = $request->search;
-        $apiProducts = collect();
-
-        // DAFTAR PEMBERSIH KODE ANEH
-        $mojibake = ['â€¢', 'â€œ', 'â€', 'â€™', 'â€“', 'â€”', 'â€‹', '&bull;'];
-        $fixed    = ['•', '"', '"', "'", '-', '-', '', '•'];
+    private function ensureApiProductsSchema(): void
+    {
+        if (Cache::get('products_schema_verified_v3')) {
+            return;
+        }
 
         try {
-            $resPremku = $premkuService->getProducts();
-            if(isset($resPremku['products'])) {
-                foreach($resPremku['products'] as $p) {
-                    $desc = $p['description'] ?? $p['catatan'] ?? null;
-                    if ($desc) { $desc = str_replace($mojibake, $fixed, $desc); }
-
-                    $apiProducts->push([
-                        'api_id' => 'PREMKU-' . $p['id'], 'name' => $p['name'], 'original_price' => $p['price'],
-                        'provider' => 'Premku', 'image' => $p['image'] ?? null, 'description' => $desc
-                    ]);
-                }
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('ALTER TABLE `products` MODIFY `api_product_id` VARCHAR(255) NULL');
+                DB::statement('ALTER TABLE `products` MODIFY `image` LONGTEXT NULL');
+                DB::statement('ALTER TABLE `products` MODIFY `description` LONGTEXT NULL');
             }
-        } catch (\Exception $e) {}
+        } catch (\Throwable $e) {}
 
-        $preflixExtraData = Cache::remember('preflix_extra_data', 3600, function() use ($mojibake, $fixed) {
-            $data = [];
-            $idUser = Setting::where('key', 'preflix_id_user')->value('value');
-            $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-            if(!$idUser || !$keyUser) return $data;
+        try {
+            Schema::table('products', function (Blueprint $table) {
+                if (!Schema::hasColumn('products', 'category')) {
+                    $table->string('category')->nullable();
+                }
+                if (!Schema::hasColumn('products', 'is_promo')) {
+                    $table->boolean('is_promo')->default(true);
+                }
+                if (!Schema::hasColumn('products', 'reseller_price')) {
+                    $table->integer('reseller_price')->nullable();
+                }
+                if (!Schema::hasColumn('products', 'api_price')) {
+                    $table->integer('api_price')->nullable();
+                }
+            });
+        } catch (\Throwable $e) {}
 
+        Cache::put('products_schema_verified_v3', true, 86400);
+    }
+
+    /**
+     * Panggil katalog live dari Premku & Preflix secara aman, paralel, dan tahan error/timeout.
+     */
+    private function fetchLiveApiCatalog(PremkuApiService $premkuService, string $providerFilter = 'all', bool $forceRefresh = false): array
+    {
+        if (function_exists('set_time_limit')) {
             try {
-                $katRes = Http::asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_kategori', 'id_user' => $idUser, 'key_user' => $keyUser])->json();
-                if(is_array($katRes)) {
-                    foreach($katRes as $k) {
-                        $prodRes = Http::asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_produk', 'id_kategori' => $k['id_kategori'], 'id_user' => $idUser, 'key_user' => $keyUser])->json();
-                        if(is_array($prodRes)) {
-                            foreach($prodRes as $p) {
-                                $desc = $p['deskripsi'] ?? null;
-                                if ($desc) {
-                                    $desc = str_replace(['\r\n', '\n'], "\n", $desc);
-                                    $desc = str_replace($mojibake, $fixed, $desc);
+                @set_time_limit(120);
+            } catch (\Throwable $e) {}
+        }
+
+        $mojibake = ['&bull;'];
+        $fixed    = ['•'];
+
+        if (!$forceRefresh && $providerFilter === 'all') {
+            $cachedCatalog = Cache::get('admin_live_api_catalog_v3');
+            if (is_array($cachedCatalog) && !empty($cachedCatalog)) {
+                return $cachedCatalog;
+            }
+        }
+
+        $fetched = [];
+
+        // 1. Panggil produk dari Premku
+        if (in_array($providerFilter, ['all', 'premku'], true)) {
+            try {
+                $resPremku = $premkuService->getProducts(10);
+                if (is_array($resPremku) && isset($resPremku['products']) && is_array($resPremku['products'])) {
+                    foreach ($resPremku['products'] as $p) {
+                        if (!is_array($p) || !isset($p['id'])) {
+                            continue;
+                        }
+                        $desc = isset($p['description']) && is_string($p['description'])
+                            ? $p['description']
+                            : (isset($p['catatan']) && is_string($p['catatan']) ? $p['catatan'] : null);
+                        if ($desc) {
+                            $desc = str_replace($mojibake, $fixed, $desc);
+                        }
+                        $apiId = 'PREMKU-' . $p['id'];
+                        $fetched[$apiId] = [
+                            'api_id'         => $apiId,
+                            'name'           => trim((string) ($p['name'] ?? 'Produk Premku')),
+                            'original_price' => max(0, (int) ($p['price'] ?? 0)),
+                            'stock'          => max(0, (int) ($p['stock'] ?? 0)),
+                            'provider'       => 'Premku',
+                            'image'          => isset($p['image']) && is_string($p['image']) ? $p['image'] : null,
+                            'description'    => $desc,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Panggil produk dari Preflix
+        if (in_array($providerFilter, ['all', 'preflix'], true)) {
+            try {
+                $idUser = Setting::where('key', 'preflix_id_user')->value('value');
+                $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
+
+                if ($idUser && $keyUser) {
+                    $preflixExtraData = Cache::get('preflix_extra_data');
+                    if (!is_array($preflixExtraData) || empty($preflixExtraData) || $forceRefresh) {
+                        $preflixExtraData = [];
+                        try {
+                            $katRes = Http::withoutVerifying()
+                                ->connectTimeout(3)
+                                ->timeout(5)
+                                ->asForm()
+                                ->post('https://h2h.preflix.my.id/app/', [
+                                    'koneksi'  => 'get_kategori',
+                                    'id_user'  => $idUser,
+                                    'key_user' => $keyUser,
+                                ])->json();
+
+                            $katIds = [];
+                            if (is_array($katRes)) {
+                                $candidates = (isset($katRes['data']) && is_array($katRes['data'])) ? $katRes['data'] : $katRes;
+                                foreach ($candidates as $k) {
+                                    if (is_array($k) && isset($k['id_kategori'])) {
+                                        $katIds[] = $k['id_kategori'];
+                                    }
                                 }
-                                $data['PREFLIX-' . $p['id_produk']] = ['icon' => $p['icon'] ?? null, 'deskripsi' => $desc];
+                            }
+
+                            if (!empty($katIds)) {
+                                $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($katIds, $idUser, $keyUser) {
+                                    $reqs = [];
+                                    foreach ($katIds as $katId) {
+                                        $reqs[] = $pool->withoutVerifying()
+                                            ->connectTimeout(2)
+                                            ->timeout(4)
+                                            ->asForm()
+                                            ->post('https://h2h.preflix.my.id/app/', [
+                                                'koneksi'     => 'get_produk',
+                                                'id_kategori' => $katId,
+                                                'id_user'     => $idUser,
+                                                'key_user'    => $keyUser,
+                                            ]);
+                                    }
+                                    return $reqs;
+                                });
+
+                                foreach ($responses as $resp) {
+                                    if ($resp instanceof \Illuminate\Http\Client\Response && $resp->successful()) {
+                                        $prodRes = $resp->json();
+                                        if (!is_array($prodRes)) {
+                                            continue;
+                                        }
+                                        $prodList = (isset($prodRes['data']) && is_array($prodRes['data'])) ? $prodRes['data'] : $prodRes;
+                                        foreach ($prodList as $p) {
+                                            if (!is_array($p) || !isset($p['id_produk'])) {
+                                                continue;
+                                            }
+                                            $desc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? $p['deskripsi'] : null;
+                                            if ($desc) {
+                                                $desc = str_replace(['\r\n', '\n'], "\n", $desc);
+                                                $desc = str_replace($mojibake, $fixed, $desc);
+                                            }
+                                            $preflixExtraData['PREFLIX-' . $p['id_produk']] = [
+                                                'icon'      => isset($p['icon']) && is_string($p['icon']) ? $p['icon'] : null,
+                                                'deskripsi' => $desc,
+                                            ];
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!empty($preflixExtraData)) {
+                                Cache::put('preflix_extra_data', $preflixExtraData, 3600);
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+
+                    $resPreflix = Http::withoutVerifying()
+                        ->connectTimeout(3)
+                        ->timeout(8)
+                        ->asForm()
+                        ->post('https://h2h.preflix.my.id/app/', [
+                            'koneksi'  => 'get_all_product',
+                            'id_user'  => $idUser,
+                            'key_user' => $keyUser,
+                        ])->json();
+
+                    if (is_array($resPreflix) && isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data']) && is_array($resPreflix['data'])) {
+                        foreach ($resPreflix['data'] as $kategori) {
+                            if (!is_array($kategori) || !isset($kategori['produk']) || !is_array($kategori['produk'])) {
+                                continue;
+                            }
+                            foreach ($kategori['produk'] as $p) {
+                                if (!is_array($p) || !isset($p['id_produk'])) {
+                                    continue;
+                                }
+                                $apiId = 'PREFLIX-' . $p['id_produk'];
+                                $fallbackDesc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? str_replace($mojibake, $fixed, $p['deskripsi']) : null;
+                                $fallbackIcon = isset($p['icon']) && is_string($p['icon']) ? $p['icon'] : null;
+
+                                $fetched[$apiId] = [
+                                    'api_id'         => $apiId,
+                                    'name'           => trim((string) ($p['nama_produk'] ?? 'Produk Preflix')),
+                                    'original_price' => max(0, (int) ($p['harga'] ?? 0)),
+                                    'stock'          => max(0, (int) ($p['stok'] ?? 0)),
+                                    'provider'       => 'Preflix',
+                                    'image'          => $preflixExtraData[$apiId]['icon'] ?? $fallbackIcon,
+                                    'description'    => $preflixExtraData[$apiId]['deskripsi'] ?? $fallbackDesc,
+                                ];
                             }
                         }
                     }
                 }
-            } catch (\Exception $e) {}
-            return $data;
-        });
-
-        try {
-            $idUser = Setting::where('key', 'preflix_id_user')->value('value');
-            $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-            $resPreflix = Http::asForm()->post('https://h2h.preflix.my.id/app/', ['koneksi' => 'get_all_product', 'id_user' => $idUser, 'key_user' => $keyUser])->json();
-
-            if(isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data'])) {
-                foreach($resPreflix['data'] as $kategori) {
-                    foreach($kategori['produk'] as $p) {
-                        $api_id = 'PREFLIX-' . $p['id_produk'];
-                        $apiProducts->push([
-                            'api_id' => $api_id, 'name' => $p['nama_produk'], 'original_price' => $p['harga'],
-                            'provider' => 'Preflix', 'image' => $preflixExtraData[$api_id]['icon'] ?? null, 
-                            'description' => $preflixExtraData[$api_id]['deskripsi'] ?? null
-                        ]);
-                    }
-                }
-            }
-        } catch (\Exception $e) {}
-
-        if ($search) {
-            $apiProducts = $apiProducts->filter(function ($item) use ($search) { return stripos($item['name'], $search) !== false; });
+            } catch (\Throwable $e) {}
         }
 
-        // Ambil Data DB dan bersihkan juga kodenya agar di form edit muncul bersih
+        // Fallback: Jika ada produk di DB yang belum terambil karena jaringan provider lambat, tetap sertakan agar tabel tidak hilang
+        try {
+            $dbExisting = Product::where('type', 'api')->get();
+            foreach ($dbExisting as $dbProd) {
+                $apiId = (string) $dbProd->api_product_id;
+                if ($apiId === '' || isset($fetched[$apiId])) {
+                    continue;
+                }
+                $isPreflix = str_starts_with($apiId, 'PREFLIX-');
+                $isPremku  = str_starts_with($apiId, 'PREMKU-');
+                if ($providerFilter === 'preflix' && !$isPreflix) continue;
+                if ($providerFilter === 'premku' && !$isPremku) continue;
+
+                $fetched[$apiId] = [
+                    'api_id'         => $apiId,
+                    'name'           => $dbProd->name,
+                    'original_price' => max(0, (int) ($dbProd->api_price ?: $dbProd->price)),
+                    'stock'          => max(0, (int) $dbProd->getRawOriginal('stock')),
+                    'provider'       => $isPreflix ? 'Preflix' : ($isPremku ? 'Premku' : 'API'),
+                    'image'          => $dbProd->image,
+                    'description'    => $dbProd->description,
+                ];
+            }
+        } catch (\Throwable $e) {}
+
+        if (!empty($fetched) && $providerFilter === 'all') {
+            Cache::put('admin_live_api_catalog_v3', $fetched, 90);
+        }
+
+        return $fetched;
+    }
+
+    public function apiMargin(Request $request, PremkuApiService $premkuService, PreflixApiService $preflixService)
+    {
+        $this->ensureApiProductsSchema();
+
+        $search = $request->search;
+        $mojibake = ['&bull;'];
+        $fixed    = ['•'];
+
+        $catalog = $this->fetchLiveApiCatalog($premkuService, 'all', $request->boolean('refresh'));
+        $apiProducts = collect(array_values($catalog));
+
+        $preflixLiveCount = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'preflix')->count();
+        $premkuLiveCount  = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'premku')->count();
+
+        if ($search) {
+            $apiProducts = $apiProducts->filter(function ($item) use ($search) {
+                return stripos((string) ($item['name'] ?? ''), (string) $search) !== false;
+            });
+        }
+
         $dbMarkups = Product::where('type', 'api')->get()->keyBy('api_product_id');
-        foreach($dbMarkups as $key => $item) {
-            if (!empty($item->description)) {
+        foreach ($dbMarkups as $key => $item) {
+            if (!empty($item->description) && is_string($item->description)) {
                 $item->description = str_replace($mojibake, $fixed, $item->description);
             }
         }
@@ -776,13 +959,16 @@ class AdminController extends Controller
         $premkuDisabled  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
 
         $preflixActiveCount = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->where('status', 'available')->count();
-        $preflixTotalCount  = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->count();
+        $preflixDbCount     = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->count();
         $premkuActiveCount  = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->where('status', 'available')->count();
-        $premkuTotalCount   = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->count();
+        $premkuDbCount      = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->count();
+
+        $preflixTotalCount = max($preflixDbCount, $preflixLiveCount);
+        $premkuTotalCount  = max($premkuDbCount, $premkuLiveCount);
 
         return view('admin.api_margin', compact(
-            'apiProducts', 
-            'dbMarkups', 
+            'apiProducts',
+            'dbMarkups',
             'search',
             'preflixDisabled',
             'premkuDisabled',
@@ -793,24 +979,22 @@ class AdminController extends Controller
         ));
     }
 
-    public function toggleProviderProducts(Request $request) {
+    public function toggleProviderProducts(Request $request, PremkuApiService $premkuService)
+    {
+        $this->ensureApiProductsSchema();
+
         $request->validate([
             'provider' => 'required|in:preflix,premku,all',
             'action'   => 'required|in:enable,disable',
         ]);
 
         $provider = $request->provider;
-        $action = $request->action;
-        $newStatus = ($action === 'enable') ? 'available' : 'unavailable';
-
-        $query = Product::where('type', 'api');
+        $action   = $request->action;
 
         if ($provider === 'preflix') {
-            $query->where('api_product_id', 'LIKE', 'PREFLIX-%');
             $providerName = 'Preflix';
             Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
         } elseif ($provider === 'premku') {
-            $query->where('api_product_id', 'LIKE', 'PREMKU-%');
             $providerName = 'Premku';
             Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
         } else {
@@ -819,14 +1003,90 @@ class AdminController extends Controller
             Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
         }
 
-        $affected = $query->update(['status' => $newStatus]);
-        Cache::forget('api_full_data');
+        if ($action === 'disable') {
+            $query = Product::where('type', 'api');
+            if ($provider === 'preflix') {
+                $query->where('api_product_id', 'LIKE', 'PREFLIX-%');
+            } elseif ($provider === 'premku') {
+                $query->where('api_product_id', 'LIKE', 'PREMKU-%');
+            }
+            $affected = $query->update(['status' => 'unavailable']);
+            Cache::forget('api_full_data');
 
-        $actionText = ($action === 'enable') 
-            ? 'diaktifkan kembali dan kini tampil di etalase toko' 
-            : 'dinonaktifkan (dimatikan) secara serentak dari etalase toko pembeli';
+            return back()->with('success', "Berhasil! {$affected} produk dari {$providerName} telah dinonaktifkan (dimatikan) dari etalase toko pembeli.");
+        }
 
-        return back()->with('success', "Berhasil! {$affected} produk dari {$providerName} telah {$actionText}.");
+        // Jika action === 'enable': Pastikan produk provider tersebut dipanggil ke DB (jika belum ada) & diaktifkan semua!
+        $fetched = $this->fetchLiveApiCatalog($premkuService, $provider);
+        $existingProducts = Product::where('type', 'api')->get()->keyBy('api_product_id');
+        $liveStockCache = Cache::get('api_last_known_stock', []);
+        if (!is_array($liveStockCache)) {
+            $liveStockCache = [];
+        }
+
+        $activatedCount = 0;
+
+        DB::transaction(function () use ($fetched, $existingProducts, $provider, &$activatedCount, &$liveStockCache) {
+            foreach ($fetched as $apiId => $item) {
+                $product = $existingProducts->get($apiId) ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
+                $isNew   = !$product->exists;
+
+                if ($isNew || empty($product->name)) {
+                    $product->name = trim((string) ($item['name'] ?? '')) ?: $apiId;
+                }
+                $origPrice = max(0, (int) ($item['original_price'] ?? 0));
+                $product->api_price = $origPrice;
+                $product->stock     = max(0, (int) ($item['stock'] ?? 0));
+
+                if ($isNew || (int) $product->price <= 0) {
+                    $product->price          = $origPrice + 3000;
+                    $product->reseller_price = $origPrice + 1500;
+                }
+                if ($isNew || empty($product->category)) {
+                    $product->category = 'Aplikasi Premium';
+                }
+                if ($isNew || empty($product->description)) {
+                    $product->description = $item['description'] ?? null;
+                }
+                if (($isNew || empty($product->image)) && !empty($item['image'])) {
+                    $product->image = $item['image'];
+                }
+                if ($isNew) {
+                    $product->is_promo = 1;
+                }
+
+                $product->status = 'available';
+                $product->save();
+
+                $liveStockCache[$apiId] = ['stock' => $product->stock];
+                $activatedCount++;
+            }
+
+            // Aktifkan juga baris yang sudah ada di DB untuk provider tersebut
+            $q = Product::where('type', 'api');
+            if ($provider === 'preflix') {
+                $q->where('api_product_id', 'LIKE', 'PREFLIX-%');
+            } elseif ($provider === 'premku') {
+                $q->where('api_product_id', 'LIKE', 'PREMKU-%');
+            }
+            $dbUpdated = $q->update(['status' => 'available']);
+            if ($activatedCount === 0) {
+                $activatedCount = $dbUpdated;
+            }
+        });
+
+        if (!empty($liveStockCache)) {
+            Cache::put('api_full_data', $liveStockCache, 60);
+            Cache::put('api_last_known_stock', $liveStockCache, 86400);
+        } else {
+            Cache::forget('api_full_data');
+        }
+
+        if ($activatedCount === 0) {
+            return back()->with('error', "Belum ada produk dari {$providerName} yang dapat diaktifkan. Pastikan API Key {$providerName} sudah benar di menu Provider API.");
+        }
+
+        return back()->with('success', "Berhasil! {$activatedCount} produk dari {$providerName} telah diaktifkan dan kini tampil di etalase toko.");
     }
 
     public function updateApiMarkup(Request $request, $api_id) {}
@@ -836,7 +1096,8 @@ class AdminController extends Controller
      */
     public function syncApiProductsFromProvider(Request $request, PremkuApiService $premkuService)
     {
-        set_time_limit(180);
+        $this->ensureApiProductsSchema();
+
         $request->validate([
             'provider'          => 'nullable|in:all,premku,preflix',
             'default_margin'    => 'nullable|integer|min:0|max:500000',
@@ -845,159 +1106,82 @@ class AdminController extends Controller
             'default_category'  => 'nullable|string|max:100',
         ]);
 
-        $provider = $request->input('provider', 'all');
-        $defaultMargin = (int) $request->input('default_margin', 3000);
-        $resellerMargin = (int) $request->input('reseller_margin', 1500);
-        $overwritePrice = $request->boolean('overwrite_price');
+        $provider        = $request->input('provider', 'all');
+        $defaultMargin   = (int) $request->input('default_margin', 3000);
+        $resellerMargin  = (int) $request->input('reseller_margin', 1500);
+        $overwritePrice  = $request->has('overwrite_price') ? $request->boolean('overwrite_price') : true;
         $defaultCategory = trim((string) $request->input('default_category', 'Aplikasi Premium')) ?: 'Aplikasi Premium';
 
-        Cache::forget('preflix_extra_data');
-        Cache::forget('api_full_data');
-        Cache::forget('api_last_known_stock');
-
-        $mojibake = ['â€¢', 'â€œ', 'â€ ', 'â€™', 'â€“', 'â€”', 'â€‹', '&bull;'];
-        $fixed    = ['•', '"', '"', "'", '-', '-', '', '•'];
-
-        $fetched = [];
-
-        // 1. Panggil produk dari Premku
-        if (in_array($provider, ['all', 'premku'], true)) {
-            try {
-                $resPremku = $premkuService->getProducts(15);
-                if (isset($resPremku['products']) && is_array($resPremku['products'])) {
-                    foreach ($resPremku['products'] as $p) {
-                        if (!isset($p['id'])) continue;
-                        $desc = $p['description'] ?? $p['catatan'] ?? null;
-                        if ($desc) {
-                            $desc = str_replace($mojibake, $fixed, $desc);
-                        }
-                        $fetched['PREMKU-' . $p['id']] = [
-                            'name'           => trim((string) ($p['name'] ?? 'Produk Premku')),
-                            'original_price' => max(0, (int) ($p['price'] ?? 0)),
-                            'stock'          => max(0, (int) ($p['stock'] ?? 0)),
-                            'image'          => $p['image'] ?? null,
-                            'description'    => $desc,
-                            'provider'       => 'Premku',
-                        ];
-                    }
-                }
-            } catch (\Throwable $e) {}
-        }
-
-        // 2. Panggil produk dari Preflix
-        if (in_array($provider, ['all', 'preflix'], true)) {
-            try {
-                $idUser = Setting::where('key', 'preflix_id_user')->value('value');
-                $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
-                if ($idUser && $keyUser) {
-                    $extraData = [];
-                    try {
-                        $katRes = Http::withoutVerifying()->timeout(10)->asForm()->post('https://h2h.preflix.my.id/app/', [
-                            'koneksi' => 'get_kategori',
-                            'id_user' => $idUser,
-                            'key_user' => $keyUser,
-                        ])->json();
-                        if (is_array($katRes)) {
-                            foreach ($katRes as $k) {
-                                if (!isset($k['id_kategori'])) continue;
-                                $prodRes = Http::withoutVerifying()->timeout(10)->asForm()->post('https://h2h.preflix.my.id/app/', [
-                                    'koneksi' => 'get_produk',
-                                    'id_kategori' => $k['id_kategori'],
-                                    'id_user' => $idUser,
-                                    'key_user' => $keyUser,
-                                ])->json();
-                                if (is_array($prodRes)) {
-                                    foreach ($prodRes as $p) {
-                                        if (!isset($p['id_produk'])) continue;
-                                        $desc = $p['deskripsi'] ?? null;
-                                        if ($desc) {
-                                            $desc = str_replace(['\r\n', '\n'], "\n", $desc);
-                                            $desc = str_replace($mojibake, $fixed, $desc);
-                                        }
-                                        $extraData['PREFLIX-' . $p['id_produk']] = [
-                                            'icon' => $p['icon'] ?? null,
-                                            'deskripsi' => $desc,
-                                        ];
-                                    }
-                                }
-                            }
-                        }
-                    } catch (\Throwable $e) {}
-
-                    $resPreflix = Http::withoutVerifying()->timeout(12)->asForm()->post('https://h2h.preflix.my.id/app/', [
-                        'koneksi'  => 'get_all_product',
-                        'id_user'  => $idUser,
-                        'key_user' => $keyUser,
-                    ])->json();
-
-                    if (isset($resPreflix['status']) && $resPreflix['status'] == 'success' && isset($resPreflix['data']) && is_array($resPreflix['data'])) {
-                        foreach ($resPreflix['data'] as $kategori) {
-                            if (!isset($kategori['produk']) || !is_array($kategori['produk'])) continue;
-                            foreach ($kategori['produk'] as $p) {
-                                if (!isset($p['id_produk'])) continue;
-                                $apiId = 'PREFLIX-' . $p['id_produk'];
-                                $fetched[$apiId] = [
-                                    'name'           => trim((string) ($p['nama_produk'] ?? 'Produk Preflix')),
-                                    'original_price' => max(0, (int) ($p['harga'] ?? 0)),
-                                    'stock'          => max(0, (int) ($p['stok'] ?? 0)),
-                                    'image'          => $extraData[$apiId]['icon'] ?? null,
-                                    'description'    => $extraData[$apiId]['deskripsi'] ?? null,
-                                    'provider'       => 'Preflix',
-                                ];
-                            }
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {}
-        }
+        $fetched = $this->fetchLiveApiCatalog($premkuService, $provider, true);
 
         if (empty($fetched)) {
             return back()->with('error', 'Tidak ada produk yang berhasil dipanggil dari provider API. Pastikan API Key Premku / Preflix sudah terisi dengan benar di menu Provider API.');
         }
 
-        $importedCount = 0;
-        $updatedCount = 0;
-        $liveStockCache = [];
-
-        foreach ($fetched as $apiId => $item) {
-            $product = Product::firstOrNew(['api_product_id' => $apiId, 'type' => 'api']);
-            $isNew = !$product->exists;
-
-            if ($isNew || empty($product->name)) {
-                $product->name = $item['name'];
-            }
-            if (Schema::hasColumn('products', 'api_price')) {
-                $product->api_price = $item['original_price'];
-            }
-            $product->stock = $item['stock'];
-
-            if ($isNew || $overwritePrice || (int) $product->price <= 0) {
-                $product->price = $item['original_price'] + $defaultMargin;
-                $product->reseller_price = $resellerMargin > 0 ? ($item['original_price'] + $resellerMargin) : null;
-            }
-
-            if ($isNew || empty($product->category)) {
-                $product->category = $defaultCategory;
-            }
-            if ($isNew || empty($product->description)) {
-                $product->description = $item['description'];
-            }
-            if (($isNew || empty($product->image)) && !empty($item['image'])) {
-                $product->image = $item['image'];
-            }
-            if ($isNew) {
-                $product->status = 'available';
-                if (Schema::hasColumn('products', 'is_promo')) {
-                    $product->is_promo = 1;
-                }
-                $importedCount++;
-            } else {
-                $updatedCount++;
-            }
-
-            $product->save();
-            $liveStockCache[$apiId] = ['stock' => $item['stock']];
+        if (in_array($provider, ['all', 'preflix'], true)) {
+            Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => '0']);
         }
+        if (in_array($provider, ['all', 'premku'], true)) {
+            Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => '0']);
+        }
+
+        $importedCount    = 0;
+        $updatedCount     = 0;
+        $existingProducts = Product::where('type', 'api')->get()->keyBy('api_product_id');
+        $liveStockCache   = Cache::get('api_last_known_stock', []);
+        if (!is_array($liveStockCache)) {
+            $liveStockCache = [];
+        }
+
+        DB::transaction(function () use (
+            $fetched,
+            $existingProducts,
+            $defaultMargin,
+            $resellerMargin,
+            $overwritePrice,
+            $defaultCategory,
+            &$importedCount,
+            &$updatedCount,
+            &$liveStockCache
+        ) {
+            foreach ($fetched as $apiId => $item) {
+                $product = $existingProducts->get($apiId) ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
+                $isNew   = !$product->exists;
+
+                if ($isNew || empty($product->name)) {
+                    $product->name = trim((string) ($item['name'] ?? '')) ?: $apiId;
+                }
+                $origPrice          = max(0, (int) ($item['original_price'] ?? 0));
+                $product->api_price = $origPrice;
+                $product->stock     = max(0, (int) ($item['stock'] ?? 0));
+
+                if ($isNew || $overwritePrice || (int) $product->price <= 0) {
+                    $product->price          = $origPrice + $defaultMargin;
+                    $product->reseller_price = $resellerMargin > 0 ? ($origPrice + $resellerMargin) : null;
+                }
+
+                if ($isNew || empty($product->category)) {
+                    $product->category = $defaultCategory;
+                }
+                if ($isNew || empty($product->description)) {
+                    $product->description = $item['description'] ?? null;
+                }
+                if (($isNew || empty($product->image)) && !empty($item['image'])) {
+                    $product->image = $item['image'];
+                }
+
+                $product->status = 'available';
+                if ($isNew) {
+                    $product->is_promo = 1;
+                    $importedCount++;
+                } else {
+                    $updatedCount++;
+                }
+
+                $product->save();
+                $liveStockCache[$apiId] = ['stock' => $product->stock];
+            }
+        });
 
         if (!empty($liveStockCache)) {
             Cache::put('api_full_data', $liveStockCache, 60);
@@ -1006,7 +1190,7 @@ class AdminController extends Controller
 
         return back()->with(
             'success',
-            "Sinkronisasi pusat berhasil! {$importedCount} produk API baru ditambahkan dan {$updatedCount} produk diperbarui (Total: " . count($fetched) . " produk live)."
+            "Sinkronisasi pusat berhasil! {$importedCount} produk API baru ditambahkan dan {$updatedCount} produk diperbarui & diaktifkan (Total: " . count($fetched) . " produk live)."
         );
     }
 
@@ -1015,11 +1199,15 @@ class AdminController extends Controller
      */
     public function resetForLaunch(Request $request)
     {
-        $resetOrders = $request->boolean('reset_orders', true);
+        if ($request->has('confirm_text') && strtoupper(trim((string) $request->input('confirm_text'))) !== 'RESET') {
+            return back()->with('error', 'Konfirmasi gagal. Ketik kata RESET dengan benar untuk mengosongkan database.');
+        }
+
+        $resetOrders        = $request->boolean('reset_orders', true);
         $resetLocalProducts = $request->boolean('reset_local_products', true);
-        $resetApiProducts = $request->boolean('reset_api_products', true);
-        $resetTestUsers = $request->boolean('reset_test_users', true);
-        $resetVouchers = $request->boolean('reset_vouchers', false);
+        $resetApiProducts   = $request->boolean('reset_api_products', true);
+        $resetTestUsers     = $request->has('delete_test_users') ? $request->boolean('delete_test_users') : $request->boolean('reset_test_users', true);
+        $resetVouchers      = $request->has('delete_vouchers') ? $request->boolean('delete_vouchers') : $request->boolean('reset_vouchers', false);
 
         $summary = [];
 
@@ -1096,13 +1284,15 @@ class AdminController extends Controller
             } elseif (Schema::hasTable('vouchers') && Schema::hasColumn('vouchers', 'used_count')) {
                 DB::table('vouchers')->update(['used_count' => 0]);
             }
+
+            Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => '0']);
+            Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => '0']);
         } finally {
             Schema::enableForeignKeyConstraints();
         }
 
         Cache::forget('api_full_data');
         Cache::forget('api_last_known_stock');
-        Cache::forget('preflix_extra_data');
         Cache::forget('promo_settings');
 
         return back()->with(
@@ -1111,51 +1301,92 @@ class AdminController extends Controller
         );
     }
 
-    public function bulkUpdateApiMarkup(Request $request) {
-        try { DB::statement('ALTER TABLE products MODIFY image LONGTEXT'); } catch (\Exception $e) {}
-        try { DB::statement('ALTER TABLE products MODIFY description LONGTEXT'); } catch (\Exception $e) {}
-        try { 
-            if (!Schema::hasColumn('products', 'is_promo')) {
-                Schema::table('products', function (Blueprint $table) { $table->boolean('is_promo')->default(1); });
-            }
-        } catch (\Exception $e) {}
+    public function bulkUpdateApiMarkup(Request $request)
+    {
+        $this->ensureApiProductsSchema();
 
         $products = $request->input('products', []);
-        $count = 0;
-
-        foreach($products as $api_id => $data) {
-            if(isset($data['markup_price']) && $data['markup_price'] > 0) {
-                
-                $product = Product::firstOrNew(['api_product_id' => $api_id, 'type' => 'api']);
-                
-                $product->name = $data['name'];
-                $product->price = $data['markup_price'];
-                if (isset($data['original_price']) && Schema::hasColumn('products', 'api_price')) {
-                    $product->api_price = (int) $data['original_price'];
-                }
-                if (isset($data['stock'])) {
-                    $product->stock = max(0, (int) $data['stock']);
-                }
-                $product->reseller_price = !empty($data['reseller_price']) ? (int)$data['reseller_price'] : null;
-                $product->category = $data['category'] ?? null;
-                $product->status = isset($data['is_active']) ? 'available' : 'unavailable';
-                
-                $product->description = $data['description'] ?? null;
-                $rawImg = !empty($data['image']) ? trim($data['image']) : null;
-                if ($rawImg && (!str_starts_with($rawImg, 'data:') || str_starts_with($rawImg, 'data:image/'))) {
-                    $product->image = $rawImg;
-                } else {
-                    $product->image = $product->image ?? null;
-                }
-                
-                $product->is_promo = isset($data['is_promo']) ? 1 : 0;
-                
-                $product->save();
-                $count++;
+        if ($request->filled('products_json')) {
+            $decoded = json_decode((string) $request->input('products_json'), true);
+            if (is_array($decoded)) {
+                $products = $decoded;
             }
         }
+
+        if (!is_array($products) || empty($products)) {
+            return back()->with('error', 'Tidak ada data produk yang dikirim untuk disimpan.');
+        }
+
+        $existingProducts   = Product::where('type', 'api')->get()->keyBy('api_product_id');
+        $count              = 0;
+        $hasActivePreflix   = false;
+        $hasActivePremku    = false;
+
+        DB::transaction(function () use ($products, $existingProducts, &$count, &$hasActivePreflix, &$hasActivePremku) {
+            foreach ($products as $api_id => $data) {
+                if (!is_array($data)) {
+                    continue;
+                }
+
+                $apiId      = trim((string) $api_id);
+                if ($apiId === '') {
+                    continue;
+                }
+
+                $existing   = $existingProducts->get($apiId);
+                $isActive   = !empty($data['is_active']) && $data['is_active'] !== '0' && $data['is_active'] !== false;
+                $rawMarkup  = (isset($data['markup_price']) && $data['markup_price'] !== '') ? (int) $data['markup_price'] : 0;
+                $origPrice  = max(0, (int) ($data['original_price'] ?? ($existing->api_price ?? 0)));
+
+                // Jika diaktifkan namun harga jual masih kosong, gunakan harga modal + Rp 3.000 otomatis
+                if ($isActive && $rawMarkup <= 0) {
+                    $rawMarkup = $origPrice > 0 ? ($origPrice + 3000) : 10000;
+                }
+
+                if ($rawMarkup > 0 || $existing) {
+                    $product = $existing ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
+
+                    $product->name           = trim((string) ($data['name'] ?? '')) ?: ($existing->name ?? $apiId);
+                    $product->price          = $rawMarkup > 0 ? $rawMarkup : max(0, (int) ($existing->price ?? ($origPrice + 3000)));
+                    $product->api_price      = $origPrice;
+                    $product->stock          = isset($data['stock']) ? max(0, (int) $data['stock']) : max(0, (int) ($existing ? $existing->getRawOriginal('stock') : 0));
+                    $product->reseller_price = (!empty($data['reseller_price']) && (int) $data['reseller_price'] > 0) ? (int) $data['reseller_price'] : null;
+                    $product->category       = !empty($data['category']) ? trim((string) $data['category']) : ($existing->category ?? 'Aplikasi Premium');
+                    $product->status         = $isActive ? 'available' : 'unavailable';
+                    $product->description    = isset($data['description']) && $data['description'] !== '' ? $data['description'] : ($existing->description ?? null);
+
+                    $rawImg = !empty($data['image']) ? trim((string) $data['image']) : null;
+                    if ($rawImg && (!str_starts_with($rawImg, 'data:') || str_starts_with($rawImg, 'data:image/'))) {
+                        $product->image = $rawImg;
+                    } else {
+                        $product->image = $product->image ?? null;
+                    }
+
+                    $product->is_promo = (!empty($data['is_promo']) && $data['is_promo'] !== '0' && $data['is_promo'] !== false) ? 1 : 0;
+
+                    $product->save();
+                    $count++;
+
+                    if ($isActive) {
+                        if (str_starts_with($apiId, 'PREFLIX-')) {
+                            $hasActivePreflix = true;
+                        } elseif (str_starts_with($apiId, 'PREMKU-')) {
+                            $hasActivePremku = true;
+                        }
+                    }
+                }
+            }
+        });
+
+        if ($hasActivePreflix) {
+            Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => '0']);
+        }
+        if ($hasActivePremku) {
+            Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => '0']);
+        }
+
         Cache::forget('api_full_data');
-        return back()->with('success', $count . ' Produk API, Logo, dan Status Promo berhasil diperbarui ke Database!');
+        return back()->with('success', $count . ' Produk API, Harga Markup, Logo, dan Status Aktif berhasil disimpan ke Database!');
     }
 
     public function localProducts(Request $request) {
@@ -1169,18 +1400,23 @@ class AdminController extends Controller
             'category'       => 'nullable|string|max:100',
             'price'          => 'required|numeric|min:0',
             'reseller_price' => 'nullable|numeric|min:0',
+            'manual_stock'   => 'nullable|integer|min:0',
             'image'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
         ]);
         $imagePath = $request->hasFile('image') ? $request->file('image')->store('products', 'public') : null;
+        $isManual = $request->process_type === 'manual';
+        $initialStock = $isManual
+            ? ($request->filled('manual_stock') ? max(0, (int) $request->manual_stock) : 99)
+            : 0;
         Product::create([
             'name' => $request->name,
             'category' => $request->category,
             'description' => $request->description,
             'price' => $request->price,
             'reseller_price' => $request->reseller_price ?: null,
-            'stock' => 0,
+            'stock' => $initialStock,
             'type' => 'local',
-            'process_type' => $request->process_type === 'manual' ? 'manual' : 'auto',
+            'process_type' => $isManual ? 'manual' : 'auto',
             'image' => $imagePath ? '/storage/' . $imagePath : null,
             'status' => 'available'
         ]);
@@ -1193,6 +1429,7 @@ class AdminController extends Controller
             'category'       => 'nullable|string|max:100',
             'price'          => 'required|numeric|min:0',
             'reseller_price' => 'nullable|numeric|min:0',
+            'manual_stock'   => 'nullable|integer|min:0',
             'image'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
         ]);
         $product = Product::findOrFail($id);
@@ -1203,6 +1440,13 @@ class AdminController extends Controller
         $product->description = $request->description;
         if ($request->has('process_type')) {
             $product->process_type = $request->process_type;
+        }
+        if (($product->process_type ?? 'auto') === 'manual') {
+            if ($request->filled('manual_stock')) {
+                $product->stock = max(0, (int) $request->manual_stock);
+            } elseif ((int) $product->stock <= 0) {
+                $product->stock = 99;
+            }
         }
         if ($request->hasFile('image')) {
             if ($product->image) { $oldPath = str_replace('/storage/', '', $product->image); if(Storage::disk('public')->exists($oldPath)) Storage::disk('public')->delete($oldPath); }

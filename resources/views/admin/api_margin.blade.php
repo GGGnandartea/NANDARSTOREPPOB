@@ -119,9 +119,13 @@
                     </div>
                 </div>
 
-                @if($preflixDisabled || $preflixActiveCount === 0)
+                @if($preflixDisabled)
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800/40">
                         🔴 SEMUA DIMATIKAN
+                    </span>
+                @elseif($preflixActiveCount === 0)
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40">
+                        ⚪ BELUM AKTIF (0 / {{ $preflixTotalCount }})
                     </span>
                 @else
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/40">
@@ -131,11 +135,11 @@
             </div>
 
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                Kelola status seluruh produk dari Preflix secara serentak. Jika dimatikan, seluruh produk Preflix tidak akan tampil di etalase toko pembeli.
+                Kelola status seluruh produk dari Preflix secara serentak. Klik <strong>Aktifkan Semua</strong> untuk langsung memanggil & mengaktifkan seluruh katalog Preflix ke etalase toko.
             </p>
 
             <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
-                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="return confirm('Yakin ingin MEMATIKAN SEMUA produk Preflix dari etalase toko?');" class="flex-1">
+                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="if(!confirm('Yakin ingin MEMATIKAN SEMUA produk Preflix dari etalase toko?')) return false; this.querySelector('button').disabled=true; this.querySelector('span').innerText='Mematikan...';" class="flex-1">
                     @csrf
                     <input type="hidden" name="provider" value="preflix">
                     <input type="hidden" name="action" value="disable">
@@ -145,7 +149,7 @@
                     </button>
                 </form>
 
-                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="return confirm('Aktifkan kembali SEMUA produk Preflix di etalase toko?');" class="flex-1">
+                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="this.querySelector('button').disabled=true; this.querySelector('span').innerText='Mengaktifkan...';" class="flex-1">
                     @csrf
                     <input type="hidden" name="provider" value="preflix">
                     <input type="hidden" name="action" value="enable">
@@ -170,9 +174,13 @@
                     </div>
                 </div>
 
-                @if($premkuDisabled || $premkuActiveCount === 0)
+                @if($premkuDisabled)
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800/40">
                         🔴 SEMUA DIMATIKAN
+                    </span>
+                @elseif($premkuActiveCount === 0)
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40">
+                        ⚪ BELUM AKTIF (0 / {{ $premkuTotalCount }})
                     </span>
                 @else
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/40">
@@ -182,11 +190,11 @@
             </div>
 
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                Kelola status seluruh produk dari Premku secara serentak. Jika dimatikan, seluruh produk Premku tidak akan tampil di etalase toko pembeli.
+                Kelola status seluruh produk dari Premku secara serentak. Klik <strong>Aktifkan Semua</strong> untuk langsung memanggil & mengaktifkan seluruh katalog Premku ke etalase toko.
             </p>
 
             <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
-                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="return confirm('Yakin ingin MEMATIKAN SEMUA produk Premku dari etalase toko?');" class="flex-1">
+                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="if(!confirm('Yakin ingin MEMATIKAN SEMUA produk Premku dari etalase toko?')) return false; this.querySelector('button').disabled=true; this.querySelector('span').innerText='Mematikan...';" class="flex-1">
                     @csrf
                     <input type="hidden" name="provider" value="premku">
                     <input type="hidden" name="action" value="disable">
@@ -196,7 +204,7 @@
                     </button>
                 </form>
 
-                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="return confirm('Aktifkan kembali SEMUA produk Premku di etalase toko?');" class="flex-1">
+                <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="this.querySelector('button').disabled=true; this.querySelector('span').innerText='Mengaktifkan...';" class="flex-1">
                     @csrf
                     <input type="hidden" name="provider" value="premku">
                     <input type="hidden" name="action" value="enable">
@@ -211,8 +219,9 @@
     </div>
 
     <!-- Form & Tabel Katalog API -->
-    <form action="{{ route('admin.products.api.bulk_markup') }}" method="POST" id="bulkMarkupForm" class="pb-24 space-y-4">
+    <form action="{{ route('admin.products.api.bulk_markup') }}" method="POST" id="bulkMarkupForm" onsubmit="return prepareBulkMarkupSubmit(this);" class="pb-24 space-y-4">
         @csrf
+        <input type="hidden" name="products_json" id="products_json" value="">
 
         <div class="admin-card overflow-hidden">
             <!-- Search Filter Bar & Provider Tabs -->
@@ -273,7 +282,7 @@
                                     $provColor = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-800/40';
                                 }
                             @endphp
-                            <tr class="markup-row hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group" data-original-price="{{ $item['original_price'] }}" data-provider="{{ strtolower($item['provider']) }}">
+                            <tr class="markup-row hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group" data-api-id="{{ $item['api_id'] }}" data-original-price="{{ $item['original_price'] }}" data-provider="{{ strtolower($item['provider']) }}">
                                 
                                 <!-- Kolom 1: Logo & Nama -->
                                 <td>
@@ -289,9 +298,9 @@
                                             <span class="text-[8px] font-mono font-bold text-gray-400">256x256</span>
                                         </div>
                                         
-                                        <input type="hidden" id="img_{{ $item['api_id'] }}" name="products[{{ $item['api_id'] }}][image]" value="{{ $savedImage }}">
-                                        <input type="hidden" name="products[{{ $item['api_id'] }}][original_price]" value="{{ $item['original_price'] }}">
-                                        <input type="hidden" name="products[{{ $item['api_id'] }}][stock]" value="{{ $item['stock'] ?? 0 }}">
+                                        <input type="hidden" id="img_{{ $item['api_id'] }}" class="row-image" name="products[{{ $item['api_id'] }}][image]" value="{{ $savedImage }}">
+                                        <input type="hidden" class="row-original-price" name="products[{{ $item['api_id'] }}][original_price]" value="{{ $item['original_price'] }}">
+                                        <input type="hidden" class="row-stock" name="products[{{ $item['api_id'] }}][stock]" value="{{ $item['stock'] ?? 0 }}">
                                         
                                         <div class="flex flex-col min-w-0 w-52 sm:w-64">
                                             <div class="flex items-center gap-1.5 mb-1">
@@ -303,7 +312,7 @@
                                             <input type="text" 
                                                    name="products[{{ $item['api_id'] }}][name]" 
                                                    value="{{ $savedName }}" 
-                                                   class="w-full px-2.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" 
+                                                   class="row-name w-full px-2.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" 
                                                    placeholder="Kustom nama produk..."
                                                    title="{{ $savedName }}">
                                             @if($savedName !== $item['name'])
@@ -311,7 +320,7 @@
                                                     Asli: {{ $item['name'] }}
                                                 </span>
                                             @endif
-                                            <input type="hidden" id="desc_input_{{ $item['api_id'] }}" name="products[{{ $item['api_id'] }}][description]" value="{{ $savedDesc }}">
+                                            <input type="hidden" id="desc_input_{{ $item['api_id'] }}" class="row-description" name="products[{{ $item['api_id'] }}][description]" value="{{ $savedDesc }}">
                                             <button type="button" onclick="openDescModal('{{ $item['api_id'] }}', '{{ htmlspecialchars($savedName, ENT_QUOTES) }}')" class="text-[10px] text-orange-500 hover:underline mt-1 font-bold w-fit flex items-center gap-1 cursor-pointer">
                                                 <span>✏️ Edit Deskripsi</span>
                                             </button>
@@ -335,7 +344,7 @@
                                 <td>
                                     <div class="relative w-28 sm:w-32">
                                         <span class="absolute left-2.5 top-2.5 text-gray-400 font-bold text-xs">Rp</span>
-                                        <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $isSaved ? $dbMarkups[$item['api_id']]->price : '' }}" class="markup-input w-full pl-8 pr-2.5 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
+                                        <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $isSaved ? $dbMarkups[$item['api_id']]->price : '' }}" class="markup-input row-markup-price w-full pl-8 pr-2.5 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
                                     </div>
                                 </td>
 
@@ -343,19 +352,19 @@
                                 <td>
                                     <div class="relative w-28 sm:w-32">
                                         <span class="absolute left-2.5 top-2.5 text-amber-500 font-bold text-xs">Rp</span>
-                                        <input type="number" name="products[{{ $item['api_id'] }}][reseller_price]" value="{{ $isSaved && isset($dbMarkups[$item['api_id']]->reseller_price) ? $dbMarkups[$item['api_id']]->reseller_price : '' }}" class="w-full pl-8 pr-2.5 py-2 bg-amber-50/30 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500" placeholder="Opsional">
+                                        <input type="number" name="products[{{ $item['api_id'] }}][reseller_price]" value="{{ $isSaved && isset($dbMarkups[$item['api_id']]->reseller_price) ? $dbMarkups[$item['api_id']]->reseller_price : '' }}" class="row-reseller-price w-full pl-8 pr-2.5 py-2 bg-amber-50/30 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500" placeholder="Opsional">
                                     </div>
                                 </td>
 
                                 <!-- Kolom 5: Kategori Tipe -->
                                 <td>
-                                    <input list="kategoriList" type="text" name="products[{{ $item['api_id'] }}][category]" value="{{ $savedCat }}" class="w-32 sm:w-36 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Pilih / Ketik...">
+                                    <input list="kategoriList" type="text" name="products[{{ $item['api_id'] }}][category]" value="{{ $savedCat }}" class="row-category w-32 sm:w-36 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Pilih / Ketik...">
                                 </td>
                                 
                                 <!-- Kolom 6: Switch Promo Merah -->
                                 <td class="text-center">
                                     <label class="relative inline-flex items-center cursor-pointer" title="Aktifkan/Matikan Label Promo">
-                                        <input type="checkbox" name="products[{{ $item['api_id'] }}][is_promo]" value="1" class="sr-only peer" {{ $isPromo ? 'checked' : '' }}>
+                                        <input type="checkbox" name="products[{{ $item['api_id'] }}][is_promo]" value="1" class="row-is-promo sr-only peer" {{ $isPromo ? 'checked' : '' }}>
                                         <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500 shadow-inner"></div>
                                     </label>
                                 </td>
@@ -363,7 +372,7 @@
                                 <!-- Kolom 7: Switch Status Aktif -->
                                 <td class="text-center">
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" name="products[{{ $item['api_id'] }}][is_active]" value="1" class="sr-only peer status-checkbox" {{ $isActive ? 'checked' : '' }}>
+                                        <input type="checkbox" name="products[{{ $item['api_id'] }}][is_active]" value="1" class="row-is-active sr-only peer status-checkbox" {{ $isActive ? 'checked' : '' }}>
                                         <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 shadow-inner"></div>
                                     </label>
                                 </td>
@@ -397,9 +406,9 @@
         <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] sm:w-auto">
             <div class="bg-gray-900/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/10 p-2.5 pl-6 rounded-full shadow-2xl flex items-center justify-between gap-6 sm:gap-10">
                 <span class="text-xs font-black text-white whitespace-nowrap">Simpan semua penyesuaian harga?</span>
-                <button type="submit" class="gradient-orange text-white font-black py-3 px-8 rounded-full shadow-lg shadow-orange-500/30 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer text-xs">
+                <button type="submit" id="btnSubmitBulkMarkup" class="gradient-orange text-white font-black py-3 px-8 rounded-full shadow-lg shadow-orange-500/30 transition-all hover:scale-105 flex items-center gap-2 cursor-pointer text-xs">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                    <span>Simpan Semua</span>
+                    <span id="btnSubmitBulkMarkupText">Simpan Semua</span>
                 </button>
             </div>
         </div>
@@ -408,6 +417,56 @@
 </div>
 
 <script>
+    function prepareBulkMarkupSubmit(form) {
+        try {
+            const payload = {};
+            const rows = form.querySelectorAll('.markup-row');
+            rows.forEach(row => {
+                const apiId = row.getAttribute('data-api-id');
+                if (!apiId) return;
+                const imgEl = row.querySelector('.row-image');
+                const origEl = row.querySelector('.row-original-price');
+                const stockEl = row.querySelector('.row-stock');
+                const nameEl = row.querySelector('.row-name');
+                const descEl = row.querySelector('.row-description');
+                const markupEl = row.querySelector('.row-markup-price');
+                const resellerEl = row.querySelector('.row-reseller-price');
+                const catEl = row.querySelector('.row-category');
+                const promoEl = row.querySelector('.row-is-promo');
+                const activeEl = row.querySelector('.row-is-active');
+
+                payload[apiId] = {
+                    image: imgEl ? imgEl.value : '',
+                    original_price: origEl ? origEl.value : 0,
+                    stock: stockEl ? stockEl.value : 0,
+                    name: nameEl ? nameEl.value : '',
+                    description: descEl ? descEl.value : '',
+                    markup_price: markupEl ? markupEl.value : '',
+                    reseller_price: resellerEl ? resellerEl.value : '',
+                    category: catEl ? catEl.value : '',
+                    is_promo: (promoEl && promoEl.checked) ? 1 : 0,
+                    is_active: (activeEl && activeEl.checked) ? 1 : 0,
+                };
+
+                // Hapus atribut name dari input per baris agar PHP max_input_vars tidak terlampaui
+                row.querySelectorAll('input[name]').forEach(inp => inp.removeAttribute('name'));
+            });
+
+            const jsonInput = document.getElementById('products_json');
+            if (jsonInput) {
+                jsonInput.value = JSON.stringify(payload);
+            }
+
+            const btn = document.getElementById('btnSubmitBulkMarkup');
+            const btnText = document.getElementById('btnSubmitBulkMarkupText');
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.innerText = 'Menyimpan...';
+        } catch (err) {
+            console.error('Gagal serialisasi form markup:', err);
+        }
+        return true;
+    }
+
     function openDescModal(apiId, name) {
         document.getElementById('descModalTitle').innerText = 'Deskripsi: ' + name;
         document.getElementById('descModalApiId').value = apiId;
@@ -472,7 +531,7 @@
         const input = document.getElementById('tableSearch').value.toLowerCase();
         const rows = document.querySelectorAll('.markup-row');
         rows.forEach(row => {
-            const nameInput = row.querySelector('input[name*="[name]"]');
+            const nameInput = row.querySelector('.row-name') || row.querySelector('input[name*="[name]"]');
             const name = (nameInput ? nameInput.value : '').toLowerCase();
             const prov = (row.getAttribute('data-provider') || '').toLowerCase();
             const matchSearch = name.includes(input);

@@ -65,7 +65,7 @@
                 </div>
             </div>
 
-            <form action="{{ route('admin.products.local.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4" x-data="{ isSubmitting: false }" @submit="isSubmitting = true">
+            <form action="{{ route('admin.products.local.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4" x-data="{ isSubmitting: false, procType: 'auto' }" @submit="isSubmitting = true">
                 @csrf
                 <div>
                     <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Nama Produk</label>
@@ -92,20 +92,25 @@
                     <label class="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Metode Proses Akun</label>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
-                            <input type="radio" name="process_type" value="auto" checked class="text-orange-500 focus:ring-orange-500">
+                            <input type="radio" name="process_type" value="auto" x-model="procType" checked class="text-orange-500 focus:ring-orange-500">
                             <div>
                                 <span class="block text-xs font-black text-gray-900 dark:text-white">Otomatis</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Dari stok akun</span>
                             </div>
                         </label>
                         <label class="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-900 cursor-pointer hover:border-orange-500 transition">
-                            <input type="radio" name="process_type" value="manual" class="text-orange-500 focus:ring-orange-500">
+                            <input type="radio" name="process_type" value="manual" x-model="procType" class="text-orange-500 focus:ring-orange-500">
                             <div>
                                 <span class="block text-xs font-black text-gray-900 dark:text-white">Manual Admin</span>
                                 <span class="block text-[10px] text-gray-400 font-medium">Diproses admin</span>
                             </div>
                         </label>
                     </div>
+                </div>
+
+                <div x-show="procType === 'manual'" style="display: none;">
+                    <label class="block text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1.5">Jumlah Stok Kuota Manual</label>
+                    <input type="number" name="manual_stock" value="99" min="0" class="w-full px-4 py-3 rounded-xl bg-emerald-50/50 dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800/40 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="99">
                 </div>
 
                 <div>
@@ -247,7 +252,7 @@
                                     <button 
                                         type="button"
                                         @click="editData = JSON.parse($el.dataset.info); openEdit = true;" 
-                                        data-info="{{ json_encode(['id' => $p->id, 'name' => $p->name, 'price' => $p->price, 'reseller_price' => $p->reseller_price, 'category' => $p->category, 'desc' => $p->description, 'process_type' => $p->process_type ?? 'auto']) }}" 
+                                        data-info="{{ json_encode(['id' => $p->id, 'name' => $p->name, 'price' => $p->price, 'reseller_price' => $p->reseller_price, 'category' => $p->category, 'desc' => $p->description, 'process_type' => $p->process_type ?? 'auto', 'stock' => (int) ($p->stock ?? 99)]) }}" 
                                         class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
                                     >
                                         Edit
@@ -349,7 +354,7 @@
                             <button 
                                 type="button"
                                 @click="editData = JSON.parse($el.dataset.info); openEdit = true;" 
-                                data-info="{{ json_encode(['id' => $p->id, 'name' => $p->name, 'price' => $p->price, 'reseller_price' => $p->reseller_price, 'category' => $p->category, 'desc' => $p->description, 'process_type' => $p->process_type ?? 'auto']) }}" 
+                                data-info="{{ json_encode(['id' => $p->id, 'name' => $p->name, 'price' => $p->price, 'reseller_price' => $p->reseller_price, 'category' => $p->category, 'desc' => $p->description, 'process_type' => $p->process_type ?? 'auto', 'stock' => (int) ($p->stock ?? 99)]) }}" 
                                 class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
                             >
                                 Edit
@@ -422,6 +427,10 @@
                             </div>
                         </label>
                     </div>
+                </div>
+                <div x-show="editData.process_type === 'manual'" style="display: none;">
+                    <label class="block text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Jumlah Stok Kuota Manual</label>
+                    <input type="number" name="manual_stock" x-model="editData.stock" min="0" class="w-full px-4 py-2.5 bg-emerald-50/40 dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500" placeholder="99">
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">

@@ -156,8 +156,14 @@ Artisan::command('store:reset-launch {--keep-users : Hanya reset saldo user ke 0
             $this->line(' ✓ Saldo Akun Admin direset ke Rp 0');
         }
 
+        if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => '0']);
+            \App\Models\Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => '0']);
+        }
+
         \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
-        \Illuminate\Support\Facades\Cache::flush();
+        \Illuminate\Support\Facades\Cache::forget('api_full_data');
+        \Illuminate\Support\Facades\Cache::forget('admin_live_api_catalog_v3');
 
         $this->info('BERHASIL! Seluruh pendapatan, riwayat order, riwayat testing, produk lokal & produk API telah kembali ke 0.');
         return 0;
