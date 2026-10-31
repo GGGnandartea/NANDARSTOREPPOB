@@ -703,6 +703,13 @@ class FrontController extends Controller
             $order->refresh();
         }
 
+        // Jika pesanan berbayar sudah dibatalkan/gagal namun belum di-refund atau masih berstatus menunggu, rekonsiliasi otomatis
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && in_array(strtolower((string) $order->order_status), ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
+            \App\Services\OrderFulfillmentService::cancelOrFailOrderWithRefund($order, $order->order_status ?: 'canceled');
+            $order->refresh();
+        }
+
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
         if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
@@ -759,6 +766,13 @@ class FrontController extends Controller
         $order = request()->attributes->get('authorized_order');
         if (!$order->user_id && !request()->query('token')) {
             return redirect($order->invoiceUrl());
+        }
+
+        // Jika pesanan berbayar sudah dibatalkan/gagal namun belum di-refund atau masih berstatus menunggu, rekonsiliasi otomatis
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && in_array(strtolower((string) $order->order_status), ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
+            \App\Services\OrderFulfillmentService::cancelOrFailOrderWithRefund($order, $order->order_status ?: 'canceled');
+            $order->refresh();
         }
 
         // Otomatis sinkronisasi akun API saat invoice dibuka jika masih menunggu
@@ -902,6 +916,12 @@ class FrontController extends Controller
         // Otomatis tandai semua pesanan QRIS & Top Up QRIS yang belum dibayar lebih dari 30 menit sebagai expired
         \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
 
+        // Otomatis rekonsiliasi & kembalikan saldo 100% jika ada pesanan lunas milik user yang dibatalkan oleh server/admin
+        $reconciledCancelCount = \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders($user->id);
+        if ($reconciledCancelCount > 0) {
+            $user->refresh();
+        }
+
         $orders = Order::where('user_id', $user->id)
             ->with('product')
             ->orderBy('created_at', 'desc')
@@ -912,7 +932,7 @@ class FrontController extends Controller
                 // Pastikan catatan teknis / server / API tidak pernah bocor ke tampilan user
                 if (!empty($order->notes)) {
                     $noteLower = strtolower($order->notes);
-                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_starts_with($order->notes, '[INTERNAL]')) {
+                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_contains($noteLower, '[internal]') || str_contains($noteLower, '[wa-sent]')) {
                         $order->notes = null;
                     }
                 }
@@ -1717,7 +1737,7 @@ class FrontController extends Controller
     public function resendOrderWa($orderId) {
         $order = request()->attributes->get('authorized_order');
 
-        $result = \App\Http\Controllers\WebhookController::sendOrderNotification($order);
+        $result = \App\Http\Controllers\WebhookController::sendOrderNotification($order, true);
 
         if (($result['status'] ?? '') === 'success') {
             return response()->json([

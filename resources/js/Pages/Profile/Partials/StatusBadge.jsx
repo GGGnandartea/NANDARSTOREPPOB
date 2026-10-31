@@ -24,8 +24,8 @@ export default function StatusBadge({ status, isPpob = false }) {
       PROCESSING: 'Pending',
       REFUNDED: 'Gagal (Saldo Di-Refund)',
       FAILED: 'Gagal (Saldo Di-Refund)',
-      CANCELED: 'Dibatalkan',
-      CANCELLED: 'Dibatalkan',
+      CANCELED: 'Dibatalkan oleh Server',
+      CANCELLED: 'Dibatalkan oleh Server',
       EXPIRED: 'Kadaluarsa (Belum Bayar)',
     };
     return (
@@ -42,9 +42,9 @@ export default function StatusBadge({ status, isPpob = false }) {
     PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
     PROCESSING: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     REFUNDED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
-    FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    CANCELED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
-    CANCELLED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+    FAILED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
+    CANCELED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
+    CANCELLED: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40',
     EXPIRED: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
   };
   const labels = {
@@ -53,10 +53,10 @@ export default function StatusBadge({ status, isPpob = false }) {
     COMPLETED: 'Selesai',
     PENDING: 'Menunggu Bayar',
     PROCESSING: 'Diproses',
-    REFUNDED: 'Di-refund ke Saldo',
-    FAILED: 'Gagal',
-    CANCELED: 'Dibatalkan',
-    CANCELLED: 'Dibatalkan',
+    REFUNDED: 'Dibatalkan oleh Server',
+    FAILED: 'Dibatalkan oleh Server',
+    CANCELED: 'Dibatalkan oleh Server',
+    CANCELLED: 'Dibatalkan oleh Server',
     EXPIRED: 'Kadaluarsa (Belum Bayar)'
   };
   return <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${map[s] || 'bg-gray-100 text-gray-500'}`}>{labels[s] || s || '-'}</span>;

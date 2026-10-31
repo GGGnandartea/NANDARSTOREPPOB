@@ -280,7 +280,7 @@
                                     </span>
                                 @elseif(in_array($st, ['canceled', 'cancelled', 'failed']))
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
-                                        ✕ {{ $st === 'failed' ? 'Gagal' : 'Batal' }}
+                                        ✕ Dibatalkan oleh Server
                                     </span>
                                 @else
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
@@ -419,7 +419,7 @@
                                 </span>
                             @elseif(in_array($st, ['canceled', 'cancelled', 'failed']))
                                 <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
-                                    ✕ {{ $st === 'failed' ? 'Gagal' : 'Batal' }}
+                                    ✕ Dibatalkan oleh Server
                                 </span>
                             @else
                                 <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
@@ -587,7 +587,7 @@
                     <select name="status" x-model="statusAction" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold dark:text-white outline-none">
                         <option value="completed">✓ Selesai (Completed)</option>
                         <option value="processing">⏳ Sedang Diproses (Processing)</option>
-                        <option value="canceled">✕ Batalkan (Canceled)</option>
+                        <option value="canceled">✕ Dibatalkan oleh Server (Auto-Refund Saldo)</option>
                     </select>
                 </div>
 

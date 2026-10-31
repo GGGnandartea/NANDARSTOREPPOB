@@ -1778,6 +1778,7 @@ class AdminController extends Controller
     }
     public function orders(Request $request) {
         \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
+        \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders();
 
         $query = Order::with(['user', 'product'])->orderBy('id', 'desc');
 
@@ -1852,6 +1853,18 @@ class AdminController extends Controller
     }
     public function updateOrderStatus(Request $request, $id) {
         $order = Order::findOrFail($id);
+        $targetStatus = strtolower(trim((string) $request->status));
+
+        // Jika dibatalkan atau gagal, otomatis refund saldo 100% (jika sudah lunas) & perbarui keterangan "Dibatalkan oleh server"
+        if (in_array($targetStatus, ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
+            $cancelRes = \App\Services\OrderFulfillmentService::cancelOrFailOrderWithRefund(
+                $order,
+                $targetStatus,
+                $request->input('sn_or_account')
+            );
+            return back()->with('success', $cancelRes['message'] ?? 'Pesanan berhasil dibatalkan oleh server & dana dikembalikan ke saldo pembeli!');
+        }
+
         $data = ['order_status' => $request->status];
         if ($request->filled('sn_or_account')) {
             $data['sn_or_account'] = $request->sn_or_account;
@@ -1860,7 +1873,7 @@ class AdminController extends Controller
         $order->update($data);
 
         // Kirim notifikasi WhatsApp ke pembeli jika status completed & WA terverifikasi
-        if (in_array(strtolower($request->status), ['completed', 'success', 'lunas']) && $order->whatsapp) {
+        if (in_array($targetStatus, ['completed', 'success', 'lunas'], true) && $order->whatsapp) {
             \App\Http\Controllers\WebhookController::sendOrderNotification($order);
         }
 

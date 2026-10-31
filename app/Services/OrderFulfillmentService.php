@@ -435,11 +435,31 @@ class OrderFulfillmentService
 
                     // SERVER WAITING / POLLING LOOP PREMKU
                     if (!$isReady && $apiTrxId) {
-                        for ($attempt = 1; $attempt <= 5; $attempt++) {
+                        for ($attempt = 1; $attempt <= 4; $attempt++) {
                             sleep(2); // Menunggu 2 detik per iterasi
+
+                            // Cek apakah webhook Premku sudah menyelesaikan atau membatalkan pesanan lebih dulu
+                            $order->refresh();
+                            $currentOrderStatus = strtolower((string) $order->order_status);
+                            if (in_array($currentOrderStatus, ['completed', 'success', 'lunas'], true) && !empty($order->sn_or_account) && !self::isWaitingText($order->sn_or_account)) {
+                                return [
+                                    'status'        => 'completed',
+                                    'is_ready'      => true,
+                                    'sn_or_account' => $order->sn_or_account,
+                                    'message'       => 'Akun berhasil diterima dari server API provider!',
+                                ];
+                            }
+                            if (in_array($currentOrderStatus, ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
+                                return self::existingResult($order);
+                            }
 
                             $statusRes = $premkuService->checkStatus($apiTrxId);
                             Log::info("[PREMKU-ORDER-WAIT-{$attempt}] Invoice: {$order->invoice_number} | Trx: {$apiTrxId} | Result: " . json_encode($statusRes));
+
+                            $polledStatus = strtolower((string) ($statusRes['data']['status'] ?? $statusRes['status'] ?? ''));
+                            if (in_array($polledStatus, ['failed', 'canceled', 'cancelled', 'gagal'], true)) {
+                                return self::cancelOrFailOrderWithRefund($order, 'canceled');
+                            }
 
                             $polledSn = self::extractSnFromData($statusRes['data'] ?? $statusRes);
                             if (!empty($polledSn)) {
@@ -454,38 +474,62 @@ class OrderFulfillmentService
                 }
             }
 
-            // C. SIMPAN HASIL STATUS AKHIR ORDER API KE DATABASE
-            if ($isReady && !empty($snAkun)) {
-                $order->sn_or_account   = $snAkun;
-                $order->account_details = $snAkun;
-                $order->order_status    = 'completed';
-                $order->payment_status  = 'paid';
-                if ($apiTrxId) $order->api_trx_id = (string) $apiTrxId;
-                $order->save();
+            // C. SIMPAN HASIL STATUS AKHIR ORDER API KE DATABASE SECARA ATOMIK (ANTI-RACE CONDITION DENGAN WEBHOOK)
+            $order->refresh();
+            $latestStatus = strtolower((string) $order->order_status);
+            if (in_array($latestStatus, ['completed', 'success', 'lunas'], true) && !empty($order->sn_or_account) && !self::isWaitingText($order->sn_or_account)) {
+                return [
+                    'status'        => 'completed',
+                    'is_ready'      => true,
+                    'sn_or_account' => $order->sn_or_account,
+                    'message'       => 'Akun berhasil diterima dari server API provider!',
+                ];
+            }
+            if (in_array($latestStatus, ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
+                return self::existingResult($order);
+            }
 
-                // Kirim pesan WhatsApp otomatis ke pembeli jika nomor terverifikasi
-                WebhookController::sendOrderNotification($order);
+            if ($isReady && !empty($snAkun)) {
+                $updatedToCompleted = Order::whereKey($order->id)
+                    ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed')")
+                    ->update([
+                        'sn_or_account'   => $snAkun,
+                        'account_details' => $snAkun,
+                        'order_status'    => 'completed',
+                        'payment_status'  => 'paid',
+                        'api_trx_id'      => $apiTrxId ? (string) $apiTrxId : $order->api_trx_id,
+                    ]);
+                $order->refresh();
+
+                // Hanya kirim 1x pesan WhatsApp jika proses ini yang pertama mengubah status menjadi completed
+                if ($updatedToCompleted) {
+                    WebhookController::sendOrderNotification($order);
+                }
 
                 return [
                     'status'        => 'completed',
                     'is_ready'      => true,
-                    'sn_or_account' => $snAkun,
+                    'sn_or_account' => $order->sn_or_account ?: $snAkun,
                     'message'       => 'Akun berhasil diterima dari server API provider!',
                 ];
             } else {
-                // Server masih memproses akun di background
+                // Server masih memproses akun di background (jangan timpa jika webhook sudah menyelesaikan/membatalkan)
                 $waitMessage = 'Sedang diproses otomatis oleh server... Mohon tunggu beberapa detik, akun akan tampil otomatis.';
-                $order->sn_or_account   = $waitMessage;
-                $order->account_details = $waitMessage;
-                $order->order_status    = 'processing';
-                $order->payment_status  = 'paid';
-                if ($apiTrxId) $order->api_trx_id = (string) $apiTrxId;
-                $order->save();
+                Order::whereKey($order->id)
+                    ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed')")
+                    ->update([
+                        'sn_or_account'   => $waitMessage,
+                        'account_details' => $waitMessage,
+                        'order_status'    => 'processing',
+                        'payment_status'  => 'paid',
+                        'api_trx_id'      => $apiTrxId ? (string) $apiTrxId : $order->api_trx_id,
+                    ]);
+                $order->refresh();
 
                 return [
-                    'status'        => 'processing',
-                    'is_ready'      => false,
-                    'sn_or_account' => $waitMessage,
+                    'status'        => $order->order_status ?: 'processing',
+                    'is_ready'      => !self::isWaitingText($order->sn_or_account),
+                    'sn_or_account' => $order->sn_or_account ?: $waitMessage,
                     'message'       => 'Server sedang memproses akun secara otomatis.',
                 ];
             }
@@ -560,6 +604,10 @@ class OrderFulfillmentService
             try {
                 if ($apiTrxId) {
                     $statusRes = $premkuService->checkStatus($apiTrxId);
+                    $premkuStatus = strtolower((string) ($statusRes['data']['status'] ?? $statusRes['status'] ?? ''));
+                    if (in_array($premkuStatus, ['failed', 'canceled', 'cancelled', 'gagal'], true)) {
+                        return self::cancelOrFailOrderWithRefund($order, 'canceled');
+                    }
                     $snAkun = self::extractSnFromData($statusRes['data'] ?? $statusRes);
                 }
             } catch (\Exception $e) {
@@ -1182,5 +1230,181 @@ class OrderFulfillmentService
             'resellers' => $expiredResellersCount,
             'total'     => $expiredOrdersCount + $expiredTopupsCount + $expiredResellersCount,
         ];
+    }
+
+    /**
+     * Batalkan pesanan (baik oleh Admin maupun oleh Server/Provider API) secara atomik & idempoten:
+     * 1. Jika pesanan sudah dibayar (paid/success/settlement/lunas) dan memiliki user_id,
+     *    otomatis kembalikan (refund) 100% dana ke Saldo Akun user (hanya 1x, dicek via TransactionLog).
+     * 2. Perbarui sn_or_account & account_details menjadi keterangan "Pesanan dibatalkan oleh server..."
+     *    agar tidak pernah menampilkan "Sedang diproses otomatis oleh server...".
+     */
+    public static function cancelOrFailOrderWithRefund(Order $order, string $newStatus = 'canceled', ?string $customReason = null): array
+    {
+        $rawStatus = strtolower(trim($newStatus));
+        $targetStatus = in_array($rawStatus, ['canceled', 'cancelled'], true)
+            ? 'canceled'
+            : ($rawStatus === 'refunded' ? 'refunded' : 'failed');
+
+        $result = DB::transaction(function () use ($order, $targetStatus, $customReason) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+            if (!$locked) {
+                return [
+                    'status'        => 'not_found',
+                    'is_refunded'   => false,
+                    'refund_amount' => 0,
+                    'message'       => 'Pesanan tidak ditemukan.',
+                ];
+            }
+
+            $payStatus = strtolower((string) $locked->payment_status);
+            $isPaid = in_array($payStatus, ['paid', 'success', 'settlement', 'lunas'], true);
+            $refundAmount = (int) ($locked->total_amount ?: ($locked->price ?: 0));
+            $refundedNow = false;
+            $alreadyRefunded = false;
+
+            if ($isPaid && !empty($locked->user_id) && $refundAmount > 0) {
+                $alreadyRefunded = TransactionLog::where('user_id', $locked->user_id)
+                    ->where('type', 'refund')
+                    ->where('description', 'like', '%' . $locked->invoice_number . '%')
+                    ->exists();
+
+                if (!$alreadyRefunded) {
+                    $buyer = User::whereKey($locked->user_id)->lockForUpdate()->first();
+                    if ($buyer) {
+                        $buyer->increment('balance', $refundAmount);
+                        TransactionLog::create([
+                            'user_id'     => $buyer->id,
+                            'type'        => 'refund',
+                            'amount'      => $refundAmount,
+                            'description' => 'Refund Otomatis (Dibatalkan oleh Server): ' . $locked->product_name . ' - Invoice #' . $locked->invoice_number,
+                        ]);
+                        $refundedNow = true;
+                        $alreadyRefunded = true;
+                    }
+                }
+            }
+
+            $nominalFmt = 'Rp ' . number_format($refundAmount, 0, ',', '.');
+            $defaultCancelText = ($isPaid && !empty($locked->user_id) && $refundAmount > 0)
+                ? "Pesanan dibatalkan oleh server.\nDana sebesar {$nominalFmt} telah dikembalikan 100% ke Saldo Akun Anda."
+                : "Pesanan dibatalkan oleh server.";
+
+            $cleanCustom = trim((string) $customReason);
+            $currentSn = trim((string) ($locked->sn_or_account ?: $locked->account_details ?: ''));
+
+            if ($cleanCustom !== '' && !self::isWaitingText($cleanCustom)) {
+                $finalSnText = $cleanCustom;
+            } elseif ($currentSn === '' || self::isWaitingText($currentSn) || str_contains(strtolower($currentSn), 'sedang diproses')) {
+                $finalSnText = $defaultCancelText;
+            } else {
+                $finalSnText = $currentSn;
+            }
+
+            $locked->order_status = $targetStatus;
+            $locked->sn_or_account = $finalSnText;
+            $locked->account_details = $finalSnText;
+            $locked->save();
+
+            return [
+                'status'          => $targetStatus,
+                'is_ready'        => false,
+                'is_refunded'     => $alreadyRefunded,
+                'refunded_now'    => $refundedNow,
+                'refund_amount'   => $refundAmount,
+                'sn_or_account'   => $finalSnText,
+                'order'           => $locked,
+                'message'         => $refundedNow
+                    ? "Pesanan #{$locked->invoice_number} dibatalkan oleh server & saldo {$nominalFmt} telah dikembalikan 100% ke pembeli."
+                    : "Pesanan #{$locked->invoice_number} dibatalkan oleh server.",
+            ];
+        });
+
+        // Kirim notifikasi WA refund 1x jika baru saja di-refund
+        if (!empty($result['refunded_now']) && !empty($result['order'])) {
+            try {
+                self::sendUserCancelRefundWaNotification($result['order'], (int) $result['refund_amount']);
+            } catch (\Throwable $e) {
+                Log::warning('[CANCEL-REFUND-WA-ERROR] ' . $e->getMessage());
+            }
+        }
+
+        unset($result['order']);
+        return $result;
+    }
+
+    /**
+     * Rekonsiliasi otomatis pesanan berbayar yang berstatus canceled/failed/refunded
+     * namun belum di-refund saldonya atau masih menampilkan teks "Sedang diproses otomatis oleh server...".
+     */
+    public static function reconcileUnrefundedCancelledOrders(?int $userId = null): int
+    {
+        $fixedCount = 0;
+        try {
+            $query = Order::whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
+                ->whereRaw("LOWER(order_status) IN ('canceled', 'cancelled', 'failed', 'refunded')");
+
+            if ($userId !== null) {
+                $query->where('user_id', $userId);
+            }
+
+            $cancelledPaidOrders = $query->orderBy('id', 'desc')->limit(50)->get();
+
+            foreach ($cancelledPaidOrders as $ord) {
+                $needsSnFix = empty($ord->sn_or_account)
+                    || self::isWaitingText($ord->sn_or_account)
+                    || str_contains(strtolower((string) $ord->sn_or_account), 'sedang diproses');
+
+                $needsBalanceRefund = false;
+                $amount = (int) ($ord->total_amount ?: ($ord->price ?: 0));
+                if (!empty($ord->user_id) && $amount > 0) {
+                    $hasRefundLog = TransactionLog::where('user_id', $ord->user_id)
+                        ->where('type', 'refund')
+                        ->where('description', 'like', '%' . $ord->invoice_number . '%')
+                        ->exists();
+                    if (!$hasRefundLog) {
+                        $needsBalanceRefund = true;
+                    }
+                }
+
+                if ($needsSnFix || $needsBalanceRefund) {
+                    self::cancelOrFailOrderWithRefund($ord, $ord->order_status ?: 'canceled');
+                    $fixedCount++;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[RECONCILE-CANCELLED-REFUND] ' . $e->getMessage());
+        }
+
+        return $fixedCount;
+    }
+
+    /**
+     * Kirim notifikasi WhatsApp otomatis ke pembeli saat pesanan dibatalkan oleh server & saldo di-refund
+     */
+    private static function sendUserCancelRefundWaNotification(Order $order, int $refundAmount): bool
+    {
+        $user = $order->user_id ? User::find($order->user_id) : null;
+        if (!$user || !$user->is_whatsapp_verified || empty($user->whatsapp)) {
+            return false;
+        }
+
+        $targetWa = preg_replace('/[^0-9]/', '', $user->whatsapp);
+        if (str_starts_with($targetWa, '0')) {
+            $targetWa = '62' . substr($targetWa, 1);
+        }
+
+        $nominalFmt = number_format($refundAmount, 0, ',', '.');
+        $msg = "↩️ *PESANAN DIBATALKAN OLEH SERVER & DANA DI-REFUND 100%*\n\n"
+             . "Halo *{$user->name}*, pesanan Anda tidak dapat dilanjutkan oleh server:\n\n"
+             . "• No. Invoice: *#{$order->invoice_number}*\n"
+             . "• Layanan: *{$order->product_name}*\n"
+             . "• Status: *Dibatalkan oleh Server*\n"
+             . "• Nominal Refund: *Rp {$nominalFmt}*\n\n"
+             . "✅ *PENGEMBALIAN DANA OTOMATIS:*\n"
+             . "Dana Anda sebesar *Rp {$nominalFmt}* telah dikembalikan *100% secara utuh ke Saldo Akun PremiumKita* Anda dan dapat langsung digunakan kembali.\n\n"
+             . "_Pesan otomatis oleh Sistem Bot WhatsApp PremiumKita._";
+
+        return WebhookController::sendWaMessage($targetWa, $msg);
     }
 }

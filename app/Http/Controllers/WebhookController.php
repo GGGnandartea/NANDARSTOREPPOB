@@ -304,28 +304,36 @@ class WebhookController extends Controller
                 ? implode("\n---\n", $formattedAccounts)
                 : (\App\Services\OrderFulfillmentService::extractSnFromData($data) ?? 'Akun berhasil dikirim oleh provider.');
 
-            // Update status pesanan ke database
-            $order->sn_or_account   = $snText;
-            $order->account_details = $snText;
-            $order->order_status    = 'completed';
-            $order->payment_status  = 'paid';
-            $order->provider        = 'Premku';
-            if ($invoice) {
-                $order->api_trx_id = (string) $invoice;
+            // Update status pesanan ke database secara atomik (cegah race condition dengan proses sinkron)
+            $updatedNotes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Premku: SUCCESS (Inv: {$invoice})";
+            $updated = Order::whereKey($order->id)
+                ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed')")
+                ->update([
+                    'sn_or_account'   => $snText,
+                    'account_details' => $snText,
+                    'order_status'    => 'completed',
+                    'payment_status'  => 'paid',
+                    'provider'        => 'Premku',
+                    'api_trx_id'      => $invoice ? (string) $invoice : $order->api_trx_id,
+                    'notes'           => $updatedNotes,
+                ]);
+            $order->refresh();
+
+            if (!$updated) {
+                Log::info("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} sudah diselesaikan oleh proses lain. Skip duplicate WA.");
+                return response()->json(['status' => true, 'message' => 'Webhook received (already processed)'], 200);
             }
-            $order->notes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Premku: SUCCESS (Inv: {$invoice})";
-            $order->save();
 
             Log::info("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} berhasil diproses & diselesaikan via webhook Premku.");
 
-            // Kirim notifikasi WhatsApp otomatis ke pembeli jika nomor terverifikasi
+            // Kirim notifikasi WhatsApp otomatis ke pembeli jika nomor terverifikasi (hanya 1x)
             try {
                 self::sendOrderNotification($order);
             } catch (\Exception $e) {
                 Log::error('[PREMKU-WEBHOOK-WA-ERROR] ' . $e->getMessage());
             }
 
-        } elseif (in_array(strtolower($data['status'] ?? ''), ['failed', 'canceled', 'gagal'])) {
+        } elseif (in_array(strtolower($data['status'] ?? ''), ['failed', 'canceled', 'cancelled', 'gagal'])) {
             $refId   = $data['ref_id'] ?? null;
             $invoice = $data['invoice'] ?? null;
             $order   = $refId ? Order::where('invoice_number', $refId)->first() : null;
@@ -333,11 +341,9 @@ class WebhookController extends Controller
                 $order = Order::where('api_trx_id', $invoice)->first();
             }
 
-            if ($order && $order->order_status !== 'completed') {
-                $order->order_status = 'failed';
-                $order->notes = ($order->notes ? $order->notes . ' | ' : '') . "Callback Premku GAGAL (Inv: {$invoice})";
-                $order->save();
-                Log::warning("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} ditandai gagal dari callback Premku.");
+            if ($order && !in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas'], true)) {
+                \App\Services\OrderFulfillmentService::cancelOrFailOrderWithRefund($order, 'canceled');
+                Log::warning("[PREMKU-WEBHOOK] Pesanan {$order->invoice_number} dibatalkan oleh server Premku & saldo pembeli di-refund otomatis.");
             }
         }
 
@@ -512,9 +518,9 @@ class WebhookController extends Controller
 
     /**
      * Kirim Notifikasi Detail Akun & Link Invoice ke WhatsApp Pembeli
-     * (KHUSUS PENGGUNA YANG SUDAH TERVERIFIKASI WHATSAPP)
+     * (KHUSUS PENGGUNA YANG SUDAH TERVERIFIKASI WHATSAPP, DIJAMIN HANYA 1X OTOMATIS PER PESANAN)
      */
-    public static function sendOrderNotification($order) {
+    public static function sendOrderNotification($order, bool $isManualResend = false) {
         if (!$order) {
             return ['status' => 'error', 'message' => 'Pesanan tidak ditemukan'];
         }
@@ -537,12 +543,58 @@ class WebhookController extends Controller
 
         $targetPhone = $buyerUser->whatsapp;
 
-        // Pastikan kolom nomor WhatsApp pada pesanan sinkron dengan nomor akun terverifikasi
-        if ($order->whatsapp !== $targetPhone) {
-            $order->update(['whatsapp' => $targetPhone]);
+        // 3. Atomic Lock & Idempotency Guard: Cegah pengiriman 2x pesan WA untuk 1 pesanan yang sama
+        if (!$isManualResend) {
+            $cacheLockKey = 'wa_order_notif_sent_' . $order->invoice_number;
+            if (!\Illuminate\Support\Facades\Cache::add($cacheLockKey, true, 86400)) {
+                Log::info("[WA-DEDUP] Notifikasi WA otomatis untuk {$order->invoice_number} sudah terkirim (cache lock). Skip duplikat.");
+                return [
+                    'status'  => 'already_sent',
+                    'target'  => $targetPhone,
+                    'message' => 'Notifikasi WhatsApp sudah dikirim sebelumnya.',
+                ];
+            }
+
+            $canSend = \Illuminate\Support\Facades\DB::transaction(function () use ($order, $targetPhone) {
+                $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+                if (!$locked) {
+                    return false;
+                }
+                if (str_contains((string) $locked->notes, '[WA-SENT]')) {
+                    return false;
+                }
+                $locked->whatsapp = $targetPhone;
+                $locked->notes = trim(($locked->notes ? $locked->notes . ' | ' : '') . '[INTERNAL][WA-SENT]');
+                $locked->save();
+                return true;
+            });
+
+            if (!$canSend) {
+                Log::info("[WA-DEDUP] Notifikasi WA otomatis untuk {$order->invoice_number} sudah tercatat [WA-SENT] di DB. Skip duplikat.");
+                return [
+                    'status'  => 'already_sent',
+                    'target'  => $targetPhone,
+                    'message' => 'Notifikasi WhatsApp sudah dikirim sebelumnya.',
+                ];
+            }
+
+            $order->refresh();
+        } else {
+            // Debounce klik manual 6 detik agar tidak terkirim ganda jika tombol diklik 2x cepat
+            $manualDebounceKey = 'wa_manual_resend_' . $order->invoice_number;
+            if (!\Illuminate\Support\Facades\Cache::add($manualDebounceKey, true, 6)) {
+                return [
+                    'status'  => 'success',
+                    'target'  => $targetPhone,
+                    'message' => 'Pesan WhatsApp sedang dikirim!',
+                ];
+            }
+            if ($order->whatsapp !== $targetPhone) {
+                $order->update(['whatsapp' => $targetPhone]);
+            }
         }
 
-        // 3. Format Konten Pesan Lengkap
+        // 4. Format Konten Pesan Lengkap
         $product = \App\Models\Product::find($order->product_id);
         $productName = $order->product_name ?: ($product ? $product->name : 'Pesanan');
         $nominal = $order->total_amount ?: ($order->price ?: 0);
@@ -550,7 +602,9 @@ class WebhookController extends Controller
         $snAkun = $order->sn_or_account ?: ($order->account_details ?: 'Pesanan sedang diproses.');
         $invoiceUrl = $order->invoiceUrl();
         $metode = str_starts_with($order->invoice_number, 'BAL-') ? 'Saldo Akun' : 'QRIS Otomatis';
-        $tanggal = $order->created_at ? $order->created_at->format('d M Y, H:i') : now()->format('d M Y, H:i');
+        $tanggal = $order->created_at
+            ? $order->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i')
+            : now()->timezone('Asia/Jakarta')->format('d M Y, H:i');
         $qty = (int) ($order->quantity ?? 1);
         if ($qty < 1) $qty = 1;
 
