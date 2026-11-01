@@ -693,6 +693,27 @@ class FrontController extends Controller
             return response()->json(['status' => 'NOT_FOUND']);
         }
 
+        // Fallback sinkronisasi langsung ke PG QRIS lokal jika status masih pending
+        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && !str_starts_with((string) $order->invoice_number, 'BAL-')) {
+            try {
+                $pgRes = Http::timeout(2)->get('http://127.0.0.1:4061/api/order/status/' . $order->invoice_number);
+                if ($pgRes->successful()) {
+                    $pgData = $pgRes->json();
+                    if (isset($pgData['status']) && in_array(strtoupper((string) $pgData['status']), ['TERBAYAR', 'PAID', 'SUCCESS', 'LUNAS'], true)) {
+                        $markedPaid = Order::whereKey($order->id)
+                            ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
+                            ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
+                            ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
+                        $order->refresh();
+                        if ($markedPaid || !$order->fulfillment_started_at) {
+                            \App\Services\OrderFulfillmentService::fulfillOrder($order);
+                            $order->refresh();
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
         // Otomatis tandai pesanan QRIS pending lebih dari 30 menit sebagai expired
         if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 30) {
             Order::whereKey($order->id)
@@ -708,6 +729,16 @@ class FrontController extends Controller
             && in_array(strtolower((string) $order->order_status), ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
             \App\Services\OrderFulfillmentService::cancelOrFailOrderWithRefund($order, $order->order_status ?: 'canceled');
             $order->refresh();
+        }
+
+        // Jika pesanan Manual Admin sudah lunas namun belum sempat mengirim alert WA ke Admin 6282317458496
+        $isManualOrder = ($order->provider === 'Manual Admin')
+            || ($order->product && $order->product->type === 'local' && $order->product->process_type === 'manual');
+        if ($isManualOrder && in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)) {
+            if (!str_contains((string) $order->notes, '[ADMIN-WA-SENT]')) {
+                \App\Services\OrderFulfillmentService::sendManualOrderAdminWaAlert($order, $order->product);
+                $order->refresh();
+            }
         }
 
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
@@ -738,27 +769,36 @@ class FrontController extends Controller
             $retStatus = 'PAID';
         }
 
+        $buyerUser = $order->user_id ? \App\Models\User::find($order->user_id) : null;
+        $buyerCategory = $buyerUser
+            ? (strtolower((string) $buyerUser->role) === 'reseller' ? 'RESELLER' : 'USER BIASA')
+            : 'PUBLIK';
+
         return response()->json([
-            'status'         => $retStatus,
-            'is_guest'       => !$order->user_id,
-            'order_status'   => $order->order_status,
-            'updated_at'     => $order->updated_at?->toIso8601String(),
-            'placed_at'      => $order->created_at?->toIso8601String(),
-            'order_id'       => $order->invoice_number,
-            'invoice_url'    => $order->invoiceUrl(),
-            'product_name'   => $order->product_name,
-            'quantity'       => (int) ($order->quantity ?? 1),
-            'product_type'   => $order->product_type,
-            'provider'       => $order->provider,
-            'price'          => (int) $order->price,
-            'discount'       => (int) ($order->discount_amount ?? $order->discount ?? 0),
-            'total_amount'   => (int) ($order->total_amount ?? $order->price),
-            'email'          => $order->email,
-            'whatsapp'       => $order->whatsapp,
-            'payment_status' => $order->payment_status,
-            'sn_or_account'  => $isReady ? $snAkun : null,
-            'is_ready'       => $isReady,
-            'created_at'     => $order->created_at ? $order->created_at->format('d M Y, H:i') : null,
+            'status'          => $retStatus,
+            'is_guest'        => !$order->user_id,
+            'order_status'    => $order->order_status,
+            'updated_at'      => $order->updated_at?->toIso8601String(),
+            'placed_at'       => $order->created_at?->toIso8601String(),
+            'order_id'        => $order->invoice_number,
+            'invoice_url'     => $order->invoiceUrl(),
+            'product_name'    => $order->product_name,
+            'quantity'        => (int) ($order->quantity ?? 1),
+            'product_type'    => $order->product_type,
+            'provider'        => $order->provider,
+            'is_manual_admin' => $isManualOrder,
+            'buyer_name'      => $order->buyer_name ?: ($buyerUser ? $buyerUser->name : 'Pembeli Publik'),
+            'buyer_category'  => $buyerCategory,
+            'admin_whatsapp'  => '6282317458496',
+            'price'           => (int) $order->price,
+            'discount'        => (int) ($order->discount_amount ?? $order->discount ?? 0),
+            'total_amount'    => (int) ($order->total_amount ?? $order->price),
+            'email'           => $order->email,
+            'whatsapp'        => $order->whatsapp,
+            'payment_status'  => $order->payment_status,
+            'sn_or_account'   => $isReady ? $snAkun : ($isManualOrder ? $snAkun : null),
+            'is_ready'        => $isReady,
+            'created_at'      => $order->created_at ? $order->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') : null,
         ]);
     }
 
@@ -932,7 +972,7 @@ class FrontController extends Controller
                 // Pastikan catatan teknis / server / API tidak pernah bocor ke tampilan user
                 if (!empty($order->notes)) {
                     $noteLower = strtolower($order->notes);
-                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_contains($noteLower, '[internal]') || str_contains($noteLower, '[wa-sent]')) {
+                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_contains($noteLower, '[internal]') || str_contains($noteLower, '[wa-sent]') || str_contains($noteLower, '[admin-wa-sent]') || str_contains($noteLower, 'menunggu admin') || str_contains($noteLower, 'menunggu pembeli')) {
                         $order->notes = null;
                     }
                 }
@@ -1232,23 +1272,33 @@ class FrontController extends Controller
             ]);
         }
 
+        $isManualOrder = ($order->provider === 'Manual Admin') || ($product->type === 'local' && $product->process_type === 'manual');
+        $buyerCategory = strtolower((string) $user->role) === 'reseller' ? 'RESELLER' : 'USER BIASA';
+
         return response()->json([
-            'status'        => 'success',
-            'order_id'      => $invoiceNumber,
-                'order_status' => $order->order_status,
-                'payment_status' => $order->payment_status,
-                'placed_at' => $order->created_at?->toIso8601String(),
-                'updated_at' => $order->updated_at?->toIso8601String(),
-            'product_name'  => $product->name,
-            'product_type'  => $order->product_type,
-            'total_nominal' => $nominal,
-            'sn_or_account' => $snAkun,
-            'is_ready'      => $isReady,
-            'created_at'    => now()->format('d M Y, H:i'),
-            'quantity'      => $qty,
-            'wa_sent'       => !empty($order->whatsapp_notified_at),
-            'wa_target'     => $targetWhatsapp,
-            'message'       => $isReady ? 'Pembelian berhasil! Akun telah siap.' : 'Pembelian berhasil! Akun Anda sedang disiapkan secara otomatis.',
+            'status'          => 'success',
+            'order_id'        => $invoiceNumber,
+            'order_status'    => $order->order_status,
+            'payment_status'  => $order->payment_status,
+            'placed_at'       => $order->created_at?->toIso8601String(),
+            'updated_at'      => $order->updated_at?->toIso8601String(),
+            'product_name'    => $product->name,
+            'product_type'    => $order->product_type,
+            'provider'        => $order->provider,
+            'is_manual_admin' => $isManualOrder,
+            'buyer_name'      => $buyerName,
+            'buyer_category'  => $buyerCategory,
+            'admin_whatsapp'  => '6282317458496',
+            'total_nominal'   => $nominal,
+            'sn_or_account'   => $snAkun,
+            'is_ready'        => $isReady,
+            'created_at'      => now()->timezone('Asia/Jakarta')->format('d M Y, H:i'),
+            'quantity'        => $qty,
+            'wa_sent'         => !empty($order->whatsapp_notified_at),
+            'wa_target'       => $targetWhatsapp,
+            'message'         => $isManualOrder
+                ? 'PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN'
+                : ($isReady ? 'Pembelian berhasil! Akun telah siap.' : 'Pembelian berhasil! Akun Anda sedang disiapkan secara otomatis.'),
         ]);
     }
 

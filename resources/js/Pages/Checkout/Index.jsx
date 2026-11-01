@@ -115,7 +115,9 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
       lower.includes('processing') ||
       lower.includes('pending') ||
       lower.includes('kosong') ||
-      lower.includes('admin akan segera')
+      lower.includes('admin akan segera') ||
+      lower.includes('wajib mengisi form garansi') ||
+      lower.includes('meminta form garansi')
     );
   };
 
@@ -439,6 +441,10 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
           product_name: data.product_name || product.name,
           total_amount: data.total_nominal || finalPrice,
           sn_or_account: data.sn_or_account,
+          provider: data.provider,
+          is_manual_admin: data.is_manual_admin,
+          buyer_name: data.buyer_name || buyerName,
+          buyer_category: data.buyer_category,
           payment_method: 'Saldo Akun',
           payment_status: 'paid',
           status: 'LUNAS',
@@ -578,6 +584,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
               quantity={completedOrder?.quantity || balanceSuccess?.quantity || quantity}
               finalPrice={finalPrice}
               user={user}
+              buyerName={buyerName}
               waSentSuccess={waSentSuccess}
               handleResendWa={handleResendWa}
               isResendingWa={isResendingWa}

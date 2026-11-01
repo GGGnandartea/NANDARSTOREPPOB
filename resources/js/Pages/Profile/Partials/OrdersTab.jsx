@@ -890,7 +890,47 @@ export default function OrdersTab({
                       </div>
                     )}
 
-                    {o.sn_or_account && !['failed', 'refunded', 'canceled', 'cancelled', 'expired'].includes(String(o.order_status || '').toLowerCase()) && (
+                    {!isOrderPpob &&
+                      isOrderPending &&
+                      (o.provider === 'Manual Admin' ||
+                        o.product?.process_type === 'manual' ||
+                        String(o.sn_or_account || '')
+                          .toLowerCase()
+                          .includes('wajib mengisi form garansi')) && (
+                        <div className="mt-2.5 p-3.5 sm:p-4 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-xl space-y-2.5">
+                          <p className="text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                            🛡️ Layanan Manual Admin — Wajib Isi Form Garansi
+                          </p>
+                          <p className="text-xs font-black text-amber-950 dark:text-amber-100 leading-relaxed uppercase">
+                            PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN
+                          </p>
+                          <div>
+                            <a
+                              href={`https://wa.me/6282317458496?text=${encodeURIComponent(
+                                `Halo Admin PremiumKita, saya sudah membayar pesanan Manual Admin.\n\n• No. Invoice: #${o.invoice_number || o.id}\n• Produk: ${o.product_name}\n• Jumlah: ${o.quantity || 1} Pcs\n• Total Lunas: ${fmt.rp(o.total_amount || o.price)}\n\nMohon kirimkan Form Garansi dan Akun untuk Login (screenshot terlampir). Terima kasih!`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm transition cursor-pointer"
+                            >
+                              <span>💬 Chat Admin Sekarang (Minta Form Garansi &amp; Akun)</span>
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                    {o.sn_or_account &&
+                      !['failed', 'refunded', 'canceled', 'cancelled', 'expired'].includes(
+                        String(o.order_status || '').toLowerCase()
+                      ) &&
+                      !(
+                        isOrderPending &&
+                        (o.provider === 'Manual Admin' ||
+                          o.product?.process_type === 'manual' ||
+                          String(o.sn_or_account || '')
+                            .toLowerCase()
+                            .includes('wajib mengisi form garansi'))
+                      ) && (
                       <div className="mt-2.5 p-3 sm:p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-xl">
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">

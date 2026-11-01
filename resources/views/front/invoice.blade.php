@@ -847,8 +847,91 @@
                 </a>
             </div>
         @else
-            <!-- PROMINENT BIG LOADING CARD JIKA AKUN MASIH MENUNGGU -->
-            @if($isWaiting)
+            @php
+                $isManualAdminOrder = ($order->provider === 'Manual Admin')
+                    || (isset($order->product) && $order->product->type === 'local' && ($order->product->process_type ?? '') === 'manual')
+                    || str_contains(strtolower((string) $rawAccount), 'wajib mengisi form garansi');
+                $buyerRoleLabel = $order->user ? (strtolower((string) $order->user->role) === 'reseller' ? 'RESELLER' : 'USER BIASA') : 'PUBLIK';
+                $buyerDisplayName = $order->buyer_name ?: ($order->user ? $order->user->name : 'Pembeli Publik');
+                $manualClaimWaText = urlencode(
+                    "Halo Admin {$storeName}, saya sudah menyelesaikan pembayaran untuk produk Manual Admin.\n\n"
+                    . "📋 *BUKTI PESANAN SAYA:*\n"
+                    . "• No. Invoice: #{$order->invoice_number}\n"
+                    . "• Nama Produk: {$order->product_name}\n"
+                    . "• Jumlah Pesanan: {$qty} Pcs\n"
+                    . "• Total Bayar: {$paidNominalFmt}\n"
+                    . "• Username Pembeli: {$buyerDisplayName} ({$buyerRoleLabel})\n\n"
+                    . "Mohon kirimkan *Form Garansi* dan *Akun untuk Login* pesanan saya (screenshot bukti terlampir). Terima kasih!"
+                );
+                $manualClaimWaUrl = "https://wa.me/6282317458496?text={$manualClaimWaText}";
+            @endphp
+
+            @if($isWaiting && $isManualAdminOrder)
+            <!-- POPUP MODAL OTOMATIS KHUSUS PRODUK MANUAL ADMIN -->
+            <div id="manual-warranty-popup" style="position: fixed; inset: 0; z-index: 9999; background: rgba(2, 6, 23, 0.78); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px;">
+                <div style="background: #ffffff; border: 2px solid #f59e0b; border-radius: 24px; max-width: 440px; width: 100%; padding: 24px 20px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);">
+                    <div style="width: 56px; height: 56px; margin: 0 auto 12px auto; border-radius: 16px; background: linear-gradient(135deg, #f97316, #f59e0b); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 26px;">
+                        🛡️
+                    </div>
+                    <div style="display: inline-block; padding: 4px 12px; border-radius: 999px; background: #dcfce7; border: 1px solid #86efac; color: #15803d; font-size: 11px; font-weight: 800; text-transform: uppercase; margin-bottom: 10px;">
+                        ✓ Pembayaran Berhasil • Wajib Klaim Garansi
+                    </div>
+                    <div style="background: #fffbeb; border: 2px solid #fbbf24; border-radius: 16px; padding: 14px; margin-bottom: 14px;">
+                        <p style="font-size: 13px; font-weight: 900; color: #92400e; line-height: 1.55; text-transform: uppercase;">
+                            PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN
+                        </p>
+                    </div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; text-align: left; font-size: 12px; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-weight: 600;">No. Invoice</span>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #0f172a;">#{{ $order->invoice_number }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-weight: 600;">Produk</span>
+                            <span style="font-weight: 800; color: #0f172a;">{{ $order->product_name }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-weight: 600;">Pembeli</span>
+                            <span style="font-weight: 800; color: #0f172a;">{{ $buyerDisplayName }} ({{ $buyerRoleLabel }})</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #e2e8f0;">
+                            <span style="color: #64748b; font-weight: 600;">Jumlah</span>
+                            <span style="font-weight: 800; color: #ea580c;">{{ $qty }} Pcs</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 3px 0;">
+                            <span style="color: #64748b; font-weight: 600;">Total Lunas</span>
+                            <span style="font-weight: 900; color: #15803d;">{{ $paidNominalFmt }}</span>
+                        </div>
+                    </div>
+                    <a href="{{ $manualClaimWaUrl }}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px 16px; border-radius: 14px; background: #16a34a; color: #ffffff; font-size: 13px; font-weight: 800; text-decoration: none; margin-bottom: 8px; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
+                        <span>💬 Chat Admin Sekarang (Minta Form Garansi &amp; Akun)</span>
+                    </a>
+                    <button type="button" onclick="document.getElementById('manual-warranty-popup').style.display='none'" style="width: 100%; padding: 10px 14px; border-radius: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; font-size: 12px; font-weight: 700; cursor: pointer;">
+                        Sudah Screenshot — Lihat Detail Invoice
+                    </button>
+                </div>
+            </div>
+
+            <div id="credential-waiting-card" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(249, 115, 22, 0.06) 100%); border: 2px solid rgba(245, 158, 11, 0.45); border-radius: 20px; padding: 28px 22px; text-align: center; margin-bottom: 26px;">
+                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: #dcfce7; border: 1px solid #86efac; border-radius: 999px; color: #15803d; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px;">
+                    ✓ Pembayaran Lunas • Layanan Manual Admin
+                </div>
+                <div style="background: #ffffff; border: 2px solid #fbbf24; border-radius: 16px; padding: 16px; margin-bottom: 16px; max-width: 540px; margin-left: auto; margin-right: auto;">
+                    <p style="font-size: 14px; font-weight: 900; color: #92400e; line-height: 1.6; text-transform: uppercase;">
+                        PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN
+                    </p>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+                    <a href="{{ $manualClaimWaUrl }}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 14px; background: #16a34a; color: #ffffff; font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);">
+                        <span>💬 Chat Admin Sekarang (Minta Form Garansi &amp; Akun)</span>
+                    </a>
+                    <button type="button" onclick="document.getElementById('manual-warranty-popup').style.display='flex'" style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 16px; border-radius: 14px; background: #fffbeb; border: 1px solid #f59e0b; color: #b45309; font-size: 12px; font-weight: 800; cursor: pointer;">
+                        <span>📸 Tampilkan Popup Bukti Screenshot</span>
+                    </button>
+                </div>
+            </div>
+            @elseif($isWaiting)
+            <!-- PROMINENT BIG LOADING CARD JIKA AKUN OTOMATIS MASIH MENUNGGU -->
             <div id="credential-waiting-card" style="background: linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(245, 158, 11, 0.05) 100%); border: 2px solid rgba(249, 115, 22, 0.35); border-radius: 20px; padding: 32px 24px; text-align: center; margin-bottom: 26px; box-shadow: 0 10px 30px -10px rgba(249, 115, 22, 0.15);">
                 <div style="width: 64px; height: 64px; margin: 0 auto 16px auto; border-radius: 50%; background: rgba(249, 115, 22, 0.15); display: flex; align-items: center; justify-content: center; position: relative;">
                     <div style="position: absolute; inset: -5px; border-radius: 50%; border: 3px solid transparent; border-top-color: #f97316; border-right-color: #fb923c; animation: live-spin 1.5s linear infinite;"></div>

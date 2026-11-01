@@ -1780,6 +1780,31 @@ class AdminController extends Controller
         \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
         \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders();
 
+        // Pastikan pesanan Manual Admin yang baru masuk otomatis mengirim alert WA ke Admin 6282317458496
+        try {
+            $unnotifiedManualOrders = Order::with('product')
+                ->where('provider', 'Manual Admin')
+                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
+                ->whereRaw("LOWER(order_status) IN ('processing', 'pending')")
+                ->where('created_at', '>=', now()->subHours(24))
+                ->where(function ($q) {
+                    $q->whereNull('notes')->orWhere('notes', 'not like', '%[ADMIN-WA-SENT]%');
+                })
+                ->limit(10)
+                ->get();
+
+            foreach ($unnotifiedManualOrders as $manualOrd) {
+                if (\App\Services\OrderFulfillmentService::isWaitingText($manualOrd->sn_or_account)) {
+                    $newNotice = "PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN";
+                    $manualOrd->update([
+                        'sn_or_account'   => $newNotice,
+                        'account_details' => $newNotice,
+                    ]);
+                }
+                \App\Services\OrderFulfillmentService::sendManualOrderAdminWaAlert($manualOrd, $manualOrd->product);
+            }
+        } catch (\Throwable $e) {}
+
         $query = Order::with(['user', 'product'])->orderBy('id', 'desc');
 
         if ($request->filled('search')) {
@@ -1866,9 +1891,14 @@ class AdminController extends Controller
         }
 
         $data = ['order_status' => $request->status];
-        if ($request->filled('sn_or_account')) {
-            $data['sn_or_account'] = $request->sn_or_account;
-            $data['account_details'] = $request->sn_or_account;
+        $inputSn = trim((string) $request->input('sn_or_account', ''));
+        if ($inputSn !== '' && !\App\Services\OrderFulfillmentService::isWaitingText($inputSn)) {
+            $data['sn_or_account'] = $inputSn;
+            $data['account_details'] = $inputSn;
+        } elseif (in_array($targetStatus, ['completed', 'success', 'lunas'], true) && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
+            $doneText = 'Pesanan telah selesai diproses oleh Admin via WhatsApp.';
+            $data['sn_or_account'] = $doneText;
+            $data['account_details'] = $doneText;
         }
         $order->update($data);
 

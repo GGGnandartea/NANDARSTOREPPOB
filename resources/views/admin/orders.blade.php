@@ -182,7 +182,7 @@
                                         📄
                                     </a>
                                 </div>
-                                <p class="text-[10px] text-gray-400 font-medium mt-0.5">{{ $order->created_at ? $order->created_at->format('d M Y, H:i') : '-' }}</p>
+                                <p class="text-[10px] text-gray-400 font-medium mt-0.5">{{ $order->created_at ? $order->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') . ' WIB' : '-' }}</p>
                             </td>
 
                             <!-- Kolom 2: Pelanggan -->
@@ -287,19 +287,27 @@
                                         {{ ucfirst($st) }}
                                     </span>
                                 @endif
-                                @if(!empty($order->notes))
-                                    <span class="block text-[9px] text-amber-600 dark:text-amber-400 font-medium max-w-[160px] truncate mt-1" title="{{ $order->notes }}">
-                                        ⚠️ {{ $order->notes }}
+                                @php
+                                    $cleanAdminNote = trim(preg_replace('/\s*\|\s*\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]/i', '', (string) $order->notes));
+                                    $cleanAdminNote = trim(preg_replace('/^\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]\s*/i', '', $cleanAdminNote));
+                                @endphp
+                                @if(!empty($cleanAdminNote))
+                                    <span class="block text-[9px] text-amber-600 dark:text-amber-400 font-medium max-w-[160px] truncate mt-1" title="{{ $cleanAdminNote }}">
+                                        ⚠️ {{ $cleanAdminNote }}
                                     </span>
                                 @endif
                             </td>
 
                             <!-- Kolom 6: Detail Akun -->
+                            @php
+                                $rawSnForModal = $order->sn_or_account ?? $order->account_details ?? '';
+                                $editableSn = \App\Services\OrderFulfillmentService::isWaitingText($rawSnForModal) ? '' : $rawSnForModal;
+                            @endphp
                             <td>
                                 @if($order->sn_or_account || $order->account_details)
                                     <button 
                                         type="button"
-                                        @click="viewAccountContent = '{{ addslashes($order->sn_or_account ?? $order->account_details) }}'; viewAccountModal = true;"
+                                        @click="viewAccountContent = '{{ addslashes($rawSnForModal) }}'; viewAccountModal = true;"
                                         class="text-[10px] font-bold text-cyan-500 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/40 px-2.5 py-1 rounded-lg hover:underline cursor-pointer"
                                     >
                                         🔑 Lihat Akun
@@ -321,7 +329,7 @@
                                         @if($isManualProduct)
                                             <button 
                                                 type="button"
-                                                @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $order->sn_or_account ?? '']) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($order->sn_or_account ?? '') }}'; openModal = true;"
+                                                @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $editableSn]) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($editableSn) }}'; openModal = true;"
                                                 class="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-[10px] transition cursor-pointer"
                                                 title="Edit Detail Kredensial Akun Manual"
                                             >
@@ -348,7 +356,7 @@
 
                                         <button 
                                             type="button"
-                                            @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $order->sn_or_account ?? '']) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($order->sn_or_account ?? '') }}'; openModal = true;"
+                                            @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $editableSn]) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($editableSn) }}'; openModal = true;"
                                             class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] transition cursor-pointer shadow-sm"
                                             title="Selesaikan & Kirim Akun"
                                         >
@@ -485,20 +493,26 @@
                     </div>
 
                     <!-- Detail Akun & Notes -->
-                    @if($order->sn_or_account || $order->account_details || !empty($order->notes))
+                    @php
+                        $mobRawSn = $order->sn_or_account ?? $order->account_details ?? '';
+                        $mobEditableSn = \App\Services\OrderFulfillmentService::isWaitingText($mobRawSn) ? '' : $mobRawSn;
+                        $mobCleanNote = trim(preg_replace('/\s*\|\s*\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]/i', '', (string) $order->notes));
+                        $mobCleanNote = trim(preg_replace('/^\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]\s*/i', '', $mobCleanNote));
+                    @endphp
+                    @if($order->sn_or_account || $order->account_details || !empty($mobCleanNote))
                         <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
                             @if($order->sn_or_account || $order->account_details)
                                 <button 
                                     type="button"
-                                    @click="viewAccountContent = '{{ addslashes($order->sn_or_account ?? $order->account_details) }}'; viewAccountModal = true;"
+                                    @click="viewAccountContent = '{{ addslashes($mobRawSn) }}'; viewAccountModal = true;"
                                     class="text-[11px] font-bold text-cyan-500 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/40 px-3 py-1.5 rounded-xl hover:underline cursor-pointer flex items-center gap-1"
                                 >
                                     🔑 <span>Lihat Akun Pembeli</span>
                                 </button>
                             @endif
-                            @if(!empty($order->notes))
+                            @if(!empty($mobCleanNote))
                                 <span class="text-[10px] text-amber-600 dark:text-amber-400 font-medium truncate max-w-full">
-                                    ⚠️ {{ $order->notes }}
+                                    ⚠️ {{ $mobCleanNote }}
                                 </span>
                             @endif
                         </div>
@@ -507,7 +521,7 @@
                     <!-- Action Buttons on Mobile -->
                     <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/5">
                         <span class="text-[10px] text-gray-400">
-                            {{ $order->created_at ? $order->created_at->format('d M Y, H:i') : '-' }}
+                            {{ $order->created_at ? $order->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') . ' WIB' : '-' }}
                         </span>
 
                         <div class="flex items-center gap-1.5">
@@ -515,7 +529,7 @@
                                 @if($isManualProduct)
                                     <button 
                                         type="button"
-                                        @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $order->sn_or_account ?? '']) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($order->sn_or_account ?? '') }}'; openModal = true;"
+                                        @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $mobEditableSn]) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($mobEditableSn) }}'; openModal = true;"
                                         class="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs transition cursor-pointer"
                                     >
                                         ✏️ Edit Akun
@@ -538,7 +552,7 @@
 
                                 <button 
                                     type="button"
-                                    @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $order->sn_or_account ?? '']) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($order->sn_or_account ?? '') }}'; openModal = true;"
+                                    @click="selectedOrder = {{ json_encode(['id' => $order->id, 'invoice' => $order->invoice_number, 'customer' => $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu'), 'product' => $order->product_name, 'sn' => $mobEditableSn]) }}; statusAction = 'completed'; accountCredentials = '{{ addslashes($mobEditableSn) }}'; openModal = true;"
                                     class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition cursor-pointer shadow-sm"
                                 >
                                     Proses / Selesai

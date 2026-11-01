@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 
 export default function CheckoutSuccessSection({
@@ -13,6 +13,7 @@ export default function CheckoutSuccessSection({
   quantity = 1,
   finalPrice,
   user,
+  buyerName = '',
   waSentSuccess,
   handleResendWa,
   isResendingWa,
@@ -28,10 +29,184 @@ export default function CheckoutSuccessSection({
   const totalAmount = completedOrder?.total_amount || balanceSuccess?.total_nominal || finalPrice;
   const displayQty = completedOrder?.quantity || balanceSuccess?.quantity || quantity;
 
+  const isManualAdminProduct = Boolean(
+    (product?.type === 'local' && product?.process_type === 'manual') ||
+      completedOrder?.provider === 'Manual Admin' ||
+      balanceSuccess?.provider === 'Manual Admin' ||
+      completedOrder?.is_manual_admin ||
+      balanceSuccess?.is_manual_admin ||
+      accountText.toLowerCase().includes('wajib mengisi form garansi')
+  );
+
+  const [showManualPopup, setShowManualPopup] = useState(true);
+
+  const displayBuyerName =
+    completedOrder?.buyer_name ||
+    balanceSuccess?.buyer_name ||
+    buyerName ||
+    user?.name ||
+    'Pembeli Publik';
+
+  const displayBuyerRole =
+    completedOrder?.buyer_category ||
+    balanceSuccess?.buyer_category ||
+    (user ? (String(user.role || '').toLowerCase() === 'reseller' ? 'RESELLER' : 'USER BIASA') : 'PUBLIK');
+
+  const displayDate =
+    completedOrder?.created_at ||
+    balanceSuccess?.created_at ||
+    new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const adminWaNumber = '6282317458496';
+  const waClaimMessage = encodeURIComponent(
+    `Halo Admin PremiumKita, saya sudah menyelesaikan pembayaran untuk produk Manual Admin.\n\n` +
+      `📋 *BUKTI PESANAN SAYA:*\n` +
+      `• No. Invoice: #${currentOrderId}\n` +
+      `• Nama Produk: ${productName}\n` +
+      `• Jumlah Pesanan: ${displayQty} Pcs\n` +
+      `• Total Bayar: ${fmt.rp(totalAmount)}\n` +
+      `• Username Pembeli: ${displayBuyerName} (${displayBuyerRole})\n` +
+      `• Tanggal: ${displayDate} WIB\n\n` +
+      `Mohon kirimkan *Form Garansi* dan *Akun untuk Login* pesanan saya (screenshot bukti terlampir). Terima kasih!`
+  );
+  const waClaimUrl = `https://wa.me/${adminWaNumber}?text=${waClaimMessage}`;
+
+  const isPendingText =
+    isAccountPending(accountText) ||
+    accountText.toLowerCase().includes('wajib mengisi form garansi') ||
+    accountText.toLowerCase().includes('meminta form garansi');
+
   return (
     <div className="text-center py-2 space-y-4">
-      {isAccountPending(accountText) ? (
-        /* ─── STATE MENUNGGU AKUN (PROMINENT LARGE LOADING CARD) ─── */
+      {/* ─── POPUP MODAL OTOMATIS KHUSUS PRODUK MANUAL ADMIN ─── */}
+      {isManualAdminProduct && isPendingText && showManualPopup && (
+        <div className="fixed inset-0 z-[999] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#0f172a] border-2 border-orange-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl text-center space-y-4 relative overflow-hidden">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-orange-500/30">
+              <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.5"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+            </div>
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider">
+                ✓ Pembayaran Berhasil • Wajib Klaim Garansi
+              </span>
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400/60 dark:border-amber-500/40">
+                <p className="text-xs sm:text-sm font-black text-amber-900 dark:text-amber-200 leading-relaxed uppercase">
+                  PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN
+                </p>
+              </div>
+            </div>
+
+            {/* RINGKASAN BUKTI UNTUK DI-SCREENSHOT */}
+            <div className="bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl p-3.5 text-left space-y-1.5 text-xs">
+              <div className="flex justify-between items-center py-0.5 border-b border-gray-200/60 dark:border-gray-700/60">
+                <span className="text-gray-400 font-semibold">No. Invoice</span>
+                <span className="font-mono font-black text-gray-900 dark:text-white">#{currentOrderId}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-gray-200/60 dark:border-gray-700/60">
+                <span className="text-gray-400 font-semibold">Produk</span>
+                <span className="font-black text-gray-900 dark:text-white truncate max-w-[190px]">{productName}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-gray-200/60 dark:border-gray-700/60">
+                <span className="text-gray-400 font-semibold">Pembeli</span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {displayBuyerName} <span className="text-[10px] text-orange-500 font-black">({displayBuyerRole})</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-gray-200/60 dark:border-gray-700/60">
+                <span className="text-gray-400 font-semibold">Jumlah Pesanan</span>
+                <span className="font-black text-orange-500">{displayQty} Pcs</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5 border-b border-gray-200/60 dark:border-gray-700/60">
+                <span className="text-gray-400 font-semibold">Total Lunas</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400">{fmt.rp(totalAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="text-gray-400 font-semibold">Tanggal</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">{displayDate} WIB</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a
+                href={waClaimUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>💬 Chat Admin Sekarang (Minta Form Garansi &amp; Akun)</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowManualPopup(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs transition cursor-pointer"
+              >
+                Sudah Screenshot — Lihat Detail Halaman Ini
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isManualAdminProduct && isPendingText ? (
+        /* ─── STATE KHUSUS PRODUK MANUAL ADMIN (WAJIB ISI FORM GARANSI & CHAT ADMIN) ─── */
+        <div className="bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-600/5 border-2 border-amber-500/40 rounded-3xl p-5 sm:p-6 text-center relative overflow-hidden shadow-xl space-y-4 animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-orange-500/30">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2.5"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+          </div>
+
+          <div className="space-y-2 relative z-10">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-black uppercase tracking-wider">
+              ✓ Pembayaran Lunas • Layanan Manual Admin
+            </span>
+            <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-gray-900/90 border border-amber-400/50 shadow-sm">
+              <p className="text-xs sm:text-sm font-black text-amber-900 dark:text-amber-300 leading-relaxed uppercase">
+                PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 relative z-10">
+            <a
+              href={waClaimUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>💬 Chat Admin Sekarang (Minta Form Garansi &amp; Akun)</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowManualPopup(true)}
+              className="w-full py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold text-xs transition cursor-pointer"
+            >
+              📸 Tampilkan Kembali Popup Bukti Screenshot
+            </button>
+          </div>
+        </div>
+      ) : isPendingText ? (
+        /* ─── STATE MENUNGGU AKUN OTOMATIS API (PROMINENT LARGE LOADING CARD) ─── */
         <div className="bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-orange-600/5 border-2 border-orange-500/30 rounded-3xl p-6 sm:p-7 text-center relative overflow-hidden shadow-2xl space-y-4 animate-fade-in">
           {/* Glowing background circles */}
           <div className="absolute -top-10 -left-10 w-36 h-36 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -224,4 +399,3 @@ export default function CheckoutSuccessSection({
     </div>
   );
 }
-

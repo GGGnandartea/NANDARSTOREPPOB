@@ -238,20 +238,35 @@ class OrderFulfillmentService
         // ─── 1. FULFILLMENT PRODUK LOKAL ───────────────────────────────────────
         if ($product->type === 'local') {
             if ($product->process_type === 'manual') {
-                $snAkun = "Pesanan sedang diproses manual oleh Admin. Akun/layanan akan dikirim via WhatsApp/Email.";
+                $qty = max(1, (int) ($order->quantity ?? 1));
+                if ((int) $product->stock > 0) {
+                    $product->update([
+                        'stock' => max(0, (int) $product->stock - $qty),
+                    ]);
+                }
+
+                $snAkun = "PRODUK INI WAJIB MENGISI FORM GARANSI, SILAHKAN SCREENSHOT INI DAN CHAT ADMIN UNTUK MEMINTA FORM GARANSI DAN AKUN UNTUK LOGIN";
                 $order->sn_or_account   = $snAkun;
                 $order->account_details = $snAkun;
                 $order->order_status    = 'processing';
                 $order->payment_status  = 'paid';
                 $order->provider        = 'Manual Admin';
-                $order->notes           = 'Menunggu admin memproses akun / layanan secara manual.';
+                $order->notes           = 'Menunggu pembeli mengisi Form Garansi & Admin mengirimkan akun login.';
                 $order->save();
 
+                // Kirim notifikasi WhatsApp otomatis ke Admin (6282317458496)
+                try {
+                    self::sendManualOrderAdminWaAlert($order, $product);
+                } catch (\Throwable $e) {
+                    Log::warning('[MANUAL-ADMIN-WA-ALERT] ' . $order->invoice_number . ': ' . $e->getMessage());
+                }
+
                 return [
-                    'status'        => 'processing',
-                    'is_ready'      => false,
-                    'sn_or_account' => $snAkun,
-                    'message'       => 'Pesanan manual berhasil diterima. Menunggu proses oleh admin.',
+                    'status'          => 'processing',
+                    'is_ready'        => false,
+                    'is_manual_admin' => true,
+                    'sn_or_account'   => $snAkun,
+                    'message'         => $snAkun,
                 ];
             }
 
@@ -770,6 +785,8 @@ class OrderFulfillmentService
             'sedang diproses',
             'admin akan segera',
             'stok akun otomatis saat ini sedang kosong',
+            'wajib mengisi form garansi',
+            'meminta form garansi',
         ];
 
         foreach ($waitingWords as $w) {
@@ -1406,5 +1423,100 @@ class OrderFulfillmentService
              . "_Pesan otomatis oleh Sistem Bot WhatsApp PremiumKita._";
 
         return WebhookController::sendWaMessage($targetWa, $msg);
+    }
+
+    /**
+     * Kirim notifikasi WhatsApp otomatis ke Admin (6282317458496) saat ada pesanan Manual Admin masuk.
+     * Mencakup: Nama Produk, Username Pembeli, Jumlah Pesanan, Jumlah Harga, Tanggal Bulan Tahun,
+     * serta Kategori Pembeli (RESELLER / USER BIASA / PUBLIK).
+     */
+    public static function sendManualOrderAdminWaAlert(Order $order, ?Product $product = null): bool
+    {
+        $cacheKey = 'wa_manual_admin_alert_' . $order->invoice_number;
+        if (!\Illuminate\Support\Facades\Cache::add($cacheKey, true, 86400)) {
+            return false;
+        }
+
+        $canSend = DB::transaction(function () use ($order) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+            if (!$locked) {
+                return false;
+            }
+            if (str_contains((string) $locked->notes, '[ADMIN-WA-SENT]')) {
+                return false;
+            }
+            $locked->notes = trim(($locked->notes ? $locked->notes . ' | ' : '') . '[INTERNAL][ADMIN-WA-SENT]');
+            $locked->save();
+            return true;
+        });
+
+        if (!$canSend) {
+            return false;
+        }
+
+        $order->refresh();
+
+        $buyerUser = $order->user_id ? User::find($order->user_id) : null;
+        $userName = $buyerUser
+            ? $buyerUser->name
+            : ($order->buyer_name ?: 'Pembeli Publik (Tanpa Akun)');
+
+        if ($buyerUser && strtolower((string) $buyerUser->role) === 'reseller') {
+            $buyerCategory = 'RESELLER';
+        } elseif ($buyerUser) {
+            $buyerCategory = 'USER BIASA';
+        } else {
+            $buyerCategory = 'PUBLIK';
+        }
+
+        $productName = $order->product_name ?: ($product ? $product->name : 'Produk Manual Admin');
+        $qty = max(1, (int) ($order->quantity ?? 1));
+        $totalAmount = (int) ($order->total_amount ?: ($order->price ?: 0));
+        $hargaFormatted = 'Rp ' . number_format($totalAmount, 0, ',', '.');
+
+        $dt = ($order->created_at ?: now())->timezone('Asia/Jakarta');
+        $bulanIndo = [
+            1  => 'Januari',
+            2  => 'Februari',
+            3  => 'Maret',
+            4  => 'April',
+            5  => 'Mei',
+            6  => 'Juni',
+            7  => 'Juli',
+            8  => 'Agustus',
+            9  => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember',
+        ];
+        $namaBulan = $bulanIndo[(int) $dt->format('n')] ?? $dt->format('F');
+        $tanggalLengkap = $dt->format('d') . ' ' . $namaBulan . ' ' . $dt->format('Y') . ', ' . $dt->format('H:i') . ' WIB';
+
+        $metodeBayar = str_starts_with((string) $order->invoice_number, 'BAL-') ? 'Saldo Akun' : 'QRIS Otomatis';
+        $waPembeli = $order->whatsapp ?: ($buyerUser->whatsapp ?? '-');
+        $emailPembeli = $order->email ?: ($buyerUser->email ?? '-');
+        $adminOrderUrl = url('/admin/orders?search=' . urlencode($order->invoice_number));
+
+        $msg = "🔔 *PESANAN MANUAL ADMIN MASUK!*\n\n"
+             . "PESANAN *{$productName}* MASUK\n\n"
+             . "📋 *DETAIL PESANAN MANUAL:*\n"
+             . "• No. Invoice: *#{$order->invoice_number}*\n"
+             . "• Nama Produk: *{$productName}*\n"
+             . "• Username Pembeli: *{$userName}*\n"
+             . "• Kategori Pembeli: *{$buyerCategory}*\n"
+             . "• Jumlah Pesanan: *{$qty} Pesanan (Pcs)*\n"
+             . "• Jumlah Harga: *{$hargaFormatted}*\n"
+             . "• Tanggal: *{$tanggalLengkap}*\n"
+             . "• Metode Bayar: *{$metodeBayar} (LUNAS)*\n"
+             . "• WhatsApp Pembeli: *{$waPembeli}*\n"
+             . "• Email Pembeli: *{$emailPembeli}*\n\n"
+             . "📌 *KETERANGAN:*\n"
+             . "Pembeli telah diarahkan untuk screenshot bukti pembelian dan chat Admin guna meminta Form Garansi & Akun Login.\n\n"
+             . "🔗 *Proses Pesanan di Admin Panel:*\n"
+             . "{$adminOrderUrl}";
+
+        // Kirim langsung ke nomor Admin 6282317458496 sesuai instruksi
+        $targetAdminWa = '6282317458496';
+        return WebhookController::sendWaMessage($targetAdminWa, $msg);
     }
 }
