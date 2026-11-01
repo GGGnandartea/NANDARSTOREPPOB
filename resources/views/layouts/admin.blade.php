@@ -57,7 +57,7 @@
         style="display: none;"
     ></div>
 
-    <div class="flex h-screen w-full relative">
+    <div class="flex h-[100dvh] w-full relative">
         
         <!-- SIDEBAR (DRAWER ON MOBILE, EXPANDABLE ON DESKTOP) -->
         <aside 
@@ -450,14 +450,25 @@
                         <span class="whitespace-nowrap">Syarat Toko</span>
                     </span>
                 </a>
+
+                <!-- Tombol Keluar Tambahan di Dalam Scroll Menu (Khusus Mobile Android/iOS agar tidak pernah tertutup bar browser) -->
+                <div class="pt-3 pb-4 admin-mobile-only">
+                    <form action="{{ route('logout') }}" method="POST" class="w-full">
+                        @csrf
+                        <button type="submit" class="flex items-center gap-3 w-full px-3.5 py-3 text-red-500 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 rounded-xl transition-colors font-extrabold text-sm cursor-pointer">
+                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                            <span class="whitespace-nowrap">Keluar dari Admin</span>
+                        </button>
+                    </form>
+                </div>
                 
             </nav>
             
             <!-- Bottom Logout Action -->
-            <div class="p-3 border-t border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-black/20">
+            <div class="admin-sidebar-logout p-3 border-t border-gray-200 dark:border-white/5 bg-gray-50/90 dark:bg-[#0b1120] shrink-0">
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
-                    <button type="submit" class="flex items-center gap-3 w-full px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors font-bold text-sm cursor-pointer">
+                    <button type="submit" class="flex items-center gap-3 w-full px-3 py-2.5 text-red-500 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-colors font-extrabold text-sm cursor-pointer">
                         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                         <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'inline' : 'hidden'" class="whitespace-nowrap">Keluar</span>
                     </button>
@@ -466,7 +477,7 @@
         </aside>
 
         <!-- KONTEN AREA KANAN -->
-        <main class="flex-1 flex flex-col min-w-0 bg-transparent h-screen overflow-hidden">
+        <main class="flex-1 flex flex-col min-w-0 bg-transparent h-[100dvh] overflow-hidden">
             
             <!-- TOP NAVBAR -->
             <header class="h-16 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-gray-200 dark:border-white/5 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 z-10 shadow-sm">
@@ -518,6 +529,13 @@
                             <p class="text-xs font-black text-gray-800 dark:text-gray-200 leading-none">{{ $adminUserName }}</p>
                             <p class="text-[10px] font-semibold text-gray-400 mt-0.5">Administrator</p>
                         </div>
+                        <form action="{{ route('logout') }}" method="POST" class="admin-mobile-only">
+                            @csrf
+                            <button type="submit" title="Keluar" class="h-8 px-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-500 flex items-center justify-center gap-1 font-extrabold text-[11px] cursor-pointer">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                <span>Keluar</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </header>

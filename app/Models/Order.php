@@ -50,6 +50,22 @@ class Order extends Model
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * Scope hanya untuk pesanan lunas yang TIDAK dibatalkan/gagal/refund.
+     * Pesanan yang dibatalkan oleh admin/server tidak dihitung ke pendapatan/laba.
+     */
+    public function scopeValidRevenue($query)
+    {
+        $paymentCol = $this->qualifyColumn('payment_status');
+        $statusCol = $this->qualifyColumn('order_status');
+
+        return $query->whereIn($paymentCol, ['paid', 'success', 'settlement', 'lunas'])
+            ->where(function ($q) use ($statusCol) {
+                $q->whereNull($statusCol)
+                  ->orWhereNotIn($statusCol, ['canceled', 'cancelled', 'failed', 'refunded', 'expired']);
+            });
+    }
+
     public function getProviderAttribute($value)
     {
         if (!empty($value)) {

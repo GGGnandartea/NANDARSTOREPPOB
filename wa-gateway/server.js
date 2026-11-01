@@ -245,7 +245,7 @@ async function startWhatsAppBot() {
 
                 // Abaikan pesan dari bot sendiri KECUALI pesan format request verifikasi user
                 if (msg.key?.fromMe) {
-                    const isUserVerificationRequest = /ingin verifikasi nomor WhatsApp|Permintaan Kode:/i.test(text) && !/VERIFIKASI NOMOR BERHASIL|KODE OTP RESET PASSWORD/i.test(text);
+                    const isUserVerificationRequest = /ingin verifikasi nomor WhatsApp|Permintaan Kode:/i.test(text) && !/VERIFIKASI NOMOR BERHASIL|VERIFIKASI NOMOR GAGAL|VERIFIKASI GAGAL|KODE OTP RESET PASSWORD/i.test(text);
                     if (!isUserVerificationRequest) continue;
                 }
 
@@ -264,14 +264,16 @@ async function startWhatsAppBot() {
 
                 const senderJid = remoteJid;
                 const isLid = senderJid.includes('@lid');
+                const senderPn = msg.key?.senderPn || msg.key?.participantPn || msg.key?.remoteJidAlt || '';
                 let senderPhone = '';
-                const textPhoneMatch = text.match(/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i);
-                if (textPhoneMatch) {
-                    senderPhone = textPhoneMatch[1].replace(/[^0-9]/g, '');
+                if (senderPn && !senderPn.includes('@lid')) {
+                    senderPhone = formatFromJid(senderPn);
                 } else if (!isLid) {
                     senderPhone = formatFromJid(senderJid);
                 }
-                const rawSender = senderJid.split('@')[0];
+                const rawSender = (senderPn && !senderPn.includes('@lid'))
+                    ? senderPn.split('@')[0]
+                    : senderJid.split('@')[0];
 
                 console.log(`[WA-BOT] 📥 Pesan masuk dari ${senderPhone || senderJid} (${rawSender}): "${text.trim().slice(0, 120)}"`);
 
@@ -376,6 +378,8 @@ async function startWhatsAppBot() {
                         } else if (resData.status === 'already_verified') {
                             const alreadyMessage = `ℹ️ *INFORMASI*\n\nNomor WhatsApp Anda sudah berstatus terverifikasi di PremiumKita.\nJika butuh bantuan, silakan hubungi admin kami.`;
                             await sendSingleReply(alreadyMessage);
+                        } else if (resData.reply_message) {
+                            await sendSingleReply(resData.reply_message);
                         }
                     } catch (webhookErr) {
                         console.error('[WA-BOT] Gagal menghubungi Webhook Laravel:', webhookErr.message);

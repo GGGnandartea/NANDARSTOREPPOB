@@ -1543,6 +1543,8 @@ class FrontController extends Controller
 
         // Generate kode verifikasi unik baru untuk nomor baru
         $code = 'PK-' . rand(10000, 99999);
+        $digits = preg_replace('/[^0-9]/', '', $code);
+        \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
 
         // Reset status verifikasi karena nomor telah diubah
         $user->update([
@@ -1560,9 +1562,10 @@ class FrontController extends Controller
 
         $waMsg = "Halo Admin PremiumKita, saya ingin verifikasi nomor WhatsApp akun saya di PremiumKita.\n\n"
                . "*Kode Verifikasi:* {$code}\n"
+               . "*Token Validasi:* VERIF-{$digits}\n"
                . "*Nama Akun:* {$user->name}\n"
                . "*Email:* {$user->email}\n"
-               . "*Nomor WA:* {$cleanPhone}\n\n"
+               . "*Nomor Profil:* {$cleanPhone}\n\n"
                . "Mohon verifikasi nomor saya agar notifikasi otomatis aktif, terima kasih!";
 
         $waUrl = "https://wa.me/{$cleanBotNumber}?text=" . urlencode($waMsg);
@@ -1606,6 +1609,11 @@ class FrontController extends Controller
         $code = (!$phoneChanged && !empty($user->wa_verification_code) && str_starts_with((string) $user->wa_verification_code, 'PK-'))
             ? $user->wa_verification_code
             : ('PK-' . rand(10000, 99999));
+        $digits = preg_replace('/[^0-9]/', '', $code);
+
+        if ($phoneChanged) {
+            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
+        }
 
         $user->update([
             'wa_verification_code' => $code,
@@ -1619,9 +1627,10 @@ class FrontController extends Controller
 
         $waMsg = "Halo Admin PremiumKita, saya ingin verifikasi nomor WhatsApp akun saya di PremiumKita.\n\n"
                . "*Kode Verifikasi:* {$code}\n"
+               . "*Token Validasi:* VERIF-{$digits}\n"
                . "*Nama Akun:* {$user->name}\n"
                . "*Email:* {$user->email}\n"
-               . "*Nomor WA:* {$user->whatsapp}\n\n"
+               . "*Nomor Profil:* {$user->whatsapp}\n\n"
                . "Mohon verifikasi nomor saya agar notifikasi otomatis aktif, terima kasih!";
 
         $waUrl = "https://wa.me/{$cleanBotNumber}?text=" . urlencode($waMsg);
@@ -1653,17 +1662,29 @@ class FrontController extends Controller
         $user->refresh();
 
         if (!$user->is_whatsapp_verified && !empty($user->whatsapp)) {
-            $isManualCheck = $request->boolean('manual') || $user->wa_verification_code === 'PK-59609';
-            $this->tryAutoCompleteWaVerification($user, $isManualCheck);
+            $this->tryAutoCompleteWaVerification($user, false);
             $user->refresh();
         }
 
         if ($user->is_whatsapp_verified) {
+            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
             return response()->json([
                 'status'      => 'success',
                 'is_verified' => true,
                 'whatsapp'    => $user->whatsapp,
                 'message'     => 'Nomor WhatsApp Anda sudah terverifikasi!',
+            ]);
+        }
+
+        $mismatch = \Illuminate\Support\Facades\Cache::get('wa_verif_mismatch_' . $user->id);
+        if (is_array($mismatch) && !empty($mismatch['message'])) {
+            return response()->json([
+                'status'          => 'mismatch',
+                'is_verified'     => false,
+                'whatsapp'        => $user->whatsapp,
+                'sender_whatsapp' => $mismatch['sender'] ?? null,
+                'code'            => $user->wa_verification_code,
+                'message'         => $mismatch['message'],
             ]);
         }
 
@@ -1677,7 +1698,29 @@ class FrontController extends Controller
     }
 
     /**
+     * Normalisasi nomor WhatsApp ke format 08xxxxxxxxxx
+     */
+    protected function normalizeWaPhone(?string $phone): string {
+        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+        if (empty($clean) || preg_match('/^5390\d+/', $clean)) {
+            return '';
+        }
+        if (str_starts_with($clean, '0628')) {
+            $clean = '08' . substr($clean, 4);
+        } elseif (str_starts_with($clean, '628')) {
+            $clean = '08' . substr($clean, 3);
+        } elseif (str_starts_with($clean, '8')) {
+            $clean = '08' . substr($clean, 1);
+        }
+        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 15) {
+            return '';
+        }
+        return $clean;
+    }
+
+    /**
      * Sinkronisasi & Selesaikan Verifikasi WhatsApp via Bot Gateway Lokal
+     * (Wajib cocok antara nomor pengirim WhatsApp dan nomor yang tertulis di profil)
      */
     protected function tryAutoCompleteWaVerification(\App\Models\User $user, bool $allowActiveBotConfirm = false): bool {
         if ($user->is_whatsapp_verified || empty($user->whatsapp)) {
@@ -1685,56 +1728,62 @@ class FrontController extends Controller
         }
 
         $code = strtoupper(trim((string) $user->wa_verification_code));
+        if (empty($code)) {
+            return false;
+        }
+
+        $digits = preg_replace('/[^0-9]/', '', $code);
+        $codesToCheck = array_values(array_unique(array_filter([
+            $code,
+            $digits !== '' ? 'VERIF-' . $digits : null,
+            $digits !== '' ? 'PK-' . $digits : null,
+        ])));
+
         $gatewayUrl = Setting::where('key', 'wa_gateway_url')->value('value') ?: 'http://127.0.0.1:5001';
         $baseGateway = rtrim($gatewayUrl, '/');
+        $expectedPhone = $this->normalizeWaPhone($user->whatsapp);
 
-        // 1. Cek ke endpoint /api/check-code pada wa-gateway jika tersedia
-        if (!empty($code)) {
+        foreach ($codesToCheck as $checkCode) {
             try {
-                $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($code), [
-                    'phone' => $user->whatsapp,
-                ]);
+                $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($checkCode));
                 if ($checkRes->successful()) {
                     $checkData = $checkRes->json();
                     if (!empty($checkData['found'])) {
-                        $user->update([
-                            'is_whatsapp_verified' => true,
-                            'whatsapp_verified_at' => now(),
-                            'wa_verification_code' => null,
-                        ]);
-                        return true;
+                        $record = $checkData['data'] ?? [];
+                        $rawSender = (string) ($record['raw_sender'] ?? $record['sender'] ?? '');
+                        $rawSender = explode('@', $rawSender)[0];
+                        $rawSender = explode(':', $rawSender)[0];
+                        $detectedSender = $this->normalizeWaPhone($rawSender);
+
+                        if ($detectedSender !== '' && $expectedPhone !== '' && $detectedSender !== $expectedPhone) {
+                            $mismatchMsg = 'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE';
+                            \Illuminate\Support\Facades\Cache::put('wa_verif_mismatch_' . $user->id, [
+                                'sender'     => $detectedSender,
+                                'expected'   => $expectedPhone,
+                                'message'    => $mismatchMsg,
+                                'updated_at' => now()->toIso8601String(),
+                            ], 600);
+                            return false;
+                        }
+
+                        if ($detectedSender !== '' && $detectedSender === $expectedPhone) {
+                            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
+                            $user->update([
+                                'is_whatsapp_verified' => true,
+                                'whatsapp_verified_at' => now(),
+                                'wa_verification_code' => null,
+                            ]);
+                            return true;
+                        }
                     }
                 }
             } catch (\Throwable $e) {}
         }
 
-        // 2. Jika user menekan tombol Cek Status Validasi / telah mengirim pesan ke WA Bot,
-        //    kirimkan pesan konfirmasi verifikasi langsung dari Bot ke nomor WhatsApp user.
-        if ($allowActiveBotConfirm && !empty($code)) {
-            $replyMessage = "✅ *VERIFIKASI NOMOR BERHASIL*\n\n"
-                . "Halo *{$user->name}*!\n"
-                . "Nomor WhatsApp Anda (*{$user->whatsapp}*) telah berhasil divalidasi dan terverifikasi di *PremiumKita*.\n\n"
-                . "🎉 *Manfaat Akun Terverifikasi:*\n"
-                . "• Notifikasi pesanan instan ke WhatsApp\n"
-                . "• Detail akun premium (Email & Password) otomatis dikirim ke chat ini\n"
-                . "• Akses promo khusus reseller\n\n"
-                . "Terima kasih telah berbelanja di PremiumKita!";
-
-            $sent = \App\Http\Controllers\WebhookController::sendWaMessage($user->whatsapp, $replyMessage);
-
-            $user->update([
-                'is_whatsapp_verified' => true,
-                'whatsapp_verified_at' => now(),
-                'wa_verification_code' => null,
-            ]);
-
-            return true;
-        }
-
         return false;
     }
 
-    // Konfirmasi Verifikasi WhatsApp (Hanya dapat divalidasi oleh Admin atau bot)
+    // Konfirmasi Verifikasi WhatsApp (Hanya dapat divalidasi oleh Admin atau bot dengan nomor yang cocok)
     public function confirmWaVerification(Request $request) {
         $user = Auth::user();
         if (!$user) return response()->json(['status' => 'error', 'message' => 'Silakan login terlebih dahulu.'], 401);
@@ -1748,6 +1797,7 @@ class FrontController extends Controller
                 $targetUser = \App\Models\User::where('wa_verification_code', strtoupper(trim($request->code)))->first();
             }
             if ($targetUser) {
+                \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $targetUser->id);
                 $targetUser->update([
                     'is_whatsapp_verified' => true,
                     'whatsapp_verified_at' => now(),
@@ -1761,14 +1811,15 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Data pengguna atau kode verifikasi tidak ditemukan.'], 404);
         }
 
-        // Validasi otomatis untuk pengguna yang sudah mengirim kode
+        // Validasi otomatis untuk pengguna yang sudah mengirim kode dari nomor yang sesuai
         $user->refresh();
         if (!$user->is_whatsapp_verified && !empty($user->wa_verification_code) && !empty($user->whatsapp)) {
-            $this->tryAutoCompleteWaVerification($user, true);
+            $this->tryAutoCompleteWaVerification($user, false);
             $user->refresh();
         }
 
         if ($user->is_whatsapp_verified) {
+            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
             return response()->json([
                 'status' => 'success',
                 'is_verified' => true,
@@ -1776,10 +1827,21 @@ class FrontController extends Controller
             ]);
         }
 
+        $mismatch = \Illuminate\Support\Facades\Cache::get('wa_verif_mismatch_' . $user->id);
+        if (is_array($mismatch) && !empty($mismatch['message'])) {
+            return response()->json([
+                'status'          => 'mismatch',
+                'is_verified'     => false,
+                'whatsapp'        => $user->whatsapp,
+                'sender_whatsapp' => $mismatch['sender'] ?? null,
+                'message'         => $mismatch['message'],
+            ]);
+        }
+
         return response()->json([
             'status' => 'waiting',
             'is_verified' => false,
-            'message' => 'Pesan belum divalidasi oleh Admin. Pastikan Anda telah mengirimkan chat WhatsApp ke Admin.'
+            'message' => 'Pesan belum diterima dari nomor WhatsApp yang terdaftar di profil (' . $user->whatsapp . '). Pastikan Anda mengirim pesan dari nomor tersebut.'
         ]);
     }
 

@@ -7,6 +7,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [statusNotice, setStatusNotice] = useState('');
+  const [mismatchInfo, setMismatchInfo] = useState(null);
   const [verificationData, setVerificationData] = useState(initialData || null);
   const [copied, setCopied] = useState(false);
   const pollingRef = useRef(null);
@@ -27,6 +28,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
     }
     setError('');
     setStatusNotice('');
+    setMismatchInfo(null);
     setLoading(true);
     try {
       const res = await fetch('/profile/wa-verify/request', {
@@ -72,8 +74,17 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
         const data = await res.json();
         if (data.is_verified) {
           clearInterval(pollingRef.current);
+          setMismatchInfo(null);
           setStep('confirmed');
           onVerified?.();
+        } else if (data.status === 'mismatch') {
+          setMismatchInfo({
+            message:
+              data.message ||
+              'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE',
+            senderWhatsapp: data.sender_whatsapp || '',
+            expectedWhatsapp: data.whatsapp || whatsapp,
+          });
         }
       } catch {}
     }, 3000);
@@ -102,10 +113,21 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
       const data = await res.json();
       if (data.is_verified) {
         if (pollingRef.current) clearInterval(pollingRef.current);
+        setMismatchInfo(null);
         setStep('confirmed');
         onVerified?.();
+      } else if (data.status === 'mismatch') {
+        setMismatchInfo({
+          message:
+            data.message ||
+            'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE',
+          senderWhatsapp: data.sender_whatsapp || '',
+          expectedWhatsapp: data.whatsapp || whatsapp,
+        });
       } else {
-        setStatusNotice('Pesan verifikasi belum terdeteksi oleh WhatsApp Bot. Pastikan Anda sudah mengirimkan chat berisi kode unik ke nomor Bot (08990738216) dan mohon tunggu beberapa detik.');
+        setStatusNotice(
+          `Pesan verifikasi belum diterima dari nomor WhatsApp yang terdaftar (${verificationData?.whatsapp || whatsapp}). Pastikan Anda mengirim chat kode unik dari nomor tersebut ke Bot (08990738216).`
+        );
       }
     } catch {
       setError('Gagal menghubungi server.');
@@ -227,16 +249,40 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
                 </div>
               </div>
 
-              {/* Status Box Menunggu Validasi Bot */}
-              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl text-center space-y-1">
-                <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-extrabold text-xs">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                  Menunggu Pesan Terkirim ke Bot WhatsApp...
+              {/* Status Box Menunggu Validasi Bot / Peringatan Gagal Nomor Berbeda */}
+              {mismatchInfo ? (
+                <div className="p-4 bg-red-50 dark:bg-red-950/40 border-2 border-red-500/70 rounded-2xl text-center space-y-2 shadow-lg shadow-red-500/10">
+                  <div className="flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400 font-black text-xs uppercase tracking-wide">
+                    <span>❌</span>
+                    <span>Verifikasi Nomor Gagal</span>
+                  </div>
+                  <p className="text-xs font-black text-red-700 dark:text-red-300 leading-relaxed">
+                    {mismatchInfo.message}
+                  </p>
+                  {mismatchInfo.senderWhatsapp && (
+                    <div className="pt-1 text-[11px] text-red-600/90 dark:text-red-300/90 font-semibold space-y-0.5">
+                      <p>
+                        Nomor di Profil Website:{' '}
+                        <span className="font-mono font-black">{mismatchInfo.expectedWhatsapp}</span>
+                      </p>
+                      <p>
+                        Nomor Pengirim Terdeteksi:{' '}
+                        <span className="font-mono font-black">{mismatchInfo.senderWhatsapp}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-300 font-medium">
-                  Status akan otomatis terverifikasi begitu bot mendeteksi chat masuk berisi kode unik Anda.
-                </p>
-              </div>
+              ) : (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl text-center space-y-1">
+                  <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-extrabold text-xs">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                    Menunggu Pesan Terkirim ke Bot WhatsApp...
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-300 font-medium">
+                    Wajib dikirim dari nomor <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{verificationData.whatsapp || whatsapp}</span>.
+                  </p>
+                </div>
+              )}
 
               {statusNotice && (
                 <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 text-center">

@@ -440,8 +440,14 @@
                             <td>
                                 @php
                                     $pst = strtolower($o->payment_status ?? 'pending');
+                                    $ost = strtolower($o->order_status ?? 'pending');
+                                    $isOrderCancelled = in_array($ost, ['canceled', 'cancelled', 'failed', 'refunded', 'expired']);
                                 @endphp
-                                @if(in_array($pst, ['paid', 'success', 'settlement']))
+                                @if($isOrderCancelled && in_array($pst, ['paid', 'success', 'settlement']))
+                                    <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
+                                        ↺ Di-Refund (Batal)
+                                    </span>
+                                @elseif(in_array($pst, ['paid', 'success', 'settlement']))
                                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/50">
                                         ✓ Lunas
                                     </span>
@@ -458,9 +464,6 @@
 
                             <!-- Kolom Status Pesanan -->
                             <td>
-                                @php
-                                    $ost = strtolower($o->order_status ?? 'pending');
-                                @endphp
                                 @if($ost === 'completed')
                                     <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/30">
                                         Selesai
@@ -468,6 +471,10 @@
                                 @elseif($ost === 'processing')
                                     <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/30">
                                         Diproses
+                                    </span>
+                                @elseif(in_array($ost, ['canceled', 'cancelled', 'failed', 'refunded', 'expired']))
+                                    <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/30">
+                                        Dibatalkan oleh Server
                                     </span>
                                 @else
                                     <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">

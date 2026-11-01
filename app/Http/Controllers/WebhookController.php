@@ -352,25 +352,74 @@ class WebhookController extends Controller
     }
 
     /**
-     * Ekstrak nomor WhatsApp valid dari sender atau isi pesan
+     * Normalisasi nomor WhatsApp Indonesia ke format standar 08xxxxxxxxxx
      */
-    protected function extractValidPhone(?string $sender, ?string $message): string
+    protected function normalizeIndoPhone(?string $phone): string
     {
-        if (!empty($message) && preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $m)) {
-            $clean = preg_replace('/[^0-9]/', '', $m[1]);
-            if (str_starts_with($clean, '628')) {
-                $clean = '08' . substr($clean, 3);
-            } elseif (str_starts_with($clean, '8')) {
-                $clean = '08' . substr($clean, 1);
-            }
-            if (strlen($clean) >= 9 && strlen($clean) <= 15) {
-                return $clean;
+        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+        if (empty($clean) || preg_match('/^5390\d+/', $clean)) {
+            return '';
+        }
+        if (str_starts_with($clean, '0628')) {
+            $clean = '08' . substr($clean, 4);
+        } elseif (str_starts_with($clean, '628')) {
+            $clean = '08' . substr($clean, 3);
+        } elseif (str_starts_with($clean, '8')) {
+            $clean = '08' . substr($clean, 1);
+        }
+        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 15) {
+            return '';
+        }
+        return $clean;
+    }
+
+    /**
+     * Ekstrak nomor WhatsApp pengirim asli dari JID (raw_sender / sender),
+     * TANPA membaca teks pesan agar tidak bisa dimanipulasi oleh teks template.
+     */
+    protected function extractActualSenderPhone(Request $request): string
+    {
+        $rawSender = (string) ($request->input('raw_sender') ?? '');
+        if (str_contains($rawSender, '@lid')) {
+            $rawSender = '';
+        } else {
+            $rawSender = explode('@', $rawSender)[0];
+            $rawSender = explode(':', $rawSender)[0];
+        }
+
+        $normalizedRaw = $this->normalizeIndoPhone($rawSender);
+        if ($normalizedRaw !== '') {
+            return $normalizedRaw;
+        }
+
+        $sender = (string) ($request->input('sender') ?? '');
+        if (!str_contains($sender, '@lid')) {
+            $sender = explode('@', $sender)[0];
+            $sender = explode(':', $sender)[0];
+            $normalizedSender = $this->normalizeIndoPhone($sender);
+            if ($normalizedSender !== '') {
+                return $normalizedSender;
             }
         }
 
-        $cleanSender = preg_replace('/[^0-9]/', '', (string) $sender);
-        if (!empty($cleanSender) && !preg_match('/^5390\d+/', $cleanSender) && strlen($cleanSender) >= 9 && strlen($cleanSender) <= 15) {
-            return $cleanSender;
+        return '';
+    }
+
+    /**
+     * Ekstrak nomor WhatsApp valid dari sender atau isi pesan (khusus fallback non-verifikasi)
+     */
+    protected function extractValidPhone(?string $sender, ?string $message): string
+    {
+        $normalizedSender = $this->normalizeIndoPhone($sender);
+        if ($normalizedSender !== '') {
+            return $normalizedSender;
+        }
+
+        if (!empty($message) && preg_match('/\*?Nomor (?:WA|Profil|Terdaftar)\*?:\*?\s*([0-9+]+)/i', $message, $m)) {
+            $normalizedText = $this->normalizeIndoPhone($m[1]);
+            if ($normalizedText !== '') {
+                return $normalizedText;
+            }
         }
 
         return '';
@@ -506,61 +555,87 @@ class WebhookController extends Controller
             }
 
             // 2. CEK VERIFIKASI AKUN WHATSAPP
-            $user = \App\Models\User::where('wa_verification_code', $code)->first();
+            $digits = preg_replace('/[^0-9]/', '', $code);
+            $candidateCodes = array_values(array_unique(array_filter([
+                $code,
+                $digits !== '' ? 'PK-' . $digits : null,
+                $digits !== '' ? 'VERIF-' . $digits : null,
+                $digits !== '' ? 'NS-' . $digits : null,
+            ])));
 
-            // Fallback A: Cari berdasarkan Email yang tertulis di pesan ("Email: xxx@gmail.com")
+            $user = \App\Models\User::whereIn('wa_verification_code', $candidateCodes)->first();
+
+            // Fallback A: Cari berdasarkan Email yang tertulis di pesan ("Email: xxx@gmail.com") jika masih punya kode aktif
             if (!$user && !empty($message) && preg_match('/\*?Email\*?:\*?\s*([^\s\r\n*]+)/i', $message, $emailMatch)) {
                 $extractedEmail = trim($emailMatch[1]);
                 if (!empty($extractedEmail)) {
-                    $user = \App\Models\User::where('email', $extractedEmail)->first();
+                    $user = \App\Models\User::where('email', $extractedEmail)
+                        ->whereNotNull('wa_verification_code')
+                        ->first();
                 }
             }
 
-            // Fallback B: Cari berdasarkan Nomor WA yang tertulis di pesan ("Nomor WA: 08xxx")
-            if (!$user && !empty($message) && preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $waMatch)) {
-                $cleanWa = preg_replace('/[^0-9]/', '', $waMatch[1]);
-                if (str_starts_with($cleanWa, '628')) {
-                    $cleanWa = '08' . substr($cleanWa, 3);
-                } elseif (str_starts_with($cleanWa, '8')) {
-                    $cleanWa = '08' . substr($cleanWa, 1);
-                }
+            // Fallback B: Cari berdasarkan Nomor WA/Profil yang tertulis di pesan jika masih punya kode aktif
+            if (!$user && !empty($message) && preg_match('/\*?Nomor (?:WA|Profil|Terdaftar)\*?:\*?\s*([0-9+]+)/i', $message, $waMatch)) {
+                $cleanWa = $this->normalizeIndoPhone($waMatch[1]);
                 if (!empty($cleanWa)) {
-                    $user = \App\Models\User::where('whatsapp', $cleanWa)->first();
+                    $user = \App\Models\User::where('whatsapp', $cleanWa)
+                        ->whereNotNull('wa_verification_code')
+                        ->first();
                 }
-            }
-
-            // Fallback C: Cari berdasarkan nomor pengirim (sender JID)
-            if (!$user && !empty($sender)) {
-                $cleanSender = preg_replace('/[^0-9]/', '', $sender);
-                $altSender = str_starts_with($cleanSender, '62') ? '0' . substr($cleanSender, 2) : ('62' . substr($cleanSender, 1));
-                $user = \App\Models\User::where(function($q) use ($cleanSender, $altSender) {
-                    $q->where('whatsapp', 'like', "%{$cleanSender}%")
-                      ->orWhere('whatsapp', 'like', "%{$altSender}%");
-                })->whereNotNull('wa_verification_code')->first();
             }
 
             if ($user) {
-                // Jangan timpa nomor yang sudah diinput oleh user jika nomornya valid!
-                $finalWhatsapp = $user->whatsapp;
+                $actualSenderPhone = $this->extractActualSenderPhone($request);
+                $expectedPhone = $this->normalizeIndoPhone($user->whatsapp);
 
-                // Jika nomor di akun user kosong atau berisi LID aneh (seperti diawali 5390 atau lebih dari 14 digit)
-                $isInvalidLid = empty($finalWhatsapp) || preg_match('/^5390\d+/', $finalWhatsapp) || strlen($finalWhatsapp) > 15;
+                // Validasi Ketat: Nomor pengirim WhatsApp WAJIB sama dengan nomor yang tertulis di profil website!
+                if ($actualSenderPhone !== '' && $expectedPhone !== '' && $actualSenderPhone !== $expectedPhone) {
+                    $mismatchMsg = 'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE';
 
-                if ($isInvalidLid) {
-                    if (!empty($fallbackSenderPhone)) {
-                        $finalWhatsapp = $fallbackSenderPhone;
-                    }
+                    \Illuminate\Support\Facades\Cache::put('wa_verif_mismatch_' . $user->id, [
+                        'sender'     => $actualSenderPhone,
+                        'expected'   => $expectedPhone,
+                        'message'    => $mismatchMsg,
+                        'updated_at' => now()->toIso8601String(),
+                    ], 600);
+
+                    \Log::warning("[WA-VERIF-MISMATCH] User ID {$user->id} ({$user->name}) gagal verifikasi: profil={$expectedPhone}, pengirim={$actualSenderPhone}");
+
+                    $failedReplyMsg = "❌ *VERIFIKASI NOMOR GAGAL*\n\n"
+                                    . "Halo *{$user->name}*!\n"
+                                    . "*{$mismatchMsg}*\n\n"
+                                    . "⚠️ *Detail Pengecekan Sistem:*\n"
+                                    . "• Nomor Terdaftar di Website: *{$expectedPhone}*\n"
+                                    . "• Nomor Pengirim Saat Ini: *{$actualSenderPhone}*\n\n"
+                                    . "📌 *Cara Mengatasi:*\n"
+                                    . "• Silakan kirim pesan verifikasi menggunakan WhatsApp dengan nomor *{$expectedPhone}*\n"
+                                    . "• Atau ganti nomor WhatsApp di profil website *PremiumKita* menjadi *{$actualSenderPhone}*\n\n"
+                                    . "Terima kasih telah berbelanja di *PremiumKita*!";
+
+                    return $this->sendAndRespondWaIncoming($request, $code, $actualSenderPhone, $failedReplyMsg, 'verification_failed_mismatch', [
+                        'message'       => $mismatchMsg,
+                        'user_id'       => $user->id,
+                        'user_name'     => $user->name,
+                        'whatsapp'      => $expectedPhone,
+                        'sender_phone'  => $actualSenderPhone,
+                        'reply_message' => $failedReplyMsg,
+                    ]);
                 }
+
+                \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
+
+                $finalWhatsapp = $expectedPhone ?: ($actualSenderPhone ?: $user->whatsapp);
 
                 $user->update([
                     'is_whatsapp_verified' => true,
                     'whatsapp_verified_at' => now(),
                     'wa_verification_code' => null,
-                    'whatsapp'             => $finalWhatsapp ?: $user->whatsapp,
+                    'whatsapp'             => $finalWhatsapp,
                 ]);
 
-                $confirmedPhone = $user->whatsapp ?: $fallbackSenderPhone;
-                $verifiedMsg = "✅ *VERIFIKASI NOMOR BERHASIL - PREMIUMKITA*\n\n"
+                $confirmedPhone = $finalWhatsapp ?: $fallbackSenderPhone;
+                $verifiedMsg = "✅ *VERIFIKASI NOMOR BERHASIL*\n\n"
                              . "Halo *{$user->name}*!\n"
                              . "Nomor WhatsApp Anda (*{$confirmedPhone}*) telah berhasil divalidasi dan terverifikasi di *PremiumKita*.\n\n"
                              . "🎉 *Manfaat Akun Terverifikasi:*\n"

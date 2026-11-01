@@ -229,8 +229,14 @@
                                     <td>
                                         @php
                                             $st = strtolower($order->payment_status ?? 'pending');
+                                            $ost = strtolower($order->order_status ?? 'pending');
+                                            $isCancelled = in_array($ost, ['canceled', 'cancelled', 'failed', 'refunded', 'expired']);
                                         @endphp
-                                        @if(in_array($st, ['paid', 'success', 'settlement']))
+                                        @if($isCancelled)
+                                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
+                                                Dibatalkan
+                                            </span>
+                                        @elseif(in_array($st, ['paid', 'success', 'settlement']))
                                             <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/50">
                                                 Sukses
                                             </span>
@@ -265,8 +271,14 @@
                             <div class="shrink-0 text-right">
                                 @php
                                     $st = strtolower($order->payment_status ?? 'pending');
+                                    $ost = strtolower($order->order_status ?? 'pending');
+                                    $isCancelled = in_array($ost, ['canceled', 'cancelled', 'failed', 'refunded', 'expired']);
                                 @endphp
-                                @if(in_array($st, ['paid', 'success', 'settlement']))
+                                @if($isCancelled)
+                                    <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-300 dark:border-rose-800/50">
+                                        Dibatalkan
+                                    </span>
+                                @elseif(in_array($st, ['paid', 'success', 'settlement']))
                                     <span class="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/50">
                                         Sukses
                                     </span>

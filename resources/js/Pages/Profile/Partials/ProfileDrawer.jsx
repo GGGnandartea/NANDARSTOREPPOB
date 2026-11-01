@@ -51,7 +51,7 @@ export default function ProfileDrawer({ open, onClose, children }) {
         role="dialog"
         aria-modal={open ? 'true' : undefined}
         aria-labelledby="profile-mobile-menu-title"
-        className="profile-drawer-panel relative w-72 max-w-[85vw] h-full bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto overscroll-contain"
+        className="profile-drawer-panel relative w-72 max-w-[85vw] h-[100dvh] max-h-[100dvh] pb-12 bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto overscroll-contain"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
           <span id="profile-mobile-menu-title" className="font-black text-gray-900 dark:text-white">Menu</span>

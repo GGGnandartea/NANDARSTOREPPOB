@@ -28,8 +28,9 @@ class AdminController extends Controller
 {
     public function dashboard() {
         \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
+        \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders();
 
-        $totalRevenue = Order::whereIn('payment_status', ['paid', 'success', 'settlement'])->sum('total_amount');
+        $totalRevenue = Order::validRevenue()->sum('total_amount');
         $newOrders = Order::where('payment_status', 'pending')->orWhereDate('created_at', today())->count();
         $totalResellers = User::where('role', 'reseller')->count();
         $pendingWaCount = User::whereNotNull('wa_verification_code')->where('is_whatsapp_verified', false)->count();
@@ -44,12 +45,12 @@ class AdminController extends Controller
             $dayLabel = $date->translatedFormat('D'); // Sen, Sel, Rab, etc.
             $days[] = $dayLabel;
 
-            $apiDaily[] = (int) Order::whereIn('payment_status', ['paid', 'success', 'settlement'])
+            $apiDaily[] = (int) Order::validRevenue()
                 ->where('product_type', 'api')
                 ->whereDate('created_at', $date->toDateString())
                 ->sum('total_amount');
 
-            $localDaily[] = (int) Order::whereIn('payment_status', ['paid', 'success', 'settlement'])
+            $localDaily[] = (int) Order::validRevenue()
                 ->where('product_type', 'local')
                 ->whereDate('created_at', $date->toDateString())
                 ->sum('total_amount');
@@ -2241,6 +2242,7 @@ class AdminController extends Controller
         }
 
         // Query dasar berdasar rentang tanggal
+        \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders();
         $ordersQuery = Order::whereBetween('created_at', [$startDate, $endDate]);
 
         // Ringkasan Statistik & Analisis Laba Bersih
@@ -2249,8 +2251,8 @@ class AdminController extends Controller
         $kiosbankMarkupType = Setting::where('key', 'kiosbank_markup_type')->value('value') ?: 'fixed';
         $kiosbankMarkupVal = (int) (Setting::where('key', 'kiosbank_markup_value')->value('value') ?: 1000);
 
-        // Ambil data pesanan lunas untuk kalkulasi Omset, Modal, dan Keuntungan Bersih
-        $paidOrders = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->with('product')->get();
+        // Ambil data pesanan lunas (tidak termasuk pesanan yang dibatalkan/refund) untuk kalkulasi Omset, Modal, dan Keuntungan Bersih
+        $paidOrders = (clone $ordersQuery)->validRevenue()->with('product')->get();
 
         $totalRevenue = 0;
         $totalCost = 0;
@@ -2286,22 +2288,25 @@ class AdminController extends Controller
 
         $successOrdersCount = $paidOrders->count();
         $pendingOrdersCount = (clone $ordersQuery)->where('payment_status', 'pending')->count();
-        $failedOrdersCount = (clone $ordersQuery)->whereIn('payment_status', ['failed', 'canceled', 'expired'])->count();
+        $failedOrdersCount = (clone $ordersQuery)->where(function ($q) {
+            $q->whereIn('payment_status', ['failed', 'canceled', 'cancelled', 'expired'])
+              ->orWhereIn('order_status', ['failed', 'canceled', 'cancelled', 'refunded', 'expired']);
+        })->count();
         $totalOrdersCount = (clone $ordersQuery)->count();
 
         $avgOrderValue = $successOrdersCount > 0 ? round($totalRevenue / $successOrdersCount) : 0;
         $successRate = $totalOrdersCount > 0 ? round(($successOrdersCount / $totalOrdersCount) * 100, 1) : 0;
 
-        // Distribusi Tipe Produk (API vs Local vs PPOB)
-        $apiRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'api')->sum('total_amount');
-        $localRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'local')->sum('total_amount');
-        $ppobRevenue = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'ppob')->sum('total_amount');
-        $apiCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'api')->count();
-        $localCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'local')->count();
-        $ppobCount = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)->where('product_type', 'ppob')->count();
+        // Distribusi Tipe Produk (API vs Local vs PPOB) - hanya pesanan sukses & tidak dibatalkan
+        $apiRevenue = (clone $ordersQuery)->validRevenue()->where('product_type', 'api')->sum('total_amount');
+        $localRevenue = (clone $ordersQuery)->validRevenue()->where('product_type', 'local')->sum('total_amount');
+        $ppobRevenue = (clone $ordersQuery)->validRevenue()->where('product_type', 'ppob')->sum('total_amount');
+        $apiCount = (clone $ordersQuery)->validRevenue()->where('product_type', 'api')->count();
+        $localCount = (clone $ordersQuery)->validRevenue()->where('product_type', 'local')->count();
+        $ppobCount = (clone $ordersQuery)->validRevenue()->where('product_type', 'ppob')->count();
 
-        // Top 5 Produk Terlaris
-        $topProducts = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
+        // Top 5 Produk Terlaris (tidak termasuk pesanan dibatalkan)
+        $topProducts = (clone $ordersQuery)->validRevenue()
             ->select('product_name', DB::raw('count(*) as sales_count'), DB::raw('sum(total_amount) as total_nominal'))
             ->groupBy('product_name')
             ->orderBy('sales_count', 'desc')
@@ -2321,7 +2326,7 @@ class AdminController extends Controller
                 $dayStr = $periodCursor->toDateString();
                 $chartLabels[] = $periodCursor->translatedFormat('d M');
 
-                $dayOrders = (clone $ordersQuery)->whereIn('payment_status', $paidStatuses)
+                $dayOrders = (clone $ordersQuery)->validRevenue()
                     ->whereDate('created_at', $dayStr)
                     ->with('product')
                     ->get();
@@ -2363,7 +2368,7 @@ class AdminController extends Controller
             while ($periodCursor->lte($endDate)) {
                 $chartLabels[] = $periodCursor->translatedFormat('M Y');
 
-                $monthOrders = Order::whereIn('payment_status', $paidStatuses)
+                $monthOrders = Order::validRevenue()
                     ->whereYear('created_at', $periodCursor->year)
                     ->whereMonth('created_at', $periodCursor->month)
                     ->with('product')
@@ -2415,7 +2420,7 @@ class AdminController extends Controller
             $mLabel = $mCarbon->translatedFormat('F Y');
             $mShortLabel = $mCarbon->translatedFormat('M Y');
 
-            $mOrders = Order::whereIn('payment_status', $paidStatuses)
+            $mOrders = Order::validRevenue()
                 ->whereYear('created_at', $mYear)
                 ->whereMonth('created_at', $mMonth)
                 ->with('product')
@@ -2594,7 +2599,11 @@ class AdminController extends Controller
             fputcsv($handle, ['Tanggal Unduh', now()->translatedFormat('d F Y, H:i:s') . ' WIB'], ';');
             fputcsv($handle, ['Total Pesanan', count($orders)], ';');
             
-            $totalNominal = $orders->whereIn('payment_status', ['paid', 'success', 'settlement'])->sum('total_amount');
+            $totalNominal = $orders->filter(function ($o) {
+                $isPaid = in_array(strtolower((string) $o->payment_status), ['paid', 'success', 'settlement', 'lunas'], true);
+                $isCancelled = in_array(strtolower((string) $o->order_status), ['canceled', 'cancelled', 'failed', 'refunded', 'expired'], true);
+                return $isPaid && !$isCancelled;
+            })->sum('total_amount');
             fputcsv($handle, ['Total Omset Lunas (Rp)', number_format($totalNominal, 0, ',', '.')], ';');
             fputcsv($handle, [], ';'); // Baris Kosong
 

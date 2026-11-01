@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { Icon } from './ProfileIcons';
 
 export default function ProfileNavbar({
@@ -26,7 +26,7 @@ export default function ProfileNavbar({
             <span className="font-black text-gray-900 dark:text-white hidden sm:block">Premium<span className="text-orange-500">Kita</span></span>
           </Link>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button 
             onClick={toggleDark} 
             className="min-h-11 min-w-11 flex items-center justify-center p-2 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white transition cursor-pointer"
@@ -41,9 +41,16 @@ export default function ProfileNavbar({
           <Link href="/" className="min-h-11 flex items-center justify-center gap-1.5 rounded-xl px-2 sm:px-3 bg-orange-500/10 text-xs font-bold text-gray-500 hover:text-orange-500 dark:text-gray-300 dark:hover:text-orange-400 transition">
             <Icon.Home className="w-4 h-4" /><span>Kembali ke Beranda</span>
           </Link>
+          <button
+            type="button"
+            onClick={() => router.post('/logout')}
+            className="md:hidden min-h-11 flex items-center justify-center gap-1 rounded-xl px-2.5 bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-500 hover:bg-red-500/20 transition cursor-pointer"
+            title="Keluar dari Akun"
+          >
+            <Icon.Logout className="w-4 h-4" /><span>Keluar</span>
+          </button>
         </div>
       </div>
     </nav>
   );
 }
-
