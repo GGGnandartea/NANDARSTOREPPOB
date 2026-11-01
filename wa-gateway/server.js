@@ -273,8 +273,8 @@ async function startWhatsAppBot() {
 
                 console.log(`[WA-BOT] 📥 Pesan masuk dari ${senderPhone || senderJid} (${rawSender}): "${text.trim().slice(0, 120)}"`);
 
-                // Deteksi Kode Verifikasi PK-XXXXX, NS-XXXXX, VERIF-XXXXX, OTP-XXXXX, atau RESET-XXXXX
-                const match = text.match(/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i);
+                // Deteksi Kode Verifikasi PK-XXXXX, NS-XXXXX, VERIF-XXXXX, OTP-XXXXX, RESET-XXXXX, atau PKR-XXXXX
+                const match = text.match(/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+|PKR-[A-Z0-9]+)/i);
                 if (match) {
                     const code = match[1].toUpperCase();
                     console.log(`[WA-BOT] 🔍 Terdeteksi kode: ${code} dari ${senderPhone || senderJid}`);
@@ -333,7 +333,9 @@ async function startWhatsAppBot() {
                             return delivered;
                         };
 
-                        if (resData.status === 'send_otp') {
+                        if (resData.status === 'handled_by_laravel') {
+                            console.log(`[WA-BOT] ✅ Balasan untuk kode ${code} telah dikirim langsung oleh Laravel (PremiumKita).`);
+                        } else if (resData.status === 'send_otp') {
                             const userName = resData.user_name || 'Pelanggan';
                             const otpCode = resData.otp_code;
                             const replyMessage = `🔐 *KODE OTP RESET PASSWORD PREMIUMKITA*\n\n` +

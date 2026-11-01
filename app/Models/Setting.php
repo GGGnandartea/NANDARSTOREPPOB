@@ -10,11 +10,17 @@ class Setting extends Model
 
     public function getValueAttribute($value)
     {
-        if (is_string($value) && stripos($value, 'nandarstore') !== false) {
-            return str_ireplace(['NANDARSTORE', 'NandarStore', 'nandarstore'], ['PREMIUMKITA', 'PremiumKita', 'premiumkita'], $value);
-        }
-        if (($this->attributes['key'] ?? null) === 'store_name' && is_string($value) && stripos($value, 'nandar') !== false) {
-            return 'PremiumKita';
+        if (is_string($value) && stripos($value, 'nandar') !== false) {
+            $replaced = str_replace(
+                ['NANDARSTORE 2.0', 'NandarStore 2.0', 'NANDARSTORE', 'NandarStore', 'nandarstore', 'NANDAR STORE', 'Nandar Store'],
+                ['PREMIUMKITA', 'PremiumKita', 'PREMIUMKITA', 'PremiumKita', 'premiumkita', 'PREMIUMKITA', 'PremiumKita'],
+                $value
+            );
+            return str_ireplace(
+                ['nandarstore 2.0', 'nandarstore', 'nandar store'],
+                ['PremiumKita', 'PremiumKita', 'PremiumKita'],
+                $replaced
+            );
         }
         return $value;
     }

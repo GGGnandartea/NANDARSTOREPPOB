@@ -1,13 +1,13 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Upload Otomatis ke GitHub - NANDARSTORE
+title Upload Otomatis ke GitHub - PREMIUMKITA
 color 0A
 
 rem Pastikan folder Git masuk ke PATH sesi ini
 set "PATH=%PATH%;C:\Program Files\Git\cmd;C:\Program Files\Git\bin;C:\Users\%USERNAME%\AppData\Local\Programs\Git\cmd"
 
 echo ========================================================
-echo       NANDARSTORE2.0 - UPLOAD OTOMATIS KE GITHUB
+echo       PREMIUMKITA 2.0 - UPLOAD OTOMATIS KE GITHUB
 echo ========================================================
 echo.
 echo Memeriksa sistem Git...
@@ -41,7 +41,7 @@ git add .
 
 echo.
 set /p commit_msg="Masukkan catatan update (tekan Enter untuk default): "
-if "%commit_msg%"=="" set commit_msg=Update toko online NandarStore: %date% %time%
+if "%commit_msg%"=="" set commit_msg=Update toko online PremiumKita: %date% %time%
 
 echo.
 echo [2/3] Menyimpan perubahan (commit)...

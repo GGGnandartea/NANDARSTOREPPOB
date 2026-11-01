@@ -504,12 +504,18 @@
                     </a>
                     
                     <!-- User Avatar -->
+                    @php
+                        $adminUserName = Auth::user()->name ?? 'Admin PremiumKita';
+                        if (stripos($adminUserName, 'nandar') !== false) {
+                            $adminUserName = 'Admin PremiumKita';
+                        }
+                    @endphp
                     <div class="flex items-center gap-2 pl-1.5 sm:pl-2 border-l border-gray-200 dark:border-white/10">
                         <div class="h-8 w-8 sm:h-9 sm:w-9 rounded-xl gradient-orange text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-md shadow-orange-500/20 cursor-pointer">
-                            {{ strtoupper(substr(Auth::user()->name ?? 'A', 0, 1)) }}
+                            {{ strtoupper(substr($adminUserName, 0, 1)) }}
                         </div>
                         <div class="hidden xl:block">
-                            <p class="text-xs font-black text-gray-800 dark:text-gray-200 leading-none">{{ Auth::user()->name ?? 'Admin' }}</p>
+                            <p class="text-xs font-black text-gray-800 dark:text-gray-200 leading-none">{{ $adminUserName }}</p>
                             <p class="text-[10px] font-semibold text-gray-400 mt-0.5">Administrator</p>
                         </div>
                     </div>

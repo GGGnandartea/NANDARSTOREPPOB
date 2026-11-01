@@ -415,7 +415,7 @@ class AuthController extends Controller
         ]);
 
         $botPhone = '08990738216';
-        $botWaUrl = 'https://wa.me/628990738216?text=' . urlencode("Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya. Kode Verifikasi: {$triggerCode}");
+        $botWaUrl = 'https://wa.me/628990738216?text=' . urlencode("Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya.\n\n*Kode Verifikasi:* {$triggerCode}\n*Nomor WA:* {$cleanPhone}");
 
         if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
             return response()->json([

@@ -855,7 +855,7 @@
                 $buyerDisplayName = $order->buyer_name ?: ($order->user ? $order->user->name : 'Pembeli Publik');
                 $manualClaimWaText = urlencode(
                     "Halo Admin {$storeName}, saya sudah menyelesaikan pembayaran untuk produk Manual Admin.\n\n"
-                    . "📋 *BUKTI PESANAN SAYA:*\n"
+                    . "*BUKTI PESANAN SAYA:*\n"
                     . "• No. Invoice: #{$order->invoice_number}\n"
                     . "• Nama Produk: {$order->product_name}\n"
                     . "• Jumlah Pesanan: {$qty} Pcs\n"

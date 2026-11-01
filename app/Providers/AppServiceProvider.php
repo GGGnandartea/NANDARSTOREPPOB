@@ -101,6 +101,40 @@ class AppServiceProvider extends ServiceProvider
         Route::pattern('orderId', '[A-Za-z0-9\-_]+');
         Route::pattern('api_id', '[0-9]+');
 
+        // Sinkronisasi otomatis nama brand ke PremiumKita di database (1x per 24 jam via cache)
+        try {
+            \Illuminate\Support\Facades\Cache::remember('pk_rebrand_sync_v3', 86400, function () {
+                if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+                    $rows = \Illuminate\Support\Facades\DB::table('settings')
+                        ->where('value', 'like', '%nandar%')
+                        ->where('key', 'not like', 'kiosbank_%')
+                        ->get();
+                    foreach ($rows as $row) {
+                        $cleaned = str_ireplace(
+                            ['NANDARSTORE 2.0', 'NandarStore 2.0', 'NANDARSTORE', 'NandarStore', 'nandarstore', 'NANDAR STORE', 'Nandar Store'],
+                            ['PREMIUMKITA', 'PremiumKita', 'PREMIUMKITA', 'PremiumKita', 'premiumkita', 'PREMIUMKITA', 'PremiumKita'],
+                            (string) $row->value
+                        );
+                        if ($row->key === 'store_name' && stripos($cleaned, 'nandar') !== false) {
+                            $cleaned = 'PremiumKita';
+                        }
+                        \Illuminate\Support\Facades\DB::table('settings')
+                            ->where('id', $row->id)
+                            ->update(['value' => $cleaned]);
+                    }
+                }
+                if (\Illuminate\Support\Facades\Schema::hasTable('users')) {
+                    \Illuminate\Support\Facades\DB::table('users')
+                        ->where('role', 'admin')
+                        ->where('name', 'like', '%nandar%')
+                        ->update(['name' => 'Admin PremiumKita']);
+                }
+                return true;
+            });
+        } catch (\Throwable $e) {
+            // Abaikan jika database belum siap saat CLI
+        }
+
         // Helper resolusi IP asli pengunjung di balik Cloudflare / Nginx Reverse Proxy
         $resolveClientIp = static function (Request $req): string {
             $cfIp = trim((string) $req->header('CF-Connecting-IP', ''));

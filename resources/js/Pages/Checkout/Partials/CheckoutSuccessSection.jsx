@@ -67,7 +67,7 @@ export default function CheckoutSuccessSection({
   const adminWaNumber = '6282317458496';
   const waClaimMessage = encodeURIComponent(
     `Halo Admin PremiumKita, saya sudah menyelesaikan pembayaran untuk produk Manual Admin.\n\n` +
-      `📋 *BUKTI PESANAN SAYA:*\n` +
+      `*BUKTI PESANAN SAYA:*\n` +
       `• No. Invoice: #${currentOrderId}\n` +
       `• Nama Produk: ${productName}\n` +
       `• Jumlah Pesanan: ${displayQty} Pcs\n` +

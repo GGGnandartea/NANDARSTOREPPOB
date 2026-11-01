@@ -386,7 +386,7 @@ export default function ForgotPassword({ botNumber = '08990738216' }) {
 
                                     {/* Tombol Kirim Chat ke Bot */}
                                     <a 
-                                        href={botWaUrl || `https://wa.me/628990738216?text=${encodeURIComponent(`Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya. Kode Verifikasi: ${triggerCode}`)}`}
+                                        href={botWaUrl || `https://wa.me/628990738216?text=${encodeURIComponent(`Halo Bot PremiumKita, saya meminta kode OTP reset password akun saya.\n\n*Kode Verifikasi:* ${triggerCode}\n*Nomor WA:* ${savedWhatsapp}`)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/25 transition cursor-pointer"

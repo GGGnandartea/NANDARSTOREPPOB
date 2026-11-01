@@ -351,6 +351,67 @@ class WebhookController extends Controller
         return response()->json(['status' => true, 'message' => 'Webhook received'], 200);
     }
 
+    /**
+     * Ekstrak nomor WhatsApp valid dari sender atau isi pesan
+     */
+    protected function extractValidPhone(?string $sender, ?string $message): string
+    {
+        if (!empty($message) && preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $m)) {
+            $clean = preg_replace('/[^0-9]/', '', $m[1]);
+            if (str_starts_with($clean, '628')) {
+                $clean = '08' . substr($clean, 3);
+            } elseif (str_starts_with($clean, '8')) {
+                $clean = '08' . substr($clean, 1);
+            }
+            if (strlen($clean) >= 9 && strlen($clean) <= 15) {
+                return $clean;
+            }
+        }
+
+        $cleanSender = preg_replace('/[^0-9]/', '', (string) $sender);
+        if (!empty($cleanSender) && !preg_match('/^5390\d+/', $cleanSender) && strlen($cleanSender) >= 9 && strlen($cleanSender) <= 15) {
+            return $cleanSender;
+        }
+
+        return '';
+    }
+
+    /**
+     * Kirim balasan WA langsung dari Laravel (dengan deduplikasi) dan kembalikan response
+     * yang menghentikan wa-gateway lama di RAM agar tidak mengirim pesan "NANDARSTORE".
+     */
+    protected function sendAndRespondWaIncoming(Request $request, string $code, ?string $targetPhone, string $replyMessage, string $fallbackStatus, array $extra = [])
+    {
+        $sent = false;
+        $cleanTarget = preg_replace('/[^0-9]/', '', (string) $targetPhone);
+
+        if (!empty($cleanTarget) && !empty($replyMessage)) {
+            $dedupKey = 'wa_incoming_reply_' . md5(strtoupper($code) . '_' . $cleanTarget . '_' . $fallbackStatus);
+            if (\Illuminate\Support\Facades\Cache::add($dedupKey, true, 6)) {
+                $sent = self::sendWaMessage($cleanTarget, $replyMessage);
+            } else {
+                $sent = true;
+            }
+        }
+
+        if ($sent) {
+            $ua = (string) $request->userAgent();
+            // Jika dipanggil oleh wa-gateway versi lama di memori (tanpa User-Agent PremiumKita-WA-Gateway),
+            // kembalikan plain-text non-JSON agar blok if/else "NANDARSTORE" di server.js lama langsung di-skip.
+            if (!str_contains($ua, 'PremiumKita-WA-Gateway') && !$request->boolean('force_json')) {
+                return response('HANDLED_BY_LARAVEL', 200)->header('Content-Type', 'text/plain');
+            }
+
+            return response()->json(array_merge([
+                'status' => 'handled_by_laravel',
+            ], $extra));
+        }
+
+        return response()->json(array_merge([
+            'status' => $fallbackStatus,
+        ], $extra));
+    }
+
     // Webhook Pesan Masuk WA (Bot / Gateway otomatis memverifikasi saat user kirim kode unik)
     public function handleWaIncoming(Request $request) {
         $message = $request->input('message') ?? $request->input('body') ?? $request->input('text') ?? '';
@@ -358,11 +419,11 @@ class WebhookController extends Controller
         $sender = $request->input('sender') ?? $request->input('raw_sender') ?? '';
 
         if (empty($code) && !empty($message)) {
-            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $message, $matches)) {
+            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+|PKR-[A-Z0-9]+)/i', $message, $matches)) {
                 $code = strtoupper($matches[1]);
             }
         } else {
-            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+)/i', $code, $matches)) {
+            if (preg_match('/(PK-\d{4,6}|NS-\d{4,6}|VERIF-\d{4,6}|OTP-[A-Z0-9]+|RESET-[A-Z0-9]+|PKR-[A-Z0-9]+)/i', $code, $matches)) {
                 $code = strtoupper($matches[1]);
             } else {
                 $code = strtoupper(trim($code));
@@ -372,11 +433,15 @@ class WebhookController extends Controller
         \Log::info("[WA-INCOMING] Message: '{$message}' | Code: '{$code}' | Sender: '{$sender}'");
 
         if (!empty($code)) {
+            $fallbackSenderPhone = $this->extractValidPhone($sender, $message);
+
             // 1. CEK APAKAH INI KODE PERMINTAAN OTP RESET PASSWORD
-            if (str_starts_with($code, 'OTP-') || str_starts_with($code, 'RESET-')) {
+            if (str_starts_with($code, 'OTP-') || str_starts_with($code, 'RESET-') || str_starts_with($code, 'PKR-')) {
                 $userOtp = \App\Models\User::where('otp_trigger_code', $code)->first();
 
                 if ($userOtp) {
+                    $targetWa = $userOtp->whatsapp ?: $fallbackSenderPhone;
+
                     // Cek apakah kode OTP sudah kosong (artinya sudah pernah dipakai reset sebelumnya)
                     if (empty($userOtp->otp_code)) {
                         $userOtp->update([
@@ -384,8 +449,12 @@ class WebhookController extends Controller
                             'otp_trigger_code' => null,
                             'otp_expires_at'   => null,
                         ]);
-                        return response()->json([
-                            'status'    => 'otp_already_used',
+
+                        $usedMsg = "⚠️ *KODE SUDAH HANGUS / SUDAH DIGUNAKAN*\n\n"
+                                 . "Kode verifikasi ini sudah pernah digunakan atau sudah hangus.\n\n"
+                                 . "Silakan kunjungi website *PremiumKita* untuk meminta kode baru jika diperlukan.";
+
+                        return $this->sendAndRespondWaIncoming($request, $code, $targetWa, $usedMsg, 'otp_already_used', [
                             'user_name' => $userOtp->name,
                             'whatsapp'  => $userOtp->whatsapp,
                             'message'   => 'Kode OTP ini sudah pernah digunakan sebelumnya dan telah hangus.',
@@ -402,24 +471,36 @@ class WebhookController extends Controller
                             'otp_expires_at'   => null,
                         ]);
 
-                        return response()->json([
-                            'status'    => 'otp_expired',
+                        $expMsg = "⚠️ *KODE OTP TELAH HANGUS*\n\n"
+                                . "Kode permintaan reset password Anda telah hangus karena telah melewati batas waktu 15 menit.\n\n"
+                                . "Silakan buka kembali website *PremiumKita* untuk membuat permintaan kode baru.";
+
+                        return $this->sendAndRespondWaIncoming($request, $code, $targetWa, $expMsg, 'otp_expired', [
                             'user_name' => $userOtp->name,
                             'whatsapp'  => $userOtp->whatsapp,
                             'message'   => 'Kode permintaan OTP sudah hangus karena melebihi batas waktu 15 menit.',
                         ]);
                     }
 
-                    return response()->json([
-                        'status'    => 'send_otp',
+                    $otpReplyMsg = "🔐 *KODE OTP RESET PASSWORD PREMIUMKITA*\n\n"
+                                 . "Halo *{$userOtp->name}*!\n"
+                                 . "Kode OTP untuk mereset kata sandi akun *PremiumKita* Anda adalah:\n\n"
+                                 . "*KODE:* {$userOtp->otp_code}\n\n"
+                                 . "⏱️ _Berlaku 15 menit & otomatis hangus jika sudah 1x digunakan._\n"
+                                 . "🔒 _Jangan berikan kode ini kepada siapapun demi keamanan._";
+
+                    return $this->sendAndRespondWaIncoming($request, $code, $targetWa, $otpReplyMsg, 'send_otp', [
                         'user_name' => $userOtp->name,
                         'otp_code'  => $userOtp->otp_code,
                         'whatsapp'  => $userOtp->whatsapp,
                     ]);
                 } else {
-                    return response()->json([
-                        'status'    => 'otp_used_or_invalid',
-                        'message'   => 'Kode permintaan OTP tidak ditemukan, sudah hangus, atau sudah pernah digunakan.',
+                    $invalidMsg = "⚠️ *KODE SUDAH HANGUS / SUDAH DIGUNAKAN*\n\n"
+                                . "Kode verifikasi ini sudah pernah digunakan atau sudah hangus.\n\n"
+                                . "Silakan kunjungi website *PremiumKita* untuk meminta kode baru jika diperlukan.";
+
+                    return $this->sendAndRespondWaIncoming($request, $code, $fallbackSenderPhone, $invalidMsg, 'otp_used_or_invalid', [
+                        'message' => 'Kode permintaan OTP tidak ditemukan, sudah hangus, atau sudah pernah digunakan.',
                     ]);
                 }
             }
@@ -466,17 +547,8 @@ class WebhookController extends Controller
                 $isInvalidLid = empty($finalWhatsapp) || preg_match('/^5390\d+/', $finalWhatsapp) || strlen($finalWhatsapp) > 15;
 
                 if ($isInvalidLid) {
-                    // Coba cari nomor asli yang tertulis di format pesan chat ("*Nomor WA:* 08xxx")
-                    if (preg_match('/\*?Nomor WA\*?:\*?\s*([0-9+]+)/i', $message, $phoneMatch)) {
-                        $cleanExtracted = preg_replace('/[^0-9]/', '', $phoneMatch[1]);
-                        if (str_starts_with($cleanExtracted, '628')) {
-                            $cleanExtracted = '08' . substr($cleanExtracted, 3);
-                        } elseif (str_starts_with($cleanExtracted, '8')) {
-                            $cleanExtracted = '08' . substr($cleanExtracted, 1);
-                        }
-                        $finalWhatsapp = $cleanExtracted;
-                    } elseif (!empty($sender) && !preg_match('/^5390\d+/', $sender) && strlen($sender) <= 15) {
-                        $finalWhatsapp = $sender;
+                    if (!empty($fallbackSenderPhone)) {
+                        $finalWhatsapp = $fallbackSenderPhone;
                     }
                 }
 
@@ -487,8 +559,17 @@ class WebhookController extends Controller
                     'whatsapp'             => $finalWhatsapp ?: $user->whatsapp,
                 ]);
 
-                return response()->json([
-                    'status'    => 'verified',
+                $confirmedPhone = $user->whatsapp ?: $fallbackSenderPhone;
+                $verifiedMsg = "✅ *VERIFIKASI NOMOR BERHASIL - PREMIUMKITA*\n\n"
+                             . "Halo *{$user->name}*!\n"
+                             . "Nomor WhatsApp Anda (*{$confirmedPhone}*) telah berhasil divalidasi dan terverifikasi di *PremiumKita*.\n\n"
+                             . "🎉 *Manfaat Akun Terverifikasi:*\n"
+                             . "• Notifikasi pesanan instan ke WhatsApp\n"
+                             . "• Detail akun premium (Email & Password) otomatis dikirim ke chat ini\n"
+                             . "• Akses promo khusus reseller\n\n"
+                             . "Terima kasih telah berbelanja di *PremiumKita*!";
+
+                return $this->sendAndRespondWaIncoming($request, $code, $confirmedPhone, $verifiedMsg, 'verified', [
                     'message'   => 'WhatsApp berhasil diverifikasi otomatis!',
                     'user_id'   => $user->id,
                     'user_name' => $user->name,
@@ -497,15 +578,18 @@ class WebhookController extends Controller
             }
 
             // Cek apakah sudah terverifikasi sebelumnya
-            if (!empty($sender) && !preg_match('/^5390\d+/', $sender)) {
-                $cleanSender = preg_replace('/[^0-9]/', '', $sender);
+            if (!empty($fallbackSenderPhone)) {
+                $cleanSender = preg_replace('/[^0-9]/', '', $fallbackSenderPhone);
                 $already = \App\Models\User::where('is_whatsapp_verified', true)
                     ->where(function($q) use ($cleanSender) {
                         $q->where('whatsapp', 'like', "%{$cleanSender}%");
                     })->first();
                 if ($already) {
-                    return response()->json([
-                        'status'    => 'already_verified',
+                    $alreadyMsg = "ℹ️ *INFORMASI PREMIUMKITA*\n\n"
+                                . "Nomor WhatsApp Anda sudah berstatus terverifikasi di *PremiumKita*.\n"
+                                . "Jika butuh bantuan, silakan hubungi admin kami.";
+
+                    return $this->sendAndRespondWaIncoming($request, $code, $already->whatsapp ?: $fallbackSenderPhone, $alreadyMsg, 'already_verified', [
                         'user_name' => $already->name,
                         'whatsapp'  => $already->whatsapp,
                     ]);
