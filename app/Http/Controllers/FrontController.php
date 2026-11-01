@@ -1701,7 +1701,11 @@ class FrontController extends Controller
      * Normalisasi nomor WhatsApp ke format 08xxxxxxxxxx
      */
     protected function normalizeWaPhone(?string $phone): string {
-        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+        $str = trim((string) $phone);
+        if ($str === '' || str_contains($str, '@lid')) {
+            return '';
+        }
+        $clean = preg_replace('/[^0-9]/', '', explode('@', explode(':', $str)[0])[0]);
         if (empty($clean) || preg_match('/^5390\d+/', $clean)) {
             return '';
         }
@@ -1709,10 +1713,10 @@ class FrontController extends Controller
             $clean = '08' . substr($clean, 4);
         } elseif (str_starts_with($clean, '628')) {
             $clean = '08' . substr($clean, 3);
-        } elseif (str_starts_with($clean, '8')) {
+        } elseif (str_starts_with($clean, '8') && strlen($clean) >= 9 && strlen($clean) <= 13) {
             $clean = '08' . substr($clean, 1);
         }
-        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 15) {
+        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 14) {
             return '';
         }
         return $clean;
@@ -1743,41 +1747,105 @@ class FrontController extends Controller
         $baseGateway = rtrim($gatewayUrl, '/');
         $expectedPhone = $this->normalizeWaPhone($user->whatsapp);
 
-        foreach ($codesToCheck as $checkCode) {
+        $record = null;
+
+        // 1. Cek langsung dari file wa-gateway/detected_codes.json di disk (0ms latency, bebas kendala jaringan)
+        $detectedFile = base_path('wa-gateway/detected_codes.json');
+        if (file_exists($detectedFile)) {
             try {
-                $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($checkCode));
-                if ($checkRes->successful()) {
-                    $checkData = $checkRes->json();
-                    if (!empty($checkData['found'])) {
-                        $record = $checkData['data'] ?? [];
-                        $rawSender = (string) ($record['raw_sender'] ?? $record['sender'] ?? '');
-                        $rawSender = explode('@', $rawSender)[0];
-                        $rawSender = explode(':', $rawSender)[0];
-                        $detectedSender = $this->normalizeWaPhone($rawSender);
-
-                        if ($detectedSender !== '' && $expectedPhone !== '' && $detectedSender !== $expectedPhone) {
-                            $mismatchMsg = 'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE';
-                            \Illuminate\Support\Facades\Cache::put('wa_verif_mismatch_' . $user->id, [
-                                'sender'     => $detectedSender,
-                                'expected'   => $expectedPhone,
-                                'message'    => $mismatchMsg,
-                                'updated_at' => now()->toIso8601String(),
-                            ], 600);
-                            return false;
-                        }
-
-                        if ($detectedSender !== '' && $detectedSender === $expectedPhone) {
-                            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
-                            $user->update([
-                                'is_whatsapp_verified' => true,
-                                'whatsapp_verified_at' => now(),
-                                'wa_verification_code' => null,
-                            ]);
-                            return true;
+                $diskData = json_decode((string) file_get_contents($detectedFile), true);
+                if (is_array($diskData)) {
+                    foreach ($codesToCheck as $checkCode) {
+                        if (!empty($diskData[$checkCode]) && is_array($diskData[$checkCode])) {
+                            $record = $diskData[$checkCode];
+                            break;
                         }
                     }
                 }
             } catch (\Throwable $e) {}
+        }
+
+        // 2. Jika belum ditemukan di file, cek via HTTP ke /api/check-code pada wa-gateway
+        if (!$record) {
+            foreach ($codesToCheck as $checkCode) {
+                try {
+                    $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($checkCode));
+                    if ($checkRes->successful()) {
+                        $checkData = $checkRes->json();
+                        if (!empty($checkData['found']) && is_array($checkData['data'] ?? null)) {
+                            $record = $checkData['data'];
+                            break;
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
+        if ($record) {
+            $senderPhone = $this->normalizeWaPhone($record['sender'] ?? '');
+            $rawSender = trim((string) ($record['raw_sender'] ?? ''));
+            if ($senderPhone === '' && !str_contains($rawSender, '@lid')) {
+                $senderPhone = $this->normalizeWaPhone($rawSender);
+            }
+
+            $isMismatch = !empty($record['sender_mismatch'])
+                || ($senderPhone !== '' && $expectedPhone !== '' && $senderPhone !== $expectedPhone);
+
+            $repliedKey = 'wa_verif_replied_' . $code;
+            $alreadyReplied = !empty($record['replied_by_bot']) || \Illuminate\Support\Facades\Cache::has($repliedKey);
+
+            if ($isMismatch) {
+                $senderDisplay = $senderPhone ?: 'Nomor Berbeda';
+                $mismatchMsg = 'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE';
+                \Illuminate\Support\Facades\Cache::put('wa_verif_mismatch_' . $user->id, [
+                    'sender'     => $senderDisplay,
+                    'expected'   => $expectedPhone,
+                    'message'    => $mismatchMsg,
+                    'updated_at' => now()->toIso8601String(),
+                ], 600);
+
+                if (!$alreadyReplied && \Illuminate\Support\Facades\Cache::add($repliedKey, true, 120)) {
+                    $failedReplyMsg = "❌ *VERIFIKASI NOMOR GAGAL*\n\n"
+                        . "Halo *{$user->name}*!\n"
+                        . "*{$mismatchMsg}*\n\n"
+                        . "⚠️ *Detail Pengecekan Sistem:*\n"
+                        . "• Nomor Terdaftar di Website: *{$expectedPhone}*\n"
+                        . "• Nomor Pengirim Saat Ini: *{$senderDisplay}*\n\n"
+                        . "📌 *Cara Mengatasi:*\n"
+                        . "• Silakan kirim pesan verifikasi menggunakan WhatsApp dengan nomor *{$expectedPhone}*\n"
+                        . "• Atau ganti nomor WhatsApp di profil website *PremiumKita* menjadi *{$senderDisplay}*\n\n"
+                        . "Terima kasih telah berbelanja di *PremiumKita*!";
+                    $target = $senderPhone ?: $rawSender;
+                    if (!empty($target)) {
+                        \App\Http\Controllers\WebhookController::sendWaMessage($target, $failedReplyMsg);
+                    }
+                }
+
+                return false;
+            }
+
+            \Illuminate\Support\Facades\Cache::forget('wa_verif_mismatch_' . $user->id);
+            $user->update([
+                'is_whatsapp_verified' => true,
+                'whatsapp_verified_at' => now(),
+                'wa_verification_code' => null,
+            ]);
+
+            if (!$alreadyReplied && \Illuminate\Support\Facades\Cache::add($repliedKey, true, 120)) {
+                $confirmedPhone = $expectedPhone ?: $user->whatsapp;
+                $verifiedMsg = "✅ *VERIFIKASI NOMOR BERHASIL*\n\n"
+                    . "Halo *{$user->name}*!\n"
+                    . "Nomor WhatsApp Anda (*{$confirmedPhone}*) telah berhasil divalidasi dan terverifikasi di *PremiumKita*.\n\n"
+                    . "🎉 *Manfaat Akun Terverifikasi:*\n"
+                    . "• Notifikasi pesanan instan ke WhatsApp\n"
+                    . "• Detail akun premium (Email & Password) otomatis dikirim ke chat ini\n"
+                    . "• Akses promo khusus reseller\n\n"
+                    . "Terima kasih telah berbelanja di *PremiumKita*!";
+                $target = $rawSender ?: $confirmedPhone;
+                \App\Http\Controllers\WebhookController::sendWaMessage($target, $verifiedMsg);
+            }
+
+            return true;
         }
 
         return false;

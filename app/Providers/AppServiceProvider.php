@@ -206,5 +206,68 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('polling', function (Request $request) use ($resolveClientIp) {
             return Limit::perMinute(60)->by($resolveClientIp($request));
         });
+
+        // 11. Otomatis pastikan wa-gateway/server.js di VPS berjalan dengan versi terbaru saat perintah CLI dijalankan
+        if ($this->app->runningInConsole() && PHP_OS_FAMILY === 'Linux') {
+            $this->ensureLatestWaGatewayRunning();
+        }
+    }
+
+    /**
+     * Cek apakah wa-gateway di port 5001 sudah menjalankan versi terbaru (2.3.0).
+     * Jika masih proses lama di memori, otomatis restart saat `php artisan optimize:clear` dijalankan.
+     */
+    protected function ensureLatestWaGatewayRunning(): void
+    {
+        try {
+            $gatewayDir = base_path('wa-gateway');
+            $serverJs = $gatewayDir . '/server.js';
+            if (!file_exists($serverJs)) {
+                return;
+            }
+
+            $statusJson = @file_get_contents('http://127.0.0.1:5001/api/status', false, stream_context_create([
+                'http' => ['timeout' => 1.5],
+            ]));
+
+            if ($statusJson !== false) {
+                $statusData = json_decode($statusJson, true);
+                if (is_array($statusData) && ($statusData['version'] ?? '') === '2.3.0') {
+                    return;
+                }
+            }
+
+            if (!function_exists('shell_exec')) {
+                return;
+            }
+
+            $escapedDir = escapeshellarg($gatewayDir);
+            $cmd = <<<BASH
+OLD_PID=$(pgrep -f "wa-gateway/server.js|node.*server.js" | head -n 1)
+NODE_BIN=""
+if [ -n "\$OLD_PID" ] && [ -e "/proc/\$OLD_PID/exe" ]; then
+    NODE_BIN=$(readlink -f "/proc/\$OLD_PID/exe" 2>/dev/null)
+fi
+if [ -z "\$NODE_BIN" ] || [ ! -x "\$NODE_BIN" ]; then
+    NODE_BIN=$(which node 2>/dev/null)
+fi
+if [ -z "\$NODE_BIN" ] || [ ! -x "\$NODE_BIN" ]; then
+    NODE_BIN=$(find /www/server/nodejs /root/.nvm /usr/local/bin /usr/bin -name node -type f -executable 2>/dev/null | head -n 1)
+fi
+fuser -k 5001/tcp >/dev/null 2>&1 || true
+pkill -9 -f "wa-gateway/server.js" >/dev/null 2>&1 || true
+pkill -9 -f "node server.js" >/dev/null 2>&1 || true
+sleep 2
+if ! pgrep -f "server.js" >/dev/null 2>&1; then
+    if [ -n "\$NODE_BIN" ] && [ -x "\$NODE_BIN" ]; then
+        cd {$escapedDir} && nohup "\$NODE_BIN" server.js > wa-gateway.log 2>&1 < /dev/null &
+    fi
+fi
+chmod 666 {$escapedDir}/detected_codes.json >/dev/null 2>&1 || true
+BASH;
+            @shell_exec($cmd);
+        } catch (\Throwable $e) {
+            // Abaikan error non-kritis saat CLI boot
+        }
     }
 }

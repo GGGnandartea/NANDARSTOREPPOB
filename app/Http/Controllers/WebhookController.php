@@ -356,7 +356,11 @@ class WebhookController extends Controller
      */
     protected function normalizeIndoPhone(?string $phone): string
     {
-        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+        $str = trim((string) $phone);
+        if ($str === '' || str_contains($str, '@lid')) {
+            return '';
+        }
+        $clean = preg_replace('/[^0-9]/', '', explode('@', explode(':', $str)[0])[0]);
         if (empty($clean) || preg_match('/^5390\d+/', $clean)) {
             return '';
         }
@@ -364,10 +368,10 @@ class WebhookController extends Controller
             $clean = '08' . substr($clean, 4);
         } elseif (str_starts_with($clean, '628')) {
             $clean = '08' . substr($clean, 3);
-        } elseif (str_starts_with($clean, '8')) {
+        } elseif (str_starts_with($clean, '8') && strlen($clean) >= 9 && strlen($clean) <= 13) {
             $clean = '08' . substr($clean, 1);
         }
-        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 15) {
+        if (!str_starts_with($clean, '08') || strlen($clean) < 9 || strlen($clean) > 14) {
             return '';
         }
         return $clean;
@@ -380,26 +384,15 @@ class WebhookController extends Controller
     protected function extractActualSenderPhone(Request $request): string
     {
         $rawSender = (string) ($request->input('raw_sender') ?? '');
-        if (str_contains($rawSender, '@lid')) {
-            $rawSender = '';
-        } else {
-            $rawSender = explode('@', $rawSender)[0];
-            $rawSender = explode(':', $rawSender)[0];
-        }
-
         $normalizedRaw = $this->normalizeIndoPhone($rawSender);
         if ($normalizedRaw !== '') {
             return $normalizedRaw;
         }
 
         $sender = (string) ($request->input('sender') ?? '');
-        if (!str_contains($sender, '@lid')) {
-            $sender = explode('@', $sender)[0];
-            $sender = explode(':', $sender)[0];
-            $normalizedSender = $this->normalizeIndoPhone($sender);
-            if ($normalizedSender !== '') {
-                return $normalizedSender;
-            }
+        $normalizedSender = $this->normalizeIndoPhone($sender);
+        if ($normalizedSender !== '') {
+            return $normalizedSender;
         }
 
         return '';
@@ -432,11 +425,21 @@ class WebhookController extends Controller
     protected function sendAndRespondWaIncoming(Request $request, string $code, ?string $targetPhone, string $replyMessage, string $fallbackStatus, array $extra = [])
     {
         $sent = false;
-        $cleanTarget = preg_replace('/[^0-9]/', '', (string) $targetPhone);
+        $rawTarget = trim((string) $targetPhone);
+        $cleanTarget = (str_contains($rawTarget, '@lid') || str_contains($rawTarget, '@s.whatsapp.net'))
+            ? $rawTarget
+            : preg_replace('/[^0-9]/', '', $rawTarget);
+
+        $digits = preg_replace('/[^0-9]/', '', $code);
+        if ($digits !== '') {
+            \Illuminate\Support\Facades\Cache::put('wa_verif_replied_PK-' . $digits, true, 120);
+            \Illuminate\Support\Facades\Cache::put('wa_verif_replied_VERIF-' . $digits, true, 120);
+        }
+        \Illuminate\Support\Facades\Cache::put('wa_verif_replied_' . strtoupper($code), true, 120);
 
         if (!empty($cleanTarget) && !empty($replyMessage)) {
             $dedupKey = 'wa_incoming_reply_' . md5(strtoupper($code) . '_' . $cleanTarget . '_' . $fallbackStatus);
-            if (\Illuminate\Support\Facades\Cache::add($dedupKey, true, 6)) {
+            if (\Illuminate\Support\Facades\Cache::add($dedupKey, true, 10)) {
                 $sent = self::sendWaMessage($cleanTarget, $replyMessage);
             } else {
                 $sent = true;
@@ -457,7 +460,8 @@ class WebhookController extends Controller
         }
 
         return response()->json(array_merge([
-            'status' => $fallbackStatus,
+            'status'        => $fallbackStatus,
+            'reply_message' => $replyMessage,
         ], $extra));
     }
 
@@ -588,37 +592,41 @@ class WebhookController extends Controller
             if ($user) {
                 $actualSenderPhone = $this->extractActualSenderPhone($request);
                 $expectedPhone = $this->normalizeIndoPhone($user->whatsapp);
+                $senderMismatchFlag = $request->boolean('sender_mismatch');
 
                 // Validasi Ketat: Nomor pengirim WhatsApp WAJIB sama dengan nomor yang tertulis di profil website!
-                if ($actualSenderPhone !== '' && $expectedPhone !== '' && $actualSenderPhone !== $expectedPhone) {
+                if ($senderMismatchFlag || ($actualSenderPhone !== '' && $expectedPhone !== '' && $actualSenderPhone !== $expectedPhone)) {
                     $mismatchMsg = 'VERIFIKASI GAGAL, SILAHKAN KIRIM PESAN DARI NOMOR WHATSAPP YANG DIMASUKAN DI WEBSITE';
+                    $senderDisplay = $actualSenderPhone ?: 'Nomor Berbeda';
 
                     \Illuminate\Support\Facades\Cache::put('wa_verif_mismatch_' . $user->id, [
-                        'sender'     => $actualSenderPhone,
+                        'sender'     => $senderDisplay,
                         'expected'   => $expectedPhone,
                         'message'    => $mismatchMsg,
                         'updated_at' => now()->toIso8601String(),
                     ], 600);
 
-                    \Log::warning("[WA-VERIF-MISMATCH] User ID {$user->id} ({$user->name}) gagal verifikasi: profil={$expectedPhone}, pengirim={$actualSenderPhone}");
+                    \Log::warning("[WA-VERIF-MISMATCH] User ID {$user->id} ({$user->name}) gagal verifikasi: profil={$expectedPhone}, pengirim={$senderDisplay}");
 
                     $failedReplyMsg = "❌ *VERIFIKASI NOMOR GAGAL*\n\n"
                                     . "Halo *{$user->name}*!\n"
                                     . "*{$mismatchMsg}*\n\n"
                                     . "⚠️ *Detail Pengecekan Sistem:*\n"
                                     . "• Nomor Terdaftar di Website: *{$expectedPhone}*\n"
-                                    . "• Nomor Pengirim Saat Ini: *{$actualSenderPhone}*\n\n"
+                                    . "• Nomor Pengirim Saat Ini: *{$senderDisplay}*\n\n"
                                     . "📌 *Cara Mengatasi:*\n"
                                     . "• Silakan kirim pesan verifikasi menggunakan WhatsApp dengan nomor *{$expectedPhone}*\n"
-                                    . "• Atau ganti nomor WhatsApp di profil website *PremiumKita* menjadi *{$actualSenderPhone}*\n\n"
+                                    . "• Atau ganti nomor WhatsApp di profil website *PremiumKita* menjadi *{$senderDisplay}*\n\n"
                                     . "Terima kasih telah berbelanja di *PremiumKita*!";
 
-                    return $this->sendAndRespondWaIncoming($request, $code, $actualSenderPhone, $failedReplyMsg, 'verification_failed_mismatch', [
+                    $replyTarget = $actualSenderPhone ?: ((string) $request->input('raw_sender'));
+
+                    return $this->sendAndRespondWaIncoming($request, $code, $replyTarget, $failedReplyMsg, 'verification_failed_mismatch', [
                         'message'       => $mismatchMsg,
                         'user_id'       => $user->id,
                         'user_name'     => $user->name,
                         'whatsapp'      => $expectedPhone,
-                        'sender_phone'  => $actualSenderPhone,
+                        'sender_phone'  => $senderDisplay,
                         'reply_message' => $failedReplyMsg,
                     ]);
                 }
@@ -644,11 +652,14 @@ class WebhookController extends Controller
                              . "• Akses promo khusus reseller\n\n"
                              . "Terima kasih telah berbelanja di *PremiumKita*!";
 
-                return $this->sendAndRespondWaIncoming($request, $code, $confirmedPhone, $verifiedMsg, 'verified', [
-                    'message'   => 'WhatsApp berhasil diverifikasi otomatis!',
-                    'user_id'   => $user->id,
-                    'user_name' => $user->name,
-                    'whatsapp'  => $user->whatsapp,
+                $replyTarget = ((string) $request->input('raw_sender')) ?: $confirmedPhone;
+
+                return $this->sendAndRespondWaIncoming($request, $code, $replyTarget, $verifiedMsg, 'verified', [
+                    'message'       => 'WhatsApp berhasil diverifikasi otomatis!',
+                    'user_id'       => $user->id,
+                    'user_name'     => $user->name,
+                    'whatsapp'      => $user->whatsapp,
+                    'reply_message' => $verifiedMsg,
                 ]);
             }
 
