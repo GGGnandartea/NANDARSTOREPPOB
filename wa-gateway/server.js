@@ -61,6 +61,8 @@ function getCandidateWebhookUrls() {
         }
     } catch (e) {}
 
+    urls.push('https://premiumkita.com/api/webhook/wa-incoming');
+    urls.push('https://www.premiumkita.com/api/webhook/wa-incoming');
     urls.push('https://v2.premiumkita.com/api/webhook/wa-incoming');
     urls.push('http://127.0.0.1:8000/api/webhook/wa-incoming');
     urls.push('http://127.0.0.1/api/webhook/wa-incoming');
