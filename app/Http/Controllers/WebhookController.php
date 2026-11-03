@@ -593,6 +593,27 @@ class WebhookController extends Controller
                 $actualSenderPhone = $this->extractActualSenderPhone($request);
                 $expectedPhone = $this->normalizeIndoPhone($user->whatsapp);
                 $senderMismatchFlag = $request->boolean('sender_mismatch');
+                $rawSenderJid = trim((string) ($request->input('raw_sender') ?? ''));
+
+                // Jika pengirim berupa @lid dan nomor asli belum terdeteksi, verifikasi LID terhadap nomor profil database via wa-gateway
+                if ($actualSenderPhone === '' && !$senderMismatchFlag && str_contains($rawSenderJid, '@lid') && $expectedPhone !== '') {
+                    try {
+                        $gatewayUrl = Setting::where('key', 'wa_gateway_url')->value('value') ?: 'http://127.0.0.1:5001';
+                        $verifyRes = Http::timeout(3)->get(rtrim($gatewayUrl, '/') . '/api/verify-lid', [
+                            'lid'   => $rawSenderJid,
+                            'phone' => $expectedPhone,
+                        ]);
+                        if ($verifyRes->successful()) {
+                            $verifyData = $verifyRes->json();
+                            if (!empty($verifyData['sender_phone'])) {
+                                $actualSenderPhone = $this->normalizeIndoPhone($verifyData['sender_phone']);
+                            }
+                            if (!empty($verifyData['sender_mismatch'])) {
+                                $senderMismatchFlag = true;
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
 
                 // Validasi Ketat: Nomor pengirim WhatsApp WAJIB sama dengan nomor yang tertulis di profil website!
                 if ($senderMismatchFlag || ($actualSenderPhone !== '' && $expectedPhone !== '' && $actualSenderPhone !== $expectedPhone)) {
@@ -619,15 +640,16 @@ class WebhookController extends Controller
                                     . "• Atau ganti nomor WhatsApp di profil website *PremiumKita* menjadi *{$senderDisplay}*\n\n"
                                     . "Terima kasih telah berbelanja di *PremiumKita*!";
 
-                    $replyTarget = $actualSenderPhone ?: ((string) $request->input('raw_sender'));
+                    $replyTarget = $actualSenderPhone ?: $rawSenderJid;
 
                     return $this->sendAndRespondWaIncoming($request, $code, $replyTarget, $failedReplyMsg, 'verification_failed_mismatch', [
-                        'message'       => $mismatchMsg,
-                        'user_id'       => $user->id,
-                        'user_name'     => $user->name,
-                        'whatsapp'      => $expectedPhone,
-                        'sender_phone'  => $senderDisplay,
-                        'reply_message' => $failedReplyMsg,
+                        'message'         => $mismatchMsg,
+                        'user_id'         => $user->id,
+                        'user_name'       => $user->name,
+                        'whatsapp'        => $expectedPhone,
+                        'sender_phone'    => $senderDisplay,
+                        'sender_mismatch' => true,
+                        'reply_message'   => $failedReplyMsg,
                     ]);
                 }
 

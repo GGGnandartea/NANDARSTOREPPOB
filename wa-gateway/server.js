@@ -10,7 +10,9 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    USyncQuery,
+    USyncUser
 } = require('@whiskeysockets/baileys');
 
 const app = express();
@@ -18,7 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
-const GATEWAY_VERSION = '2.3.0';
+const GATEWAY_VERSION = '2.4.0';
 const SESSION_DIR = path.join(__dirname, 'session');
 const DETECTED_CODES_FILE = path.join(__dirname, 'detected_codes.json');
 
@@ -66,15 +68,16 @@ loadDetectedCodesFromDisk();
 function rememberDetectedCode(code, payload = {}) {
     if (!code) return;
     const upper = String(code).trim().toUpperCase();
+    const existing = recentDetectedCodes.get(upper) || {};
     const record = {
         code: upper,
-        sender: payload.sender || '',
-        raw_sender: payload.raw_sender || '',
-        sender_mismatch: Boolean(payload.sender_mismatch),
-        claimed_phone: payload.claimed_phone || '',
-        replied_by_bot: Boolean(payload.replied_by_bot),
-        message: payload.message || '',
-        timestamp: Date.now()
+        sender: payload.sender !== undefined ? (payload.sender || '') : (existing.sender || ''),
+        raw_sender: payload.raw_sender !== undefined ? (payload.raw_sender || '') : (existing.raw_sender || ''),
+        sender_mismatch: payload.sender_mismatch !== undefined ? Boolean(payload.sender_mismatch) : Boolean(existing.sender_mismatch),
+        claimed_phone: payload.claimed_phone !== undefined ? (payload.claimed_phone || '') : (existing.claimed_phone || ''),
+        replied_by_bot: payload.replied_by_bot !== undefined ? Boolean(payload.replied_by_bot) : Boolean(existing.replied_by_bot),
+        message: payload.message !== undefined ? (payload.message || '') : (existing.message || ''),
+        timestamp: existing.timestamp || Date.now()
     };
     recentDetectedCodes.set(upper, record);
 
@@ -86,6 +89,7 @@ function rememberDetectedCode(code, payload = {}) {
     }
 
     saveDetectedCodesToDisk();
+    return record;
 }
 
 function normalizeIndoPhone(raw) {
@@ -107,6 +111,11 @@ function normalizeIndoPhone(raw) {
     return clean;
 }
 
+function extractLidDigits(jidOrLid) {
+    if (!jidOrLid) return '';
+    return String(jidOrLid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+}
+
 function resolvePhoneFromSessionLidFiles(lidUser) {
     if (!lidUser) return '';
     try {
@@ -126,7 +135,7 @@ function resolvePhoneFromSessionLidFiles(lidUser) {
                 if (m) {
                     try {
                         const val = JSON.parse(fs.readFileSync(path.join(SESSION_DIR, f), 'utf8'));
-                        const mappedLid = String(val || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+                        const mappedLid = extractLidDigits(val);
                         if (mappedLid && mappedLid === lidUser) {
                             const phone = normalizeIndoPhone(m[1]);
                             if (phone) return phone;
@@ -139,20 +148,77 @@ function resolvePhoneFromSessionLidFiles(lidUser) {
     return '';
 }
 
-async function resolveSenderDetails(sockInstance, msg, senderJid, text) {
+async function resolveLidForPhone(sockInstance, rawPhone) {
+    const normPhone = normalizeIndoPhone(rawPhone);
+    if (!normPhone) return '';
+
+    const clean62 = '62' + normPhone.slice(1);
+    const pnJid = `${clean62}@s.whatsapp.net`;
+
+    // 1. Cek dari file session lid-mapping-<clean62>.json di disk (0ms latency)
+    try {
+        const forwardFile = path.join(SESSION_DIR, `lid-mapping-${clean62}.json`);
+        if (fs.existsSync(forwardFile)) {
+            const fileVal = JSON.parse(fs.readFileSync(forwardFile, 'utf8'));
+            const cachedLid = extractLidDigits(fileVal);
+            if (cachedLid) return cachedLid;
+        }
+    } catch (e) {}
+
+    // 2. Gunakan signalRepository.lidMapping.getLIDForPN bawaan Baileys v7 (otomatis USync LID protocol + simpan ke session)
+    try {
+        if (sockInstance?.signalRepository?.lidMapping?.getLIDForPN) {
+            const lidJid = await sockInstance.signalRepository.lidMapping.getLIDForPN(pnJid);
+            const lidDigits = extractLidDigits(lidJid);
+            if (lidDigits) return lidDigits;
+        }
+    } catch (e) {}
+
+    // 3. Fallback USyncQuery dengan ContactProtocol + LIDProtocol (untuk nomor yang belum pernah chat sebelumnya)
+    try {
+        if (sockInstance?.executeUSyncQuery && typeof USyncQuery === 'function' && typeof USyncUser === 'function') {
+            const uq = new USyncQuery().withContactProtocol().withLIDProtocol();
+            uq.withUser(new USyncUser().withPhone(`+${clean62}`).withId(pnJid));
+            const res = await sockInstance.executeUSyncQuery(uq);
+            const item = Array.isArray(res?.list) ? res.list.find(x => x && x.lid) : null;
+            if (item?.lid) {
+                const lidDigits = extractLidDigits(item.lid);
+                if (lidDigits) {
+                    try {
+                        await sockInstance.signalRepository?.lidMapping?.storeLIDPNMappings?.([
+                            { lid: `${lidDigits}@lid`, pn: pnJid }
+                        ]);
+                    } catch (e) {}
+                    return lidDigits;
+                }
+            }
+        }
+    } catch (e) {}
+
+    return '';
+}
+
+let sock = null;
+let latestQrDataUrl = null;
+let connectionStatus = 'initializing';
+let botPhoneNumber = null;
+
+async function resolveSenderDetails(sockInstance, msg, senderJid, text, expectedPhoneOverride = '') {
     const isLid = String(senderJid || '').includes('@lid');
     const claimedMatch = String(text || '').match(/\*?Nomor (?:Profil|WA|Terdaftar)\*?:\*?\s*([0-9+]+)/i);
-    const claimedProfilePhone = claimedMatch ? normalizeIndoPhone(claimedMatch[1]) : '';
+    const claimedProfilePhone = normalizeIndoPhone(expectedPhoneOverride) || (claimedMatch ? normalizeIndoPhone(claimedMatch[1]) : '');
 
     let senderPhone = '';
     let senderMismatch = false;
 
-    // 1. Cek field senderPn / participantPn / remoteJidAlt dari Baileys v7
+    // 1. Cek field remoteJidAlt / participantAlt / senderPn / participantPn dari Baileys v7
     const pnCandidates = [
-        msg.key?.senderPn,
-        msg.key?.participantPn,
-        msg.key?.remoteJidAlt,
-        !isLid ? senderJid : ''
+        msg?.key?.remoteJidAlt,
+        msg?.key?.participantAlt,
+        msg?.key?.senderPn,
+        msg?.key?.participantPn,
+        !isLid ? senderJid : '',
+        msg?.key?.fromMe ? (botPhoneNumber || sockInstance?.user?.id || '') : ''
     ];
     for (const cand of pnCandidates) {
         if (cand && !String(cand).includes('@lid')) {
@@ -166,7 +232,7 @@ async function resolveSenderDetails(sockInstance, msg, senderJid, text) {
 
     // 2. Jika senderJid adalah @lid dan nomor belum ditemukan, cek lidMapping Baileys & file session
     if (!senderPhone && isLid) {
-        const lidUser = String(senderJid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+        const lidUser = extractLidDigits(senderJid);
 
         try {
             if (sockInstance?.signalRepository?.lidMapping?.getPNForLID) {
@@ -181,39 +247,17 @@ async function resolveSenderDetails(sockInstance, msg, senderJid, text) {
             senderPhone = resolvePhoneFromSessionLidFiles(lidUser);
         }
 
-        // 3. Jika masih belum terpetakan dan pesan mencantumkan Nomor Profil, cek apakah LID Nomor Profil cocok
-        if (!senderPhone && claimedProfilePhone && lidUser && sockInstance?.onWhatsApp) {
-            try {
-                // Cek dulu dari file lid-mapping-<claimedPhone>.json di disk jika ada
-                const clean62 = '62' + claimedProfilePhone.slice(1);
-                const forwardFile = path.join(SESSION_DIR, `lid-mapping-${clean62}.json`);
-                if (fs.existsSync(forwardFile)) {
-                    const expectedLid = String(JSON.parse(fs.readFileSync(forwardFile, 'utf8')) || '')
-                        .split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                    if (expectedLid) {
-                        if (expectedLid === lidUser) {
-                            senderPhone = claimedProfilePhone;
-                        } else {
-                            senderMismatch = true;
-                        }
-                    }
+        // 3. Jika masih belum terpetakan dan ada Nomor Profil target, resolusi LID dari Nomor Profil via USync LID Protocol
+        if (!senderPhone && claimedProfilePhone && lidUser) {
+            const expectedLid = await resolveLidForPhone(sockInstance, claimedProfilePhone);
+            if (expectedLid) {
+                if (expectedLid === lidUser) {
+                    senderPhone = claimedProfilePhone;
+                    senderMismatch = false;
+                } else {
+                    senderMismatch = true;
                 }
-
-                if (!senderPhone && !senderMismatch) {
-                    const waCheck = await sockInstance.onWhatsApp(`${clean62}@s.whatsapp.net`);
-                    const info = Array.isArray(waCheck) ? waCheck[0] : null;
-                    if (info?.lid) {
-                        const expectedLid = String(info.lid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                        if (expectedLid) {
-                            if (expectedLid === lidUser) {
-                                senderPhone = claimedProfilePhone;
-                            } else {
-                                senderMismatch = true;
-                            }
-                        }
-                    }
-                }
-            } catch (e) {}
+            }
         }
     }
 
@@ -264,11 +308,6 @@ function getCandidateWebhookTargets() {
 
     return targets;
 }
-
-let sock = null;
-let latestQrDataUrl = null;
-let connectionStatus = 'initializing';
-let botPhoneNumber = null;
 
 function formatToJid(number) {
     if (!number) return null;
@@ -381,6 +420,14 @@ async function startWhatsAppBot() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('lid-mapping.update', async (mapping) => {
+        try {
+            if (mapping && mapping.lid && mapping.pn && sock?.signalRepository?.lidMapping?.storeLIDPNMappings) {
+                await sock.signalRepository.lidMapping.storeLIDPNMappings([mapping]);
+            }
+        } catch (e) {}
+    });
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -532,15 +579,24 @@ async function startWhatsAppBot() {
 
                         if (resData && resData.status === 'handled_by_laravel') {
                             rememberDetectedCode(code, {
-                                sender: senderPhone,
+                                sender: resData.sender_phone || senderPhone,
                                 raw_sender: senderJid,
-                                sender_mismatch: senderMismatch,
-                                claimed_phone: claimedProfilePhone,
+                                sender_mismatch: typeof resData.sender_mismatch === 'boolean' ? resData.sender_mismatch : senderMismatch,
+                                claimed_phone: resData.whatsapp || claimedProfilePhone,
                                 replied_by_bot: true,
                                 message: text
                             });
                             console.log(`[WA-BOT] ✅ Balasan untuk kode ${code} telah dikirim oleh Laravel.`);
                         } else if (resData && resData.reply_message) {
+                            if (typeof resData.sender_mismatch === 'boolean') {
+                                rememberDetectedCode(code, {
+                                    sender: resData.sender_phone || senderPhone,
+                                    raw_sender: senderJid,
+                                    sender_mismatch: resData.sender_mismatch,
+                                    claimed_phone: resData.whatsapp || claimedProfilePhone,
+                                    message: text
+                                });
+                            }
                             await sendSingleReply(resData.reply_message);
                         } else if (resData && resData.status === 'send_otp') {
                             const userName = resData.user_name || 'Pelanggan';
@@ -620,11 +676,88 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-app.get('/api/check-code/:code', (req, res) => {
+app.get('/api/verify-lid', async (req, res) => {
+    const rawLid = String(req.query.lid || '').trim();
+    const rawPhone = String(req.query.phone || '').trim();
+    const lidDigits = extractLidDigits(rawLid);
+    const expectedPhone = normalizeIndoPhone(rawPhone);
+
+    if (!lidDigits || !expectedPhone) {
+        return res.json({ status: 'invalid', match: false });
+    }
+
+    let senderPhone = resolvePhoneFromSessionLidFiles(lidDigits);
+    if (!senderPhone && sock?.signalRepository?.lidMapping?.getPNForLID) {
+        try {
+            const pn = await sock.signalRepository.lidMapping.getPNForLID(`${lidDigits}@lid`);
+            if (pn) senderPhone = normalizeIndoPhone(pn);
+        } catch (e) {}
+    }
+
+    if (senderPhone) {
+        const match = senderPhone === expectedPhone;
+        return res.json({
+            status: 'resolved',
+            match,
+            sender_phone: senderPhone,
+            expected_phone: expectedPhone,
+            sender_mismatch: !match
+        });
+    }
+
+    const expectedLid = await resolveLidForPhone(sock, expectedPhone);
+    if (expectedLid) {
+        const match = expectedLid === lidDigits;
+        return res.json({
+            status: 'resolved',
+            match,
+            sender_phone: match ? expectedPhone : '',
+            expected_phone: expectedPhone,
+            sender_mismatch: !match
+        });
+    }
+
+    return res.json({ status: 'unknown', match: false });
+});
+
+app.get('/api/check-code/:code', async (req, res) => {
     loadDetectedCodesFromDisk();
     const code = String(req.params.code || '').trim().toUpperCase();
-    const found = recentDetectedCodes.get(code);
+    let found = recentDetectedCodes.get(code);
     if (found) {
+        const expectedPhone = normalizeIndoPhone(req.query.expected_phone || '');
+        if (expectedPhone) {
+            if (found.sender) {
+                const isMismatch = found.sender !== expectedPhone;
+                if (found.sender_mismatch !== isMismatch) {
+                    found = rememberDetectedCode(code, {
+                        ...found,
+                        sender_mismatch: isMismatch,
+                        claimed_phone: expectedPhone
+                    });
+                }
+            } else if (String(found.raw_sender || '').includes('@lid') && sock) {
+                const lidDigits = extractLidDigits(found.raw_sender);
+                const expectedLid = await resolveLidForPhone(sock, expectedPhone);
+                if (expectedLid && lidDigits) {
+                    if (expectedLid === lidDigits) {
+                        found = rememberDetectedCode(code, {
+                            ...found,
+                            sender: expectedPhone,
+                            sender_mismatch: false,
+                            claimed_phone: expectedPhone
+                        });
+                    } else {
+                        found = rememberDetectedCode(code, {
+                            ...found,
+                            sender_mismatch: true,
+                            claimed_phone: expectedPhone
+                        });
+                    }
+                }
+            }
+        }
+
         return res.json({
             status: 'success',
             found: true,

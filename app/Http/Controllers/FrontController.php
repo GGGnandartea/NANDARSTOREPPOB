@@ -1765,12 +1765,21 @@ class FrontController extends Controller
             } catch (\Throwable $e) {}
         }
 
-        // 2. Jika belum ditemukan di file, cek via HTTP ke /api/check-code pada wa-gateway
-        if (!$record) {
+        // 2. Jika belum ditemukan di file, atau jika pengirim masih berupa @lid yang belum terpetakan, cek via HTTP ke /api/check-code pada wa-gateway
+        $needsGatewayLidResolution = $record
+            && empty($this->normalizeWaPhone($record['sender'] ?? ''))
+            && str_contains((string) ($record['raw_sender'] ?? ''), '@lid')
+            && empty($record['sender_mismatch']);
+
+        if (!$record || $needsGatewayLidResolution) {
+            $gatewayReachable = false;
             foreach ($codesToCheck as $checkCode) {
                 try {
-                    $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($checkCode));
+                    $checkRes = Http::timeout(2)->get($baseGateway . '/api/check-code/' . urlencode($checkCode), [
+                        'expected_phone' => $expectedPhone,
+                    ]);
                     if ($checkRes->successful()) {
+                        $gatewayReachable = true;
                         $checkData = $checkRes->json();
                         if (!empty($checkData['found']) && is_array($checkData['data'] ?? null)) {
                             $record = $checkData['data'];
@@ -1778,6 +1787,10 @@ class FrontController extends Controller
                         }
                     }
                 } catch (\Throwable $e) {}
+            }
+
+            if (!$gatewayReachable) {
+                \App\Providers\AppServiceProvider::ensureLatestWaGatewayRunning();
             }
         }
 

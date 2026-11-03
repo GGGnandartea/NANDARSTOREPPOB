@@ -78,6 +78,7 @@ export default function WaVerificationModal({ onClose, userWhatsapp, onVerified,
           setStep('confirmed');
           onVerified?.();
         } else if (data.status === 'mismatch') {
+          setStatusNotice('');
           setMismatchInfo({
             message:
               data.message ||
