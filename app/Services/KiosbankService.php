@@ -1160,11 +1160,11 @@ class KiosbankService
             ];
         }
 
-        if (!preg_match('/^[0-9]{4,20}$/', $customerId)) {
+        if (!preg_match('/^[0-9A-Za-z\-~]{3,30}$/', $customerId)) {
             return [
                 'status'  => 'error',
                 'rc'      => '99',
-                'message' => 'Nomor pelanggan harus berupa angka.',
+                'message' => 'Format nomor pelanggan tidak valid.',
             ];
         }
 
@@ -1238,22 +1238,15 @@ class KiosbankService
             return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
         }
 
-        return [
-            'status'        => 'success',
-            'rc'            => '00',
-            'product_id'    => $productId,
-            'customer_id'   => $customerId,
-            'customer_name' => 'PELANGGAN ' . strtoupper(substr($customerId, -4)),
-            'product_name'  => 'Inquiry ' . $productId,
-            'amount'        => 50000,
-            'admin_fee'     => 2500,
-            'penalty'       => 0,
-            'total'         => 52500,
-            'service_fee'   => $this->resolveServiceFee(52500),
-            'grand_total'   => $this->applyMarkup(52500),
-            'reference_id'  => $refId,
-            'data'          => ['status' => 'INQUIRY_OK'],
-        ];
+        return KiosbankDevelopmentNopel::simulateInquiry(
+            $productId,
+            $customerId,
+            $refId,
+            $extraParams,
+            $this,
+            $this->resolveServiceFee(52500),
+            $this->applyMarkup(52500)
+        );
     }
 
     /** Parse nominal Kiosbank yang dikirim sebagai zero-padded string. */
@@ -1340,7 +1333,7 @@ class KiosbankService
                     'data'         => $res['data'] ?? [],
                 ];
             }
-            if ($this->isDeveloperMode() && in_array((string) ($res['rc'] ?? '99'), ['10', '15', '17', '18', '19', '27', '38', '39', '99'], true)) {
+            if ($this->isDeveloperMode() && in_array((string) ($res['rc'] ?? '99'), ['10', '15', '17', '18', '19', '27', '38', '39', '61', '99'], true)) {
                 Log::info("[KIOSBANK-DEV-PAYBILL-FALLBACK] Server dev Kiosbank merespon RC " . ($res['rc'] ?? '99') . ". Mengaktifkan simulasi payment developer mode.");
             } else {
                 return [
@@ -1355,14 +1348,7 @@ class KiosbankService
             return ['status' => 'error', 'rc' => '99', 'message' => 'Koneksi Kiosbank Production gagal. Transaksi belum dikonfirmasi.'];
         }
 
-        return [
-            'status'       => 'success',
-            'rc'           => '00',
-            'reference_id' => $refId,
-            'sn'           => 'SANDBOX-' . strtoupper(bin2hex(random_bytes(6))),
-            'data'         => ['status' => 'BERHASIL'],
-            'is_sandbox'   => true,
-        ];
+        return KiosbankDevelopmentNopel::simulatePayBill($productId, $customerId, $total, $refId, $this);
     }
 
     /**
@@ -1452,18 +1438,20 @@ class KiosbankService
             return ['status' => 'error', 'rc' => '99', 'message' => 'Transaksi belum dapat dikonfirmasi ke Kiosbank.'];
         }
 
-        // Sandbox payment simulation untuk developer mode (sesuai panduan Nopel Uji Coba Kiosbank Main/Nopel/PULSA)
-        if ($customerId === '081280982287') {
-            return [
-                'status'  => 'failed',
-                'rc'      => '67',
-                'message' => $this->getResponseCodeMessage('67'),
-            ];
-        }
-        if ($customerId === '081280982297') {
+        // Sandbox payment simulation untuk developer mode (sesuai panduan Nopel Uji Coba Kiosbank Main/Nopel/*)
+        $nopelOverride = KiosbankDevelopmentNopel::getSinglePaymentTestOverride($customerId);
+        if ($nopelOverride !== null) {
+            $overrideRc = $nopelOverride['rc'] ?? '67';
+            if (($nopelOverride['status'] ?? '') === 'failed') {
+                return [
+                    'status'  => 'failed',
+                    'rc'      => $overrideRc,
+                    'message' => $this->getResponseCodeMessage($overrideRc),
+                ];
+            }
             return [
                 'status'       => 'processing',
-                'rc'           => '00',
+                'rc'           => $overrideRc,
                 'reference_id' => $refId,
                 'sn'           => null,
                 'product_name' => 'Layanan PPOB ' . $productId,
@@ -1746,6 +1734,7 @@ class KiosbankService
             '17' => 'Transaksi gagal',
             '18' => 'Switching hulu belum diregistrasi',
             '19' => 'Data tidak ditemukan',
+            '22' => 'Format nomor pelanggan tidak sesuai / tidak ditemukan',
             '27' => 'Transaksi tidak dapat dilakukan saat ini',
             '34' => 'Periode login berakhir, silakan login ulang',
             '37' => 'Kesalahan saat setting admin bank',

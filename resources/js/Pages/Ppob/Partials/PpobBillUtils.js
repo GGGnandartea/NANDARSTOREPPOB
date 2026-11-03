@@ -85,7 +85,7 @@ export const extractBillSummary = (inquiry) => {
  * PDAM memakai kode wilayah dari PdamProducts.js.
  */
 export const BILL_SERVICES = [
-  { id: 'pdam', label: 'PDAM Air Bersih (Kota / Kabupaten)', productId: null, placeholder: 'Contoh: 123456789', minLength: 4 },
+  { id: 'pdam', label: 'PDAM Air Bersih (Kota / Kabupaten)', productId: null, placeholder: 'Contoh: 01041480014', minLength: 3 },
   { id: 'pln_postpaid', label: 'PLN Pascabayar (Tagihan Listrik)', productId: '100301', placeholder: 'Contoh: 551600530024', minLength: 8 },
   { id: 'bpjs', label: 'BPJS Kesehatan', productId: '900001', placeholder: 'Contoh: 8888800020839792', minLength: 8 },
 ];

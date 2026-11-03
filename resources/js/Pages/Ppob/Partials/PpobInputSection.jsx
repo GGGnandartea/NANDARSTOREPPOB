@@ -625,11 +625,11 @@ export default function PpobInputSection({
               </label>
               <input
                 id="bill-customer-id"
-                inputMode="numeric"
+                inputMode={activeTab === 'pdam' ? 'text' : 'numeric'}
                 type="text"
                 value={tagihanCustomerId}
                 onChange={(e) => {
-                  setTagihanCustomerId(e.target.value.replace(/[^0-9]/g, ''));
+                  setTagihanCustomerId(e.target.value.replace(/[^0-9A-Za-z\-~]/g, ''));
                   setTagihanInquiryResult(null);
                   setSelectedProduct(null);
                 }}
