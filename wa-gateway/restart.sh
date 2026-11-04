@@ -40,8 +40,8 @@ fi
 
 export PATH="$(dirname "$NODE_BIN"):$PATH"
 
-# Hentikan proses node server.js lama tanpa membunuh subshell ini
-for pid in $(ps -ef | grep "[n]ode" | grep "server\.js" | awk '{print $2}'); do
+# Hanya hentikan proses wa-gateway spesifik di direktori ini (JANGAN gunakan grep "server.js" umum karena akan membunuh pg.nandarstore.my.id & wabotai!)
+for pid in $(ps -ef | grep "[n]ode" | grep "$DIR/server\.js" | awk '{print $2}'); do
     if [ "$pid" != "$$" ] && [ "$pid" != "${PPID:-0}" ]; then
         kill -9 "$pid" >/dev/null 2>&1 || true
     fi

@@ -207,51 +207,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($resolveClientIp($request));
         });
 
-        // 11. Otomatis pastikan wa-gateway/server.js di VPS berjalan dengan versi terbaru saat perintah CLI dijalankan
-        if ($this->app->runningInConsole() && PHP_OS_FAMILY === 'Linux') {
-            self::ensureLatestWaGatewayRunning();
-        }
+        // Catatan: Manajemen proses Node.js (PM2) ditangani langsung oleh PM2 di VPS
+        // agar tidak membunuh proses server.js lain (seperti pg.nandarstore.my.id / wabotai).
     }
 
     /**
-     * Cek apakah wa-gateway di port 5001 sudah menjalankan versi terbaru (2.4.0).
-     * Jika mati atau masih versi lama di memori, otomatis jalankan wa-gateway/restart.sh.
+     * Method dipertahankan sebagai no-op untuk kompatibilitas pemanggilan lama.
      */
     public static function ensureLatestWaGatewayRunning(): void
     {
-        try {
-            if (PHP_OS_FAMILY !== 'Linux') {
-                return;
-            }
-
-            $gatewayDir = base_path('wa-gateway');
-            $serverJs = $gatewayDir . '/server.js';
-            $restartSh = $gatewayDir . '/restart.sh';
-            if (!file_exists($serverJs)) {
-                return;
-            }
-
-            $statusJson = @file_get_contents('http://127.0.0.1:5001/api/status', false, stream_context_create([
-                'http' => ['timeout' => 1.5],
-            ]));
-
-            if ($statusJson !== false) {
-                $statusData = json_decode($statusJson, true);
-                if (is_array($statusData) && ($statusData['version'] ?? '') === '2.4.0') {
-                    return;
-                }
-            }
-
-            if (!function_exists('shell_exec')) {
-                return;
-            }
-
-            if (file_exists($restartSh)) {
-                @chmod($restartSh, 0755);
-                @shell_exec('bash ' . escapeshellarg($restartSh) . ' --force >/dev/null 2>&1 &');
-            }
-        } catch (\Throwable $e) {
-            // Abaikan error non-kritis
-        }
+        return;
     }
 }
