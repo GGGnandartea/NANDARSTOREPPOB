@@ -60,6 +60,13 @@ export default function OrdersTab({
   // Sync / Recheck Status States
   const [syncingAll, setSyncingAll] = useState(false);
   const [recheckingOrderId, setRecheckingOrderId] = useState(null);
+  const [recheckCooldown, setRecheckCooldown] = useState(0);
+
+  useEffect(() => {
+    if (recheckCooldown <= 0) return;
+    const t = setInterval(() => setRecheckCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [recheckCooldown]);
 
   const appCount = allOrders.filter((o) => o.product_type !== 'ppob').length;
   const ppobCount = allOrders.filter((o) => o.product_type === 'ppob').length;
@@ -178,8 +185,9 @@ export default function OrdersTab({
 
   // Cek Status Ulang 1 Transaksi PPOB Spesifik (/Services/Check-Status)
   const handleRecheckSingleOrder = async (invoiceOrId) => {
-    if (!invoiceOrId || recheckingOrderId) return;
+    if (!invoiceOrId || recheckingOrderId || recheckCooldown > 0) return;
     setRecheckingOrderId(invoiceOrId);
+    setRecheckCooldown(100);
     try {
       const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
       const res = await fetch(`/ppob/check-status/${encodeURIComponent(invoiceOrId)}`, {
@@ -200,6 +208,36 @@ export default function OrdersTab({
             const st = String(data.order_status || '').toLowerCase();
             const toastType = ['failed', 'refunded'].includes(st) ? 'error' : 'success';
             showToast(toastType, data.message || 'Status transaksi telah diperiksa ke server Kiosbank.');
+          }
+        },
+      });
+    } catch {
+      setRecheckingOrderId(null);
+      if (showToast) showToast('error', 'Gagal memeriksa status ke server. Silakan coba lagi.');
+    }
+  };
+
+  // Cek Status Pembayaran & Ambil Akun 1 Transaksi Aplikasi Premium
+  const handleRecheckAppOrder = async (invoiceOrId) => {
+    if (!invoiceOrId || recheckingOrderId || recheckCooldown > 0) return;
+    setRecheckingOrderId(invoiceOrId);
+    setRecheckCooldown(100);
+    try {
+      const res = await fetch(`/checkout/status/${encodeURIComponent(invoiceOrId)}?manual=1`);
+      const data = await res.json();
+      router.reload({
+        only: ['orders', 'auth', 'mutations', 'topups', 'stats'],
+        preserveScroll: true,
+        onFinish: () => {
+          setRecheckingOrderId(null);
+          if (showToast) {
+            if (data?.is_ready) {
+              showToast('success', 'Pembayaran Lunas & Akun berhasil diterima dari server!');
+            } else if (String(data?.status || '').toLowerCase() === 'paid') {
+              showToast('success', 'Pembayaran Lunas! Server sedang menyiapkan akun otomatis Anda.');
+            } else {
+              showToast('info', 'Status pembayaran dan pesanan telah diperiksa ke server.');
+            }
           }
         },
       });
@@ -863,8 +901,8 @@ export default function OrdersTab({
                           <button
                             type="button"
                             onClick={() => handleRecheckSingleOrder(o.invoice_number || o.id)}
-                            disabled={isOrderRechecking}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black shadow-sm transition cursor-pointer disabled:opacity-60"
+                            disabled={isOrderRechecking || recheckCooldown > 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black shadow-sm transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             title="Cek status terbaru transaksi ini ke endpoint /Services/Check-Status Kiosbank"
                           >
                             <svg
@@ -880,7 +918,13 @@ export default function OrdersTab({
                                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                               />
                             </svg>
-                            <span>{isOrderRechecking ? 'Mengecek Server...' : 'Cek Status Ulang'}</span>
+                            <span>
+                              {isOrderRechecking
+                                ? 'Mengecek Server...'
+                                : recheckCooldown > 0
+                                  ? `Cek Status (${recheckCooldown}s)`
+                                  : 'Cek Status Ulang'}
+                            </span>
                           </button>
                         </div>
                         <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 leading-relaxed">
@@ -889,6 +933,38 @@ export default function OrdersTab({
                         </p>
                       </div>
                     )}
+
+                    {!isOrderPpob &&
+                      (isOrderPending || ['pending', 'unpaid'].includes(String(o.payment_status || '').toLowerCase())) &&
+                      !(
+                        o.provider === 'Manual Admin' ||
+                        o.product?.process_type === 'manual' ||
+                        String(o.sn_or_account || '')
+                          .toLowerCase()
+                          .includes('wajib mengisi form garansi')
+                      ) && (
+                        <div className="mt-2.5 p-3 sm:p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] font-black text-amber-800 dark:text-amber-300">
+                            {isOrderPaid
+                              ? '⏳ Pembayaran Lunas — Menyiapkan Akun Otomatis'
+                              : '⏳ Menunggu Konfirmasi Pembayaran QRIS'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleRecheckAppOrder(o.invoice_number || o.id)}
+                            disabled={isOrderRechecking || recheckCooldown > 0}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black shadow-sm transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            <span>
+                              {isOrderRechecking
+                                ? 'Mengecek Server...'
+                                : recheckCooldown > 0
+                                  ? `⏱️ Cek Pembayaran (${recheckCooldown}s)`
+                                  : '🔄 Cek Pembayaran / Ambil Akun'}
+                            </span>
+                          </button>
+                        </div>
+                      )}
 
                     {!isOrderPpob &&
                       isOrderPending &&

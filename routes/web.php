@@ -95,6 +95,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     // --- RUTE PAYMENT GATEWAY ADMIN (BARU) ---
     Route::get('/settings/payment', [AdminController::class, 'paymentSettings'])->name('settings.payment');
     Route::post('/settings/payment', [AdminController::class, 'savePaymentSettings'])->name('settings.payment.save');
+    Route::get('/settings/payment/status', [AdminController::class, 'paymentGatewayStatus'])->name('settings.payment.status');
+    Route::post('/settings/payment/test', [AdminController::class, 'paymentGatewayTestConnection'])->name('settings.payment.test');
     // -----------------------------------------
     
     Route::get('/terms', [AdminController::class, 'terms'])->name('terms');
@@ -158,6 +160,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
 
     // --- RUTE VERIFIKASI & GATEWAY WHATSAPP ADMIN ---
     Route::get('/wa-verifications', [AdminController::class, 'waVerifications'])->name('wa_verifications');
+    Route::get('/wa-gateway', [AdminController::class, 'waVerifications'])->name('wa_gateway');
     Route::post('/wa-verifications/approve', [AdminController::class, 'approveWaVerification'])->name('wa_verifications.approve');
     Route::post('/wa-verifications/reject', [AdminController::class, 'rejectWaVerification'])->name('wa_verifications.reject');
     Route::post('/wa-verifications/update-phone', [AdminController::class, 'updateUserWhatsapp'])->name('wa_verifications.update_phone');

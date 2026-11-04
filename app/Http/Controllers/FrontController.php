@@ -170,7 +170,7 @@ class FrontController extends Controller
     /**
      * Ambil & sinkronkan data stok live produk API (Premku & Preflix) secara konsisten di semua halaman.
      * Menyimpan cadangan stok terakhir (api_last_known_stock) agar jika API provider sempat lambat/timeout,
-     * stok tidak tiba-tiba berubah menjadi 0.
+     * stok tidak tiba-tiba berubah menjadi 0 dan pengunjung tidak pernah tertahan menunggu API pihak ketiga.
      */
     public function getApiStockData(bool $forceRefresh = false): array
     {
@@ -183,16 +183,31 @@ class FrontController extends Controller
             return $cached;
         }
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
-
         $lastKnown = Cache::get('api_last_known_stock', []);
         $data = is_array($lastKnown) ? $lastKnown : [];
+
+        // Jika diakses oleh pengunjung web (bukan cron/CLI/unit test) dan data cadangan sudah tersedia,
+        // langsung sajikan data cadangan secara instan (<5ms) lalu segarkan di background setelah response dikirim.
+        if (!$forceRefresh && !empty($data) && !app()->runningInConsole() && !app()->runningUnitTests()) {
+            Cache::put('api_full_data', $data, 120);
+            if (!app()->bound('api_stock_refresh_registered')) {
+                app()->instance('api_stock_refresh_registered', true);
+                app()->terminating(function () {
+                    try {
+                        app(self::class)->getApiStockData(true);
+                    } catch (\Throwable $e) {}
+                });
+            }
+            return $data;
+        }
+
+        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
 
         try {
             if (!$disabledPremku) {
                 $premkuService = app(PremkuApiService::class);
-                $resPremku = $premkuService->getProducts(5);
+                $resPremku = $premkuService->getProducts(3);
                 if (isset($resPremku['products']) && is_array($resPremku['products'])) {
                     foreach ($resPremku['products'] as $p) {
                         if (isset($p['id'])) {
@@ -209,7 +224,7 @@ class FrontController extends Controller
             if (!$disabledPreflix && $idUser && $keyUser) {
                 $resPreflix = Http::withoutVerifying()
                     ->connectTimeout(3)
-                    ->timeout(5)
+                    ->timeout(3)
                     ->asForm()
                     ->post('https://h2h.preflix.my.id/app/', [
                         'koneksi'  => 'get_all_product',
@@ -234,11 +249,47 @@ class FrontController extends Controller
         } catch (\Throwable $e) {}
 
         if (!empty($data)) {
-            Cache::put('api_full_data', $data, 60);
+            Cache::put('api_full_data', $data, 300);
             Cache::put('api_last_known_stock', $data, 86400);
         }
 
         return $data;
+    }
+
+    /**
+     * Kirim peringatan otomatis ke WhatsApp Admin jika server QRIS Node.js (Port 4061) mati/tidak merespons.
+     * Dilengkapi cooldown 15 menit agar WhatsApp Admin tidak terkena spam.
+     */
+    public static function notifyAdminQrisOffline(string $context = 'Checkout QRIS', ?string $errorDetail = null): void
+    {
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        try {
+            if (!Cache::add('qris_offline_alert_cooldown', true, 900)) {
+                return;
+            }
+
+            $adminWa = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
+            $waktu = now()->timezone('Asia/Jakarta')->format('d M Y, H:i:s');
+            $detailRingkas = $errorDetail ? trim(substr($errorDetail, 0, 180)) : 'Connection refused / Timeout pada Port 4061';
+
+            $pesanAlert = "⚠️ *PERINGATAN SISTEM: SERVER QRIS (PORT 4061) OFFLINE*\n\n"
+                . "Halo Admin *PremiumKita*, sistem mendeteksi bahwa layanan *Payment Gateway Node.js (Port 4061)* tidak merespons saat pembeli melakukan transaksi.\n\n"
+                . "📌 *Detail Kejadian:*\n"
+                . "• Aktivitas: *{$context}*\n"
+                . "• Waktu: *{$waktu} WIB*\n"
+                . "• Keterangan: `{$detailRingkas}`\n\n"
+                . "🛠️ *Solusi Cepat di VPS:*\n"
+                . "Jalankan perintah berikut di terminal VPS:\n"
+                . "`pm2 restart payment_gateway`\n\n"
+                . "_Notifikasi otomatis Sistem Monitoring PremiumKita (Cooldown 15 Menit)._";
+
+            \App\Http\Controllers\WebhookController::sendWaMessage($adminWa, $pesanAlert);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Gagal mengirim alert WA QRIS offline: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -272,8 +323,8 @@ class FrontController extends Controller
     /**
      * Mengambil produk paling banyak dibeli hari ini secara realtime harian (termasuk PPOB)
      */
-    public function getTopSellingTodayProducts(array $apiData = []) {
-        if (empty($apiData)) {
+    public function getTopSellingTodayProducts(?array $apiData = null) {
+        if ($apiData === null) {
             $apiData = $this->getApiStockData();
         }
         $todayStart = now()->startOfDay();
@@ -600,11 +651,7 @@ class FrontController extends Controller
 
         $data = null;
         $lastQrisError = null;
-        $qrisEndpoints = array_unique(array_filter([
-            rtrim((string) env('QRIS_GATEWAY_URL', 'http://127.0.0.1:4061'), '/') . '/api/order',
-            'http://127.0.0.1:4061/api/order',
-            'http://localhost:4061/api/order',
-        ]));
+        $qrisEndpoints = \App\Services\OrderFulfillmentService::qrisGatewayEndpoints('/api/order');
 
         foreach ($qrisEndpoints as $endpoint) {
             try {
@@ -624,6 +671,7 @@ class FrontController extends Controller
 
         if ($data === null) {
             \Illuminate\Support\Facades\Log::error('QRIS Node.js API connection error: ' . $lastQrisError);
+            self::notifyAdminQrisOffline('Checkout Produk (' . $product->name . ' - Rp ' . number_format($nominal, 0, ',', '.') . ')', $lastQrisError);
             return response()->json(['status' => 'error', 'message' => 'Gagal terhubung ke Node.js QRIS API Lokal (Port 4061). Pastikan service QRIS Node.js di VPS sedang berjalan.']);
         }
 
@@ -700,7 +748,7 @@ class FrontController extends Controller
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Order creation error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Gagal menyimpan pesanan: ' . $e->getMessage()]);
+            return response()->json(['status' => 'error', 'message' => 'Server sedang sibuk melayani antrean pesanan. Silakan coba lagi dalam beberapa saat.']);
         }
     }
 
@@ -710,29 +758,14 @@ class FrontController extends Controller
             return response()->json(['status' => 'NOT_FOUND']);
         }
 
-        // Fallback sinkronisasi langsung ke PG QRIS lokal jika status masih pending
-        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && !str_starts_with((string) $order->invoice_number, 'BAL-')) {
-            try {
-                $pgRes = Http::timeout(2)->get('http://127.0.0.1:4061/api/order/status/' . $order->invoice_number);
-                if ($pgRes->successful()) {
-                    $pgData = $pgRes->json();
-                    if (isset($pgData['status']) && in_array(strtoupper((string) $pgData['status']), ['TERBAYAR', 'PAID', 'SUCCESS', 'LUNAS'], true)) {
-                        $markedPaid = Order::whereKey($order->id)
-                            ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
-                            ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
-                            ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
-                        $order->refresh();
-                        if ($markedPaid || !$order->fulfillment_started_at) {
-                            \App\Services\OrderFulfillmentService::fulfillOrder($order);
-                            $order->refresh();
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {}
-        }
+        $isManualRequest = (bool) request()->boolean('manual');
 
-        // Otomatis tandai pesanan QRIS pending lebih dari 30 menit sebagai expired
-        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 30) {
+        // Sinkronisasi langsung ke PG QRIS lokal (Port 4061) & jalankan fulfillOrder jika sudah lunas namun belum pernah ditembak ke API
+        \App\Services\OrderFulfillmentService::syncPaymentFromLocalGateway($order);
+        $order->refresh();
+
+        // Otomatis tandai pesanan QRIS pending lebih dari 20 menit sebagai expired
+        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 20) {
             Order::whereKey($order->id)
                 ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
                 ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
@@ -759,15 +792,19 @@ class FrontController extends Controller
         }
 
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
-        if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
-            \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && $order->product_type === 'api'
+            && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
+            \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order, $isManualRequest);
             $order->refresh();
         }
 
         // Jika pesanan PPOB sudah dibayar dan masih processing/pending, cek status ke /Services/Check-Status Kiosbank
-        if ($order->payment_status === 'paid' && $order->product_type === 'ppob' && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && $order->product_type === 'ppob'
+            && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
             $throttleKey = 'ppob_poll_checkstatus_' . $order->id;
-            if (!Cache::has($throttleKey)) {
+            if ($isManualRequest || !Cache::has($throttleKey)) {
                 Cache::put($throttleKey, 1, 8);
                 \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
                 $order->refresh();
@@ -825,6 +862,10 @@ class FrontController extends Controller
             return redirect($order->invoiceUrl());
         }
 
+        // Sinkronisasi langsung ke PG QRIS lokal (Port 4061) & jalankan fulfillOrder jika sudah lunas namun belum pernah ditembak ke API
+        \App\Services\OrderFulfillmentService::syncPaymentFromLocalGateway($order);
+        $order->refresh();
+
         // Jika pesanan berbayar sudah dibatalkan/gagal namun belum di-refund atau masih berstatus menunggu, rekonsiliasi otomatis
         if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
             && in_array(strtolower((string) $order->order_status), ['canceled', 'cancelled', 'failed', 'refunded'], true)) {
@@ -833,13 +874,17 @@ class FrontController extends Controller
         }
 
         // Otomatis sinkronisasi akun API saat invoice dibuka jika masih menunggu
-        if ($order->payment_status === 'paid' && $order->product_type === 'api' && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && $order->product_type === 'api'
+            && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
             $order->refresh();
         }
 
         // Otomatis cek status PPOB saat invoice dibuka jika masih processing/pending
-        if ($order->payment_status === 'paid' && $order->product_type === 'ppob' && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && $order->product_type === 'ppob'
+            && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
             \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($order);
             $order->refresh();
         }
@@ -857,8 +902,22 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Silakan login terlebih dahulu.'], 401);
         }
 
+        // 1. Cek terlebih dahulu pesanan QRIS milik user yang masih berstatus pending/unpaid di sistem
+        $unpaidQuery = Order::where('user_id', $user->id)
+            ->whereIn('payment_status', ['pending', 'unpaid'])
+            ->where('created_at', '>=', now()->subHours(24));
+        if ($request->filled('order_id')) {
+            $target = $request->input('order_id');
+            $unpaidQuery->where(function ($q) use ($target) {
+                $q->where('invoice_number', $target)->orWhere('id', $target);
+            });
+        }
+        foreach ($unpaidQuery->orderBy('id', 'desc')->limit(10)->get() as $unpaidOrd) {
+            \App\Services\OrderFulfillmentService::syncPaymentFromLocalGateway($unpaidOrd);
+        }
+
         $query = Order::where('user_id', $user->id)
-            ->whereIn('payment_status', ['paid', 'success', 'settlement'])
+            ->whereIn('payment_status', ['paid', 'success', 'settlement', 'lunas'])
             ->whereIn('order_status', ['processing', 'pending']);
 
         if ($request->filled('order_id')) {
@@ -888,11 +947,13 @@ class FrontController extends Controller
         $lastMessage = '';
 
         foreach ($pendingOrders as $ord) {
+            \App\Services\OrderFulfillmentService::syncPaymentFromLocalGateway($ord);
+            $ord->refresh();
             if ($ord->product_type === 'ppob' || str_starts_with((string) $ord->invoice_number, 'PPOB-')) {
                 $res = \App\Services\OrderFulfillmentService::reconcilePendingPpobOrder($ord);
                 $lastMessage = $res['message'] ?? '';
             } elseif ($ord->product_type === 'api') {
-                $res = \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($ord);
+                $res = \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($ord, true);
                 $lastMessage = $res['message'] ?? '';
             }
             $ord->refresh();
@@ -939,9 +1000,11 @@ class FrontController extends Controller
             $isPaidInPg = false;
             if ($pt->order_id_gateway) {
                 try {
-                    $pgRes = Http::timeout(2)->get('http://127.0.0.1:4061/api/order/status/' . $pt->order_id_gateway);
+                    $basePg = \App\Services\OrderFulfillmentService::qrisGatewayBaseUrl();
+                    $pgRes = Http::timeout(2)->get($basePg . '/api/order/status/' . $pt->order_id_gateway);
                     $pgData = $pgRes->json();
-                    if (isset($pgData['status']) && in_array(strtoupper($pgData['status']), ['TERBAYAR', 'PAID', 'SUCCESS', 'LUNAS'])) {
+                    $rawTopupSt = strtoupper((string) ($pgData['data']['status'] ?? $pgData['status'] ?? ''));
+                    if (in_array($rawTopupSt, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT'], true) || ($rawTopupSt === 'SUCCESS' && !isset($pgData['data']['status']))) {
                         $isPaidInPg = true;
                     }
                 } catch (\Exception $e) {}
@@ -957,9 +1020,9 @@ class FrontController extends Controller
                     'description' => 'Top Up Saldo via QRIS - ' . $pt->invoice_number,
                 ]);
             } else {
-                // Kadaluarsa otomatis jika lebih dari 30 menit (1800 detik)
+                // Kadaluarsa otomatis jika lebih dari 20 menit (1200 detik)
                 $secondsPassed = $pt->created_at ? $pt->created_at->diffInSeconds(now()) : 9999;
-                if ($secondsPassed >= 1800) {
+                if ($secondsPassed >= 1200) {
                     $pt->update(['status' => 'expired']);
                 }
             }
@@ -973,8 +1036,8 @@ class FrontController extends Controller
             $user->refresh();
         }
 
-        // Otomatis tandai semua pesanan QRIS & Top Up QRIS yang belum dibayar lebih dari 30 menit sebagai expired
-        \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(30);
+        // Otomatis tandai semua pesanan QRIS & Top Up QRIS yang belum dibayar lebih dari 20 menit sebagai expired
+        \App\Services\OrderFulfillmentService::expireUnpaidQrisRecords(20);
 
         // Otomatis rekonsiliasi & kembalikan saldo 100% jika ada pesanan lunas milik user yang dibatalkan oleh server/admin
         $reconciledCancelCount = \App\Services\OrderFulfillmentService::reconcileUnrefundedCancelledOrders($user->id);
@@ -1018,14 +1081,14 @@ class FrontController extends Controller
                 ];
             });
 
-        // 2. Ambil Topup Request yang masih pending / expired agar user tetap bisa bayar
+        // 2. Ambil Topup Request yang masih pending / expired agar user tetap bisa bayar (durasi 20 menit = 1200 detik)
         $pendingTopups = \App\Models\TopupRequest::where('user_id', $user->id)
             ->whereIn('status', ['pending', 'expired'])
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function($t) {
-                $secondsPassed = $t->created_at ? $t->created_at->diffInSeconds(now()) : 999;
-                $isExpired = ($t->status === 'expired' || ($t->status === 'pending' && $secondsPassed >= 600));
+                $secondsPassed = $t->created_at ? $t->created_at->diffInSeconds(now()) : 9999;
+                $isExpired = ($t->status === 'expired' || ($t->status === 'pending' && $secondsPassed >= 1200));
                 return [
                     'id'             => 'TU-' . $t->id,
                     'invoice_number' => $t->invoice_number,
@@ -1035,7 +1098,7 @@ class FrontController extends Controller
                     'description'    => 'Top Up Saldo via QRIS (' . ($t->invoice_number ?? '') . ')',
                     'status'         => $isExpired ? 'expired' : 'pending',
                     'qris_url'       => $isExpired ? null : $t->qris_url,
-                    'remaining_seconds' => max(0, 600 - $secondsPassed),
+                    'remaining_seconds' => max(0, 1200 - $secondsPassed),
                     'created_at'     => $t->created_at ? $t->created_at->toDateTimeString() : null,
                 ];
             });
@@ -1339,34 +1402,49 @@ class FrontController extends Controller
         $invoiceNumber = 'TU-' . strtoupper(Str::random(8)) . '-' . time();
         $callbackUrl = url('/api/webhook/topup-qris');
 
-        try {
-            $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
-                'nominal'      => (int) $request->amount,
-                'callback_url' => $callbackUrl,
-            ]);
-            $data = $response->json();
+        $data = null;
+        $lastTopupQrisErr = null;
+        $qrisEndpoints = \App\Services\OrderFulfillmentService::qrisGatewayEndpoints('/api/order');
 
-            if (isset($data['data']['orderId'])) {
-                TopupRequest::create([
-                    'user_id'            => $user->id,
-                    'invoice_number'     => $invoiceNumber,
-                    'amount'             => $request->amount,
-                    'payment_method'     => 'qris',
-                    'status'             => 'pending',
-                    'qris_url'           => $data['data']['url_qris'] ?? null,
-                    'order_id_gateway'   => $data['data']['orderId'],
+        foreach ($qrisEndpoints as $endpoint) {
+            try {
+                $response = Http::connectTimeout(5)->timeout(15)->post($endpoint, [
+                    'nominal'      => (int) $request->amount,
+                    'callback_url' => $callbackUrl,
                 ]);
-
-                return response()->json([
-                    'status'        => 'success',
-                    'order_id'      => $data['data']['orderId'],
-                    'invoice'       => $invoiceNumber,
-                    'total_nominal' => $data['data']['total_nominal'],
-                    'url_qris'      => $data['data']['url_qris'],
-                ]);
+                $json = $response->json();
+                if (is_array($json)) {
+                    $data = $json;
+                    break;
+                }
+            } catch (\Exception $e) {
+                $lastTopupQrisErr = $e->getMessage();
             }
-        } catch (\Exception $e) {
+        }
+
+        if ($data === null) {
+            self::notifyAdminQrisOffline('Top Up Saldo QRIS (Rp ' . number_format((int) $request->amount, 0, ',', '.') . ')', $lastTopupQrisErr);
             return response()->json(['status' => 'error', 'message' => 'Gagal terhubung ke server pembayaran.']);
+        }
+
+        if (isset($data['data']['orderId'])) {
+            TopupRequest::create([
+                'user_id'            => $user->id,
+                'invoice_number'     => $invoiceNumber,
+                'amount'             => $request->amount,
+                'payment_method'     => 'qris',
+                'status'             => 'pending',
+                'qris_url'           => $data['data']['url_qris'] ?? null,
+                'order_id_gateway'   => $data['data']['orderId'],
+            ]);
+
+            return response()->json([
+                'status'        => 'success',
+                'order_id'      => $data['data']['orderId'],
+                'invoice'       => $invoiceNumber,
+                'total_nominal' => $data['data']['total_nominal'],
+                'url_qris'      => $data['data']['url_qris'],
+            ]);
         }
 
         return response()->json(['status' => 'error', 'message' => 'Gagal membuat tagihan top up.']);
@@ -1385,9 +1463,11 @@ class FrontController extends Controller
             $isPaidInPg = false;
             if ($topup->order_id_gateway) {
                 try {
-                    $pgRes = Http::timeout(2)->get('http://127.0.0.1:4061/api/order/status/' . $topup->order_id_gateway);
+                    $basePg = \App\Services\OrderFulfillmentService::qrisGatewayBaseUrl();
+                    $pgRes = Http::timeout(2)->get($basePg . '/api/order/status/' . $topup->order_id_gateway);
                     $pgData = $pgRes->json();
-                    if (isset($pgData['status']) && in_array(strtoupper($pgData['status']), ['TERBAYAR', 'PAID', 'SUCCESS', 'LUNAS'])) {
+                    $rawTopupSt = strtoupper((string) ($pgData['data']['status'] ?? $pgData['status'] ?? ''));
+                    if (in_array($rawTopupSt, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT'], true) || ($rawTopupSt === 'SUCCESS' && !isset($pgData['data']['status']))) {
                         $isPaidInPg = true;
                     }
                 } catch (\Exception $e) {}
@@ -1407,7 +1487,7 @@ class FrontController extends Controller
                 }
             } else {
                 $secondsPassed = $topup->created_at ? $topup->created_at->diffInSeconds(now()) : 9999;
-                if ($secondsPassed >= 1800) {
+                if ($secondsPassed >= 1200) {
                     $topup->update(['status' => 'expired']);
                 }
             }
@@ -1505,33 +1585,47 @@ class FrontController extends Controller
         $invoiceNumber = 'RES-' . strtoupper(Str::random(8)) . '-' . time();
         $callbackUrl = url('/api/webhook/reseller-qris');
 
-        try {
-            $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
-                'nominal'      => $fee,
-                'callback_url' => $callbackUrl,
-            ]);
-            $data = $response->json();
+        $data = null;
+        $lastResellerQrisErr = null;
+        $qrisEndpoints = \App\Services\OrderFulfillmentService::qrisGatewayEndpoints('/api/order');
 
-            if (isset($data['data']['orderId'])) {
-                \App\Models\ResellerRegistration::create([
-                    'user_id'          => $user->id,
-                    'invoice_number'   => $invoiceNumber,
-                    'amount'           => $fee,
-                    'payment_method'   => 'qris',
-                    'status'           => 'pending',
-                    'qris_url'         => $data['data']['url_qris'] ?? null,
-                    'order_id_gateway' => $data['data']['orderId'],
+        foreach ($qrisEndpoints as $endpoint) {
+            try {
+                $response = Http::connectTimeout(5)->timeout(15)->post($endpoint, [
+                    'nominal'      => $fee,
+                    'callback_url' => $callbackUrl,
                 ]);
-
-                return response()->json([
-                    'status'        => 'success',
-                    'order_id'      => $data['data']['orderId'],
-                    'invoice'       => $invoiceNumber,
-                    'total_nominal' => $data['data']['total_nominal'] ?? $fee,
-                    'url_qris'      => $data['data']['url_qris'],
-                ]);
+                $json = $response->json();
+                if (is_array($json)) {
+                    $data = $json;
+                    break;
+                }
+            } catch (\Exception $e) {
+                $lastResellerQrisErr = $e->getMessage();
             }
-        } catch (\Exception $e) {}
+        }
+
+        if ($data === null) {
+            self::notifyAdminQrisOffline('Upgrade VIP Reseller via QRIS (Rp ' . number_format($fee, 0, ',', '.') . ')', $lastResellerQrisErr);
+        } elseif (isset($data['data']['orderId'])) {
+            \App\Models\ResellerRegistration::create([
+                'user_id'          => $user->id,
+                'invoice_number'   => $invoiceNumber,
+                'amount'           => $fee,
+                'payment_method'   => 'qris',
+                'status'           => 'pending',
+                'qris_url'         => $data['data']['url_qris'] ?? null,
+                'order_id_gateway' => $data['data']['orderId'],
+            ]);
+
+            return response()->json([
+                'status'        => 'success',
+                'order_id'      => $data['data']['orderId'],
+                'invoice'       => $invoiceNumber,
+                'total_nominal' => $data['data']['total_nominal'] ?? $fee,
+                'url_qris'      => $data['data']['url_qris'],
+            ]);
+        }
 
         return response()->json(['status' => 'error', 'message' => 'Gagal membuat tagihan QRIS pendaftaran reseller. Pastikan server pembayaran aktif.']);
     }

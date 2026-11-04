@@ -17,7 +17,7 @@ return [
 
     'default' => env('CACHE_STORE', 'failover'),
 
-    'limiter' => env('CACHE_LIMITER', 'failover'),
+    'limiter' => env('CACHE_LIMITER', env('CACHE_STORE', 'failover')),
 
     /*
     |--------------------------------------------------------------------------

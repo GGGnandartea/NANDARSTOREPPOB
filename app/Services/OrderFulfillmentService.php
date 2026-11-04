@@ -337,9 +337,11 @@ class OrderFulfillmentService
                 $idProdukAsli = str_replace('PREFLIX-', '', $apiProductId);
                 $idUser  = Setting::where('key', 'preflix_id_user')->value('value');
                 $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
+                $hadConnectionTimeout = false;
 
                 try {
                     $qty = max(1, (int) ($order->quantity ?: 1));
+                    $buyerEmail = $order->email ?: ($order->user?->email ?: 'pembeli@premiumkita.com');
 
                     // Hanya lakukan request pemesanan jika order belum pernah ditembak ke Preflix
                     if (empty($apiTrxId)) {
@@ -348,14 +350,18 @@ class OrderFulfillmentService
 
                         for ($i = 0; $i < $qty; $i++) {
                             $itemCatatan = $order->invoice_number . ($qty > 1 ? "-ITEM" . ($i + 1) : "");
-                            $resOrder = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
-                                'koneksi'   => 'order',
-                                'id_produk' => $idProdukAsli,
-                                'id_user'   => $idUser,
-                                'key_user'  => $keyUser,
-                                'email'     => $order->email,
-                                'catatan'   => $itemCatatan,
-                            ])->json();
+                            $resOrder = Http::withoutVerifying()
+                                ->connectTimeout(5)
+                                ->timeout(15)
+                                ->asForm()
+                                ->post('https://h2h.preflix.my.id/app/', [
+                                    'koneksi'   => 'order',
+                                    'id_produk' => $idProdukAsli,
+                                    'id_user'   => $idUser,
+                                    'key_user'  => $keyUser,
+                                    'email'     => $buyerEmail,
+                                    'catatan'   => $itemCatatan,
+                                ])->json();
 
                             Log::info("[PREFLIX-ORDER-INIT] Invoice: {$order->invoice_number} | Item: " . ($i + 1) . " | Response: " . json_encode($resOrder));
 
@@ -371,7 +377,7 @@ class OrderFulfillmentService
                                 }
                             }
 
-                            if (isset($resOrder['status']) && strtolower($resOrder['status']) === 'success') {
+                            if (isset($resOrder['status']) && strtolower((string) $resOrder['status']) === 'success') {
                                 $itemTrxId = $preflixData['id_stok'] 
                                           ?? $preflixData['id_order'] 
                                           ?? $preflixData['id_riwayat'] 
@@ -389,7 +395,7 @@ class OrderFulfillmentService
                                 $failMsg = $resOrder['message'] ?? $resOrder['data']['status'] ?? 'Gagal dari provider';
                                 Log::warning("[PREFLIX-ORDER-FAILED] Invoice: {$order->invoice_number} Item: " . ($i + 1) . " | Message: {$failMsg}");
 
-                                if (str_contains(strtolower($failMsg), 'saldo') || str_contains(strtolower($failMsg), 'forbidden')) {
+                                if (str_contains(strtolower((string) $failMsg), 'saldo') || str_contains(strtolower((string) $failMsg), 'forbidden')) {
                                     $order->notes = 'Saldo akun Preflix provider sedang tidak mencukupi.';
                                 }
                             }
@@ -408,8 +414,17 @@ class OrderFulfillmentService
                             $snAkun = implode("\n\n---\n\n", $snList);
                         }
                     }
+                } catch (\Illuminate\Http\Client\ConnectionException $ce) {
+                    $hadConnectionTimeout = true;
+                    Log::error("[PREFLIX-ORDER-TIMEOUT] " . $ce->getMessage());
                 } catch (\Exception $e) {
                     Log::error("[PREFLIX-ORDER-ERROR] " . $e->getMessage());
+                }
+
+                // Jika bukan karena network timeout (misal Preflix merespon gagal sementara) dan belum ada api_trx_id,
+                // buka kunci fulfillment_started_at agar percobaan cek berikutnya dapat menembak ulang ke API.
+                if (!$hadConnectionTimeout && empty($apiTrxId) && !$isReady) {
+                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
                 }
             }
 
@@ -446,6 +461,10 @@ class OrderFulfillmentService
                     if ($apiTrxId) {
                         $order->api_trx_id = (string) $apiTrxId;
                         $order->save();
+                    } elseif (!$isReady) {
+                        // Jika gagal membuat pesanan di Premku dan belum mendapatkan invoice provider,
+                        // buka kembali fulfillment_started_at agar dapat ditembak ulang saat cek status.
+                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
                     }
 
                     // SERVER WAITING / POLLING LOOP PREMKU
@@ -557,13 +576,129 @@ class OrderFulfillmentService
     }
 
     /**
+     * Ambil konfigurasi IP/Host, Port, Protokol, dan URL lengkap Server Payment Gateway QRIS Node.js.
+     */
+    public static function qrisGatewayConfig(): array
+    {
+        $protocol = 'http';
+        $host     = '127.0.0.1';
+        $port     = '4061';
+        $customUrl = '';
+
+        try {
+            $settings = Setting::whereIn('key', [
+                'qris_gateway_protocol',
+                'qris_gateway_host',
+                'qris_gateway_port',
+                'qris_gateway_url',
+            ])->pluck('value', 'key');
+
+            $protocol  = strtolower(trim((string) ($settings['qris_gateway_protocol'] ?? 'http'))) === 'https' ? 'https' : 'http';
+            $host      = trim((string) ($settings['qris_gateway_host'] ?? '')) ?: '127.0.0.1';
+            $port      = preg_replace('/[^0-9]/', '', (string) ($settings['qris_gateway_port'] ?? '')) ?: '4061';
+            $customUrl = rtrim(trim((string) ($settings['qris_gateway_url'] ?? '')), '/');
+        } catch (\Throwable $e) {}
+
+        $host = preg_replace('#^https?://#i', '', $host);
+        $host = trim(explode('/', $host)[0]);
+        if (str_contains($host, ':')) {
+            [$parsedHost, $parsedPort] = explode(':', $host, 2);
+            $host = trim($parsedHost) ?: '127.0.0.1';
+            if (preg_match('/^\d+$/', trim($parsedPort))) {
+                $port = trim($parsedPort);
+            }
+        }
+
+        $builtUrl = ($port === '80' && $protocol === 'http') || ($port === '443' && $protocol === 'https')
+            ? "{$protocol}://{$host}"
+            : "{$protocol}://{$host}:{$port}";
+
+        $baseUrl = $customUrl !== '' ? $customUrl : (rtrim((string) env('QRIS_GATEWAY_URL', $builtUrl), '/') ?: $builtUrl);
+
+        return [
+            'protocol' => $protocol,
+            'host'     => $host,
+            'port'     => $port,
+            'base_url' => $baseUrl,
+        ];
+    }
+
+    public static function qrisGatewayBaseUrl(): string
+    {
+        return self::qrisGatewayConfig()['base_url'];
+    }
+
+    public static function qrisGatewayEndpoints(string $path = '/api/order'): array
+    {
+        $cleanPath = '/' . ltrim($path, '/');
+        $cfg = self::qrisGatewayConfig();
+        $base = rtrim($cfg['base_url'], '/');
+        $port = $cfg['port'] ?: '4061';
+
+        return array_values(array_unique(array_filter([
+            $base . $cleanPath,
+            rtrim((string) env('QRIS_GATEWAY_URL', 'http://127.0.0.1:' . $port), '/') . $cleanPath,
+            'http://127.0.0.1:' . $port . $cleanPath,
+            'http://localhost:' . $port . $cleanPath,
+        ])));
+    }
+
+    /**
+     * Sinkronisasi status pembayaran langsung ke server QRIS lokal (Port 4061) jika pesanan masih pending/unpaid.
+     * Jika sudah terbayar di gateway, otomatis tandai lunas dan jalankan fulfillOrder.
+     */
+    public static function syncPaymentFromLocalGateway(Order $order): bool
+    {
+        $order->refresh();
+        $payLower = strtolower((string) $order->payment_status);
+
+        if (!app()->runningUnitTests() && in_array($payLower, ['pending', 'unpaid', 'expired'], true) && !str_starts_with((string) $order->invoice_number, 'BAL-')) {
+            try {
+                $basePg = self::qrisGatewayBaseUrl();
+                $pgRes = Http::connectTimeout(2)->timeout(3)->get($basePg . '/api/order/status/' . $order->invoice_number);
+                if ($pgRes->successful()) {
+                    $pgData = $pgRes->json();
+                    $rawStatus = strtoupper(trim((string) ($pgData['data']['status'] ?? $pgData['status'] ?? $pgData['payment_status'] ?? '')));
+                    if (in_array($rawStatus, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT', 'BERHASIL'], true)
+                        || ($rawStatus === 'SUCCESS' && !isset($pgData['data']['status']))) {
+                        $markedPaid = Order::whereKey($order->id)
+                            ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
+                            ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
+                            ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
+                        $order->refresh();
+                        if ($markedPaid || !$order->fulfillment_started_at) {
+                            self::fulfillOrder($order);
+                            $order->refresh();
+                        }
+                        return true;
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Jika di sistem sudah berstatus lunas (paid) namun belum pernah ditembak ke API / belum pernah di-fulfill,
+        // langsung jalankan fulfillOrder sekarang juga!
+        $order->refresh();
+        if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            && !in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed'], true)
+            && !$order->fulfillment_started_at
+            && empty($order->api_trx_id)) {
+            self::fulfillOrder($order);
+            $order->refresh();
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Memeriksa dan memperbarui status pesanan API jika sebelumnya masih dalam status 'processing'
      * Dipanggil secara realtime oleh polling di halaman Invoice / Checkout / Profile.
      */
-    public static function checkAndSyncApiOrder(Order $order): array
+    public static function checkAndSyncApiOrder(Order $order, bool $forceRetryIfUnclaimed = false): array
     {
         $order->refresh();
-        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement'], true)
+        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
             || in_array(strtolower($order->order_status), ['refunded', 'canceled', 'cancelled', 'failed'], true)) {
             return self::existingResult($order);
         }
@@ -575,6 +710,11 @@ class OrderFulfillmentService
                 'sn_or_account' => $order->sn_or_account,
                 'is_updated'    => false,
             ];
+        }
+
+        // Jika pesanan sudah lunas (paid) tapi belum pernah ditembak sama sekali ke provider API, langsung tembak sekarang!
+        if (!$order->fulfillment_started_at && empty($order->api_trx_id)) {
+            return self::fulfillOrder($order);
         }
 
         $product = Product::find($order->product_id);
@@ -600,13 +740,24 @@ class OrderFulfillmentService
             $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
 
             try {
-                $statusRes = Http::withoutVerifying()->asForm()->post('https://h2h.preflix.my.id/app/', [
-                    'koneksi'  => 'get_riwayat',
-                    'id_user'  => $idUser,
-                    'key_user' => $keyUser,
-                ])->json();
+                $statusRes = Http::withoutVerifying()
+                    ->connectTimeout(5)
+                    ->timeout(10)
+                    ->asForm()
+                    ->post('https://h2h.preflix.my.id/app/', [
+                        'koneksi'  => 'get_riwayat',
+                        'id_user'  => $idUser,
+                        'key_user' => $keyUser,
+                    ])->json();
 
                 $snAkun = self::preflixCredentialsForOrder($order, $statusRes);
+
+                // Jika pembeli menekan tombol Cek Pembayaran Manual ($forceRetryIfUnclaimed = true)
+                // dan pesanan belum memiliki api_trx_id serta tidak ditemukan di riwayat Preflix, tembak ulang!
+                if (empty($snAkun) && $forceRetryIfUnclaimed && empty($order->fresh()->api_trx_id) && !self::preflixOrderExistsInHistory($order, $statusRes)) {
+                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
+                    return self::fulfillOrder($order->fresh());
+                }
             } catch (\Exception $e) {
                 Log::warning("[PREFLIX-SYNC-ERROR] " . $e->getMessage());
             }
@@ -624,6 +775,9 @@ class OrderFulfillmentService
                         return self::cancelOrFailOrderWithRefund($order, 'canceled');
                     }
                     $snAkun = self::extractSnFromData($statusRes['data'] ?? $statusRes);
+                } elseif ($forceRetryIfUnclaimed) {
+                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
+                    return self::fulfillOrder($order->fresh());
                 }
             } catch (\Exception $e) {
                 Log::warning("[PREMKU-SYNC-ERROR] " . $e->getMessage());
@@ -633,7 +787,7 @@ class OrderFulfillmentService
         // JIKA AKUN SUDAH DISEDIAKAN OLEH PROVIDER!
         if (!empty($snAkun) && !self::isWaitingText($snAkun)) {
             $updated = Order::whereKey($order->id)
-                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement')")
+                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
                 ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed')")
                 ->update([
                     'sn_or_account' => $snAkun, 'account_details' => $snAkun,
@@ -663,30 +817,78 @@ class OrderFulfillmentService
         ];
     }
 
-    private static function preflixCredentialsForOrder(Order $order, mixed $history): ?string
+    private static function preflixHistoryRows(mixed $history): array
     {
         if (!is_array($history)) {
+            return [];
+        }
+        if (isset($history['data'])) {
+            if (is_array($history['data'])) {
+                return $history['data'];
+            }
+            if (is_string($history['data'])) {
+                $decoded = json_decode($history['data'], true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+        return $history;
+    }
+
+    private static function preflixOrderExistsInHistory(Order $order, mixed $history): bool
+    {
+        $rows = self::preflixHistoryRows($history);
+        if (empty($rows)) {
+            return false;
+        }
+        $inv = trim((string) $order->invoice_number);
+        foreach ($rows as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $catatan = trim((string) ($item['catatan'] ?? ''));
+            if ($catatan !== '' && ($catatan === $inv || str_starts_with($catatan, $inv . '-ITEM'))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function preflixCredentialsForOrder(Order $order, mixed $history): ?string
+    {
+        $rows = self::preflixHistoryRows($history);
+        if (empty($rows)) {
             return null;
         }
         $quantity = max(1, (int) $order->quantity);
         $ids = array_values(array_filter(explode(',', (string) $order->api_trx_id)));
         $credentials = [];
+        $matchedStockIds = [];
         $usedRows = [];
         for ($index = 0; $index < $quantity; $index++) {
             $reference = $order->invoice_number.($quantity > 1 ? '-ITEM'.($index + 1) : '');
-            foreach ($history as $row => $item) {
+            foreach ($rows as $row => $item) {
                 if (!is_array($item) || isset($usedRows[$row])) {
                     continue;
                 }
                 $matchesId = count($ids) === $quantity && isset($item['id_stok'])
                     && (string) $item['id_stok'] === $ids[$index];
-                $matchesReference = isset($item['catatan']) && $item['catatan'] === $reference;
-                if (($matchesId || $matchesReference) && !empty($item['sn']) && !self::isWaitingText($item['sn'])) {
-                    $credentials[] = ($quantity > 1 ? '[Akun '.($index + 1)."]:\n" : '').$item['sn'];
+                $matchesReference = isset($item['catatan']) && trim((string) $item['catatan']) === $reference;
+                $itemSn = $item['sn'] ?? $item['serial_number'] ?? $item['akun'] ?? null;
+                if (($matchesId || $matchesReference) && !empty($itemSn) && !self::isWaitingText((string) $itemSn)) {
+                    $credentials[] = ($quantity > 1 ? '[Akun '.($index + 1)."]:\n" : '').$itemSn;
+                    if (!empty($item['id_stok'])) {
+                        $matchedStockIds[] = (string) $item['id_stok'];
+                    }
                     $usedRows[$row] = true;
                     break;
                 }
             }
+        }
+
+        if (empty($order->api_trx_id) && count($matchedStockIds) === $quantity) {
+            Order::whereKey($order->id)->whereNull('api_trx_id')->update(['api_trx_id' => implode(',', $matchedStockIds)]);
         }
 
         return count($credentials) === $quantity ? implode("\n\n---\n\n", $credentials) : null;
@@ -1183,9 +1385,9 @@ class OrderFulfillmentService
 
     /**
      * Batalkan / Expire otomatis semua pesanan QRIS, Top Up QRIS, dan Pendaftaran Reseller QRIS
-     * yang belum dibayar (unpaid / pending) setelah melewati batas waktu tertentu (default: 30 menit).
+     * yang belum dibayar (unpaid / pending) setelah melewati batas waktu tertentu (default: 20 menit).
      */
-    public static function expireUnpaidQrisRecords(int $minutes = 30): array
+    public static function expireUnpaidQrisRecords(int $minutes = 20): array
     {
         $minutes = max(5, $minutes);
         $cutoff = now()->subMinutes($minutes);
@@ -1205,6 +1407,11 @@ class OrderFulfillmentService
                 ->get();
 
             foreach ($staleOrders as $staleOrder) {
+                // Pastikan pesanan belum terbayar di server QRIS lokal sebelum menandai expired
+                if (self::syncPaymentFromLocalGateway($staleOrder)) {
+                    continue;
+                }
+
                 $existingNotes = trim((string) $staleOrder->notes);
                 $expireReason = "Tagihan QRIS otomatis dibatalkan karena melewati batas waktu pembayaran {$minutes} menit.";
                 $newNotes = $existingNotes !== ''

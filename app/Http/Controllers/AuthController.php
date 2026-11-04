@@ -291,7 +291,8 @@ class AuthController extends Controller
             $totalNominal = $fee;
 
             try {
-                $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
+                $basePg = \App\Services\OrderFulfillmentService::qrisGatewayBaseUrl();
+                $response = Http::connectTimeout(5)->timeout(15)->post($basePg . '/api/order', [
                     'nominal'      => $fee,
                     'callback_url' => $callbackUrl,
                 ]);
@@ -342,9 +343,49 @@ class AuthController extends Controller
 
         if (!$reg) return response()->json(['status' => 'NOT_FOUND']);
 
+        if ($reg->status === 'pending') {
+            $isPaidInPg = false;
+            if ($reg->order_id_gateway) {
+                try {
+                    $basePg = \App\Services\OrderFulfillmentService::qrisGatewayBaseUrl();
+                    $pgRes = Http::timeout(2)->get($basePg . '/api/order/status/' . $reg->order_id_gateway);
+                    if ($pgRes->successful()) {
+                        $pgData = $pgRes->json();
+                        $rawSt = strtoupper((string) ($pgData['data']['status'] ?? $pgData['status'] ?? ''));
+                        if (in_array($rawSt, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT'], true) || ($rawSt === 'SUCCESS' && !isset($pgData['data']['status']))) {
+                            $isPaidInPg = true;
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            if ($isPaidInPg) {
+                $reg->update(['status' => 'paid']);
+                $user = User::find($reg->user_id);
+                if ($user) {
+                    $user->update([
+                        'role'      => 'reseller',
+                        'is_active' => true,
+                    ]);
+                    TransactionLog::create([
+                        'user_id'     => $user->id,
+                        'type'        => 'reseller_fee',
+                        'amount'      => $reg->amount,
+                        'description' => 'Aktivasi Akun VIP Reseller - ' . $reg->invoice_number,
+                    ]);
+                }
+            } else {
+                $secondsPassed = $reg->created_at ? $reg->created_at->diffInSeconds(now()) : 9999;
+                if ($secondsPassed >= 1200) {
+                    $reg->update(['status' => 'expired']);
+                }
+            }
+        }
+
         return response()->json([
-            'status' => $reg->status,
-            'amount' => $reg->amount,
+            'status'  => $reg->status,
+            'amount'  => $reg->amount,
+            'is_paid' => $reg->status === 'paid',
         ]);
     }
 

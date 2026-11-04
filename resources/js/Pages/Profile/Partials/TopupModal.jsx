@@ -9,23 +9,52 @@ export default function TopupModal({ onClose, onSuccess }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(1200);
+  const [checking, setChecking] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [checkMsg, setCheckMsg] = useState('');
   const pollingRef = useRef(null);
 
   const presets = [10000, 25000, 50000, 100000, 200000, 500000];
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
+
+  const checkStatusOnce = async (oid, isManual = false) => {
+    if (!oid || (isManual && cooldown > 0)) return;
+    if (isManual) { setChecking(true); setCooldown(100); setCheckMsg(''); }
+    try {
+      const r = await fetch(`/topup/status/${oid}`);
+      const d = await r.json();
+      if (d.status === 'paid' || d.status === 'PAID') {
+        clearInterval(pollingRef.current);
+        setStep('done');
+        onSuccess?.();
+      } else if (isManual) {
+        setCheckMsg('Pembayaran belum terdeteksi. Pastikan nominal unik sesuai.');
+      }
+    } catch {
+      if (isManual) setCheckMsg('Gagal mengecek status pembayaran.');
+    } finally {
+      if (isManual) setChecking(false);
+    }
+  };
+
   const startPolling = (oid) => {
-    pollingRef.current = setInterval(async () => {
-      try {
-        const r = await fetch(`/topup/status/${oid}`);
-        const d = await r.json();
-        if (d.status === 'paid' || d.status === 'PAID') {
-          clearInterval(pollingRef.current);
-          setStep('done');
-          onSuccess?.();
-        }
-      } catch {}
+    pollingRef.current = setInterval(() => {
+      checkStatusOnce(oid, false);
     }, 3000);
   };
+
+  useEffect(() => {
+    if (step !== 'qris' || timeLeft <= 0) return;
+    const t = setInterval(() => setTimeLeft(prev => Math.max(0, prev - 1)), 1000);
+    return () => clearInterval(t);
+  }, [step, timeLeft]);
 
   useEffect(() => () => clearInterval(pollingRef.current), []);
 
@@ -42,6 +71,8 @@ export default function TopupModal({ onClose, onSuccess }) {
       });
       const d = await r.json();
       if (d.status === 'success') {
+        setImgLoaded(false);
+        setTimeLeft(1200);
         setQrisUrl(d.url_qris); setOrderId(d.order_id); setTotal(d.total_nominal);
         setStep('qris'); startPolling(d.order_id);
       } else {
@@ -57,7 +88,7 @@ export default function TopupModal({ onClose, onSuccess }) {
         <div className="bg-gradient-to-br from-[#0b1121] to-[#1e3a5f] p-5 flex items-center justify-between">
           <div>
             <h3 className="text-white font-black text-lg">Top Up Saldo</h3>
-            <p className="text-blue-300 text-xs font-medium mt-0.5">Bayar via QRIS otomatis</p>
+            <p className="text-blue-300 text-xs font-medium mt-0.5">Bayar via QRIS otomatis (20 Menit)</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition cursor-pointer" aria-label="Tutup Modal Top Up">
             <Icon.X className="w-4 h-4" />
@@ -81,7 +112,7 @@ export default function TopupModal({ onClose, onSuccess }) {
               {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
               {amount > 0 && <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-3 flex justify-between items-center"><span className="text-xs font-bold text-blue-700 dark:text-blue-300">Total Top Up</span><span className="font-black text-blue-700 dark:text-blue-300">{fmt.rp(amount)}</span></div>}
               <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
-                {loading ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Memproses...</> : <><Icon.Scan className="w-4 h-4" />Bayar via QRIS</>}
+                {loading ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Menyiapkan QRIS...</> : <><Icon.Scan className="w-4 h-4" />Bayar via QRIS</>}
               </button>
             </form>
           )}
@@ -89,12 +120,38 @@ export default function TopupModal({ onClose, onSuccess }) {
           {step === 'qris' && (
             <div className="text-center">
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Total Dibayar</p>
-              <p className="text-3xl font-black text-gray-900 dark:text-white mb-4">{fmt.rp(total)}</p>
-              <div className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-3 inline-block mb-4">
-                {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-52 h-52 object-contain" /> : <div className="w-52 h-52 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center text-gray-400 text-xs font-bold">Memuat QRIS...</div>}
+              <p className="text-3xl font-black text-gray-900 dark:text-white mb-2">{fmt.rp(total)}</p>
+              <p className="text-[11px] font-bold text-amber-500 mb-3">
+                ⏳ Batas Waktu (20 Menit): {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+              </p>
+              <div className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-3 inline-block mb-4 relative min-w-[208px] min-h-[208px]">
+                {!imgLoaded && (
+                  <div className="w-52 h-52 bg-gray-100 dark:bg-gray-700 rounded-xl flex flex-col items-center justify-center text-gray-500 dark:text-gray-300 text-xs font-bold animate-pulse">
+                    <div className="w-9 h-9 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin mb-2"></div>
+                    <span>Menyiapkan QRIS...</span>
+                  </div>
+                )}
+                {qrisUrl && (
+                  <img
+                    src={qrisUrl}
+                    alt="QRIS"
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => setImgLoaded(true)}
+                    className={`w-52 h-52 object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0 absolute inset-3'}`}
+                  />
+                )}
               </div>
-              <div className="flex items-center justify-center gap-2 text-blue-500 font-bold text-xs animate-pulse bg-blue-50 dark:bg-blue-900/20 py-2.5 rounded-xl mb-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>Menunggu pembayaran...
+              <button
+                type="button"
+                onClick={() => checkStatusOnce(orderId, true)}
+                disabled={checking || cooldown > 0}
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mb-2.5"
+              >
+                {checking ? 'Mengecek Pembayaran...' : cooldown > 0 ? `⏱️ Cek Pembayaran (${cooldown}s)` : '🔄 Sudah Bayar? Cek Pembayaran Sekarang'}
+              </button>
+              {checkMsg && <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-2">{checkMsg}</p>}
+              <div className="flex items-center justify-center gap-2 text-blue-500 font-bold text-xs animate-pulse bg-blue-50 dark:bg-blue-900/20 py-2 rounded-xl mb-3">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>Menunggu pembayaran otomatis...
               </div>
               <p className="text-[11px] text-gray-400 mb-3">ID: <span className="font-mono text-gray-600 dark:text-gray-300">{orderId}</span></p>
               <button onClick={onClose} className="text-gray-400 hover:text-red-500 text-xs font-bold transition cursor-pointer">Tutup (bayar nanti)</button>
@@ -116,4 +173,3 @@ export default function TopupModal({ onClose, onSuccess }) {
     </div>
   );
 }
-

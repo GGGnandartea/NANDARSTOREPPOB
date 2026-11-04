@@ -54,10 +54,10 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const [isResendingWa, setIsResendingWa] = useState(false);
   const [waSentSuccess, setWaSentSuccess] = useState(false);
 
-  // QRIS Manual Check Cooldown & 5-minute Expiration Timer
+  // QRIS Manual Check Cooldown & 20-minute Expiration Timer
   const [cooldown, setCooldown] = useState(0);
   const [isCheckingManual, setIsCheckingManual] = useState(false);
-  const [qrisTimeLeft, setQrisTimeLeft] = useState(300); // 5 menit (300 detik)
+  const [qrisTimeLeft, setQrisTimeLeft] = useState(1200); // 20 menit (1200 detik)
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
     );
   };
 
-  // Cooldown timer (100 detik)
+  // Cooldown timer (5 detik agar mudah dicek ulang di HP)
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => {
@@ -130,10 +130,10 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  // QRIS 5-minute countdown (300 detik)
+  // QRIS 20-minute countdown (1200 detik)
   useEffect(() => {
     if (!orderId || orderStatus !== 'WAITING_PAYMENT') return;
-    setQrisTimeLeft(300);
+    setQrisTimeLeft(1200);
     const timer = setInterval(() => {
       setQrisTimeLeft((prev) => {
         if (prev <= 1) {
@@ -152,14 +152,15 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const manualCheckPayment = async () => {
-    if (cooldown > 0 || isCheckingManual || !orderId) return;
+  const manualCheckPayment = async (silent = false) => {
+    const activeOrderId = completedOrder?.order_id || balanceSuccess?.order_id || orderId;
+    if ((!silent && cooldown > 0) || isCheckingManual || !activeOrderId) return;
     setIsCheckingManual(true);
-    setCooldown(100);
+    if (!silent) setCooldown(100);
     try {
-      const res = await fetch(`/checkout/status/${orderId}`);
+      const res = await fetch(`/checkout/status/${activeOrderId}?manual=1`);
       const data = await res.json();
-          if (res.ok && data.order_id) setTrackingData(data);
+      if (res.ok && data.order_id) setTrackingData(data);
       if (
         data.status === 'SUCCESS' ||
         data.status === 'LUNAS' ||
@@ -168,16 +169,23 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         data.payment_status === 'paid'
       ) {
         setOrderStatus('SUCCESS');
-        setCompletedOrder(data);
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'success',
-          title: 'Pembayaran Ditemukan & Berhasil!',
-          showConfirmButton: false,
-          timer: 3000,
-        });
-      } else {
+        setCompletedOrder((prev) => ({ ...(prev || {}), ...data }));
+        if (balanceSuccess && data.sn_or_account) {
+          setBalanceSuccess((prev) => ({ ...(prev || {}), sn_or_account: data.sn_or_account }));
+        }
+        if (!silent) {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: data.sn_or_account && !isAccountPending(data.sn_or_account)
+              ? 'Pembayaran Lunas & Akun Siap!'
+              : 'Pembayaran Ditemukan! Menyiapkan akun otomatis...',
+            showConfirmButton: false,
+            timer: 3000,
+          });
+        }
+      } else if (!silent) {
         Swal.fire({
           toast: true,
           position: 'top-end',
@@ -188,10 +196,29 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         });
       }
     } catch {
-      Swal.fire('Error', 'Gagal memeriksa status pembayaran.', 'error');
+      if (!silent) {
+        Swal.fire('Error', 'Gagal memeriksa status pembayaran.', 'error');
+      }
     }
     setIsCheckingManual(false);
   };
+
+  // Auto-cek saat pengguna di HP kembali dari aplikasi E-Wallet / M-Banking ke browser
+  useEffect(() => {
+    const activeOrderId = completedOrder?.order_id || balanceSuccess?.order_id || orderId;
+    if (!activeOrderId) return;
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        manualCheckPayment(true);
+      }
+    };
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    return () => {
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [orderId, orderStatus, completedOrder?.order_id, balanceSuccess?.order_id]);
 
   // Polling QRIS
   useEffect(() => {
@@ -491,8 +518,56 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
           href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
-        <style>{`.font-jakarta{font-family:'Plus Jakarta Sans',sans-serif}`}</style>
+        <style>{`
+          .font-jakarta{font-family:'Plus Jakarta Sans',sans-serif}
+          progress.qris-loading-spinner:indeterminate::-webkit-progress-bar,
+          progress.qris-loading-spinner:indeterminate::-webkit-progress-value,
+          progress.qris-loading-spinner:indeterminate::-moz-progress-bar { display: none; background: none; }
+          progress.qris-loading-spinner:indeterminate {
+            --size: 56px;
+            --thickness: 5px;
+            --spinner-color: #f97316;
+            --track-color: rgba(249, 115, 22, 0.18);
+            --_used-spinner-duration: 1.1s;
+            width: var(--size);
+            height: var(--size);
+            border-radius: 50%;
+            appearance: none;
+            border: 0;
+            background: conic-gradient(from 90deg, var(--spinner-color) 250deg, transparent 0) var(--track-color);
+            -webkit-mask-image: radial-gradient(farthest-side, transparent calc(100% - var(--thickness)), #000 calc(100% - var(--thickness)));
+            mask-image: radial-gradient(farthest-side, transparent calc(100% - var(--thickness)), #000 calc(100% - var(--thickness)));
+            animation: qris-spin var(--_used-spinner-duration) linear infinite;
+          }
+          @keyframes qris-spin { to { transform: rotate(360deg); } }
+          @media (prefers-reduced-motion: reduce) {
+            progress.qris-loading-spinner:indeterminate { --_used-spinner-duration: 6s; }
+          }
+        `}</style>
       </Head>
+
+      {/* OVERLAY ANIMASI SAAT MENYIAPKAN KODE QRIS */}
+      {isProcessing && payMethod === 'qris' && (
+        <div className="fixed inset-0 z-[999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-xs bg-white dark:bg-gray-900 border-2 border-orange-500/40 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+            <div className="relative flex items-center justify-center mx-auto w-16 h-16">
+              <progress aria-label="Menyiapkan QRIS" className="qris-loading-spinner" />
+              <span className="absolute text-lg font-black text-orange-500">QR</span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-base font-black text-gray-900 dark:text-white">
+                Menyiapkan Kode QRIS...
+              </p>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-300 leading-relaxed">
+                Mohon tunggu sebentar, sedang membuat kode QRIS pembayaran otomatis Anda.
+              </p>
+            </div>
+            <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full w-2/3 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 rounded-full animate-pulse mx-auto" />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="w-full max-w-[440px] my-auto bg-white dark:bg-gray-900 rounded-3xl sm:rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* HEADER */}
@@ -588,6 +663,9 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
               waSentSuccess={waSentSuccess}
               handleResendWa={handleResendWa}
               isResendingWa={isResendingWa}
+              manualCheckPayment={() => manualCheckPayment(false)}
+              isCheckingManual={isCheckingManual}
+              cooldown={cooldown}
               fmt={fmt}
             />
           )}

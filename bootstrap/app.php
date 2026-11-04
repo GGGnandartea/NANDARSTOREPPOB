@@ -92,4 +92,28 @@ return Application::configure(basePath: dirname(__DIR__))
                 return back()->with('error', $msg);
             }
         });
+
+        // Samarkan seluruh error internal / fatal / kode (500, RouteNotFound, QueryException, ViewException, dll.)
+        // menjadi tampilan ramah "Server Sedang Sibuk" agar detail kode/error teknis tidak pernah terlihat oleh pengunjung.
+        $exceptions->render(function (\Throwable $e, $request) {
+            if (
+                $e instanceof \Illuminate\Validation\ValidationException ||
+                $e instanceof \Illuminate\Auth\AuthenticationException ||
+                $e instanceof \Illuminate\Auth\Access\AuthorizationException ||
+                $e instanceof \Illuminate\Http\Exceptions\HttpResponseException ||
+                $e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException ||
+                $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
+            ) {
+                return null;
+            }
+
+            if ($request->wantsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest' || $request->is('api/*')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Server sedang sibuk melayani antrean transaksi. Silakan coba lagi dalam beberapa saat.',
+                ], 500);
+            }
+
+            return response()->view('errors.500', [], 500);
+        });
     })->create();

@@ -27,24 +27,27 @@ class AppServiceProvider extends ServiceProvider
         // Self-healing cache & rate limiter: hindari fopen Permission denied di storage/framework/cache/data
         // akibat perbedaan user root (CLI/cron) vs www (web server).
         // Jangan set 'permission' => 0666 karena FileStore::ensurePermissionsAreCorrect juga men-chmod direktori cache!
-        config([
-            'cache.stores.file_safe' => [
-                'driver' => 'file',
-                'path' => $safeCacheDir,
-                'lock_path' => $safeCacheDir,
-            ],
-            'cache.stores.failover' => [
-                'driver' => 'failover',
-                'stores' => ['file_safe', 'database', 'array'],
-            ],
-            'cache.stores.file' => [
-                'driver' => 'failover',
-                'stores' => ['file_safe', 'database', 'array'],
-            ],
-            'cache.default' => 'failover',
-            'cache.limiter' => 'failover',
-            'logging.channels.stack.ignore_exceptions' => true,
-        ]);
+        if (!$this->app->runningUnitTests()) {
+            config([
+                'app.debug' => false,
+                'cache.stores.file_safe' => [
+                    'driver' => 'file',
+                    'path' => $safeCacheDir,
+                    'lock_path' => $safeCacheDir,
+                ],
+                'cache.stores.failover' => [
+                    'driver' => 'failover',
+                    'stores' => ['file_safe', 'database', 'array'],
+                ],
+                'cache.stores.file' => [
+                    'driver' => 'failover',
+                    'stores' => ['file_safe', 'database', 'array'],
+                ],
+                'cache.default' => 'failover',
+                'cache.limiter' => 'failover',
+                'logging.channels.stack.ignore_exceptions' => true,
+            ]);
+        }
 
         // Self-healing session: jika SESSION_DRIVER=file tapi folder sessions terkunci oleh root, gunakan folder temp per-UID
         if (config('session.driver') === 'file') {

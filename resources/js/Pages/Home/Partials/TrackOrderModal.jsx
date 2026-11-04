@@ -8,6 +8,28 @@ export default function TrackOrderModal({
 }) {
     const [showAccount, setShowAccount] = useState(false);
     const [copyMessage, setCopyMessage] = useState('');
+    const [manualChecking, setManualChecking] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const t = setInterval(() => setCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+        return () => clearInterval(t);
+    }, [cooldown]);
+
+    const handleManualRecheck = async () => {
+        if (!trackResult?.order_id || manualChecking || cooldown > 0) return;
+        setManualChecking(true);
+        setCooldown(100);
+        try {
+            const response = await fetch(`/checkout/status/${encodeURIComponent(trackResult.order_id)}?manual=1`, { headers: { Accept: 'application/json' } });
+            if (response.ok) {
+                const data = await response.json();
+                setTrackResult(data);
+            }
+        } catch {}
+        setManualChecking(false);
+    };
     const progress = trackResult?.order_id ? orderProgress(trackResult) : null;
     const canShowAccount = trackResult?.is_ready && progress?.step === 2 && !progress?.exception && trackResult?.sn_or_account;
 
@@ -87,7 +109,19 @@ export default function TrackOrderModal({
                             </div>
                             {showAccount && <pre className="mt-3 p-3 rounded-lg bg-white dark:bg-gray-900 whitespace-pre-wrap break-all text-sm leading-relaxed text-gray-900 dark:text-gray-100">{trackResult.sn_or_account}</pre>}
                         </section>}
-                        {!progress.terminal && <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">Detail akun akan tersedia setelah pesanan selesai. Status diperiksa setiap 15 detik.</p>}
+                        {!progress.terminal && (
+                            <div className="mb-3 space-y-2">
+                                <p className="text-xs text-gray-600 dark:text-gray-300">Detail akun akan tersedia setelah pesanan selesai. Status diperiksa setiap 15 detik.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleManualRecheck}
+                                    disabled={manualChecking || cooldown > 0}
+                                    className="w-full min-h-11 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs sm:text-sm font-black shadow-md transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {manualChecking ? '⏳ Mengecek Pembayaran & Server...' : cooldown > 0 ? `⏱️ Cek Pembayaran (${cooldown}s)` : '🔄 Sudah Bayar? Cek Pembayaran Sekarang'}
+                                </button>
+                            </div>
+                        )}
                         <div className="flex flex-wrap gap-2">
                             {trackResult.invoice_url && <a href={trackResult.invoice_url} className="inline-flex items-center min-h-11 px-4 rounded-xl bg-orange-500 text-white text-sm font-semibold">Buka Invoice & Detail</a>}
                             {trackResult.is_guest && trackResult.invoice_url && <button type="button" onClick={() => copy(trackResult.invoice_url, 'Tautan invoice pribadi disalin. Simpan untuk membuka pesanan dari browser lain.')} className="min-h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200">Salin Tautan Pribadi</button>}

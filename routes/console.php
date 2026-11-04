@@ -76,9 +76,10 @@ Artisan::command('ppob:check-low-balance {--force : Paksa kirim pesan WhatsApp m
 
 /**
  * Cron / CLI Command: Auto-Expire / Auto-Cancel Pesanan QRIS, Top Up QRIS, dan Reseller QRIS
- * yang belum dibayar setelah melewati batas waktu 30 menit.
+ * yang belum dibayar setelah melewati batas waktu 20 menit, sekaligus sinkronisasi otomatis
+ * pesanan QRIS / API yang sudah terbayar namun belum selesai diproses.
  */
-Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa dalam menit}', function () {
+Artisan::command('orders:expire-unpaid {--minutes=20 : Batas waktu kadaluarsa dalam menit}', function () {
     try {
         \App\Models\Setting::where('key', 'store_name')
             ->where('value', 'like', '%nandar%')
@@ -86,6 +87,36 @@ Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa da
     } catch (\Throwable $e) {}
 
     $minutes = max(5, (int) $this->option('minutes'));
+
+    // 1. Cek pesanan QRIS yang masih pending dalam 25 menit terakhir ke server PG lokal (Port 4061)
+    try {
+        $recentPendingQris = Order::whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
+            ->where('created_at', '>=', now()->subMinutes($minutes + 5))
+            ->orderBy('id', 'desc')
+            ->limit(25)
+            ->get();
+
+        foreach ($recentPendingQris as $pendingOrd) {
+            OrderFulfillmentService::syncPaymentFromLocalGateway($pendingOrd);
+        }
+
+        // 2. Pastikan pesanan yang sudah paid di sistem namun belum di-fulfill / masih menunggu akun API ikut disinkronkan
+        $paidProcessingOrders = Order::whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
+            ->whereRaw("LOWER(order_status) IN ('pending', 'processing')")
+            ->where('created_at', '>=', now()->subHours(6))
+            ->orderBy('id', 'desc')
+            ->limit(25)
+            ->get();
+
+        foreach ($paidProcessingOrders as $paidOrd) {
+            OrderFulfillmentService::syncPaymentFromLocalGateway($paidOrd);
+            $paidOrd->refresh();
+            if ($paidOrd->product_type === 'api' && OrderFulfillmentService::isWaitingText($paidOrd->sn_or_account)) {
+                OrderFulfillmentService::checkAndSyncApiOrder($paidOrd);
+            }
+        }
+    } catch (\Throwable $e) {}
+
     $result = OrderFulfillmentService::expireUnpaidQrisRecords($minutes);
 
     if (($result['total'] ?? 0) === 0) {
@@ -95,7 +126,7 @@ Artisan::command('orders:expire-unpaid {--minutes=30 : Batas waktu kadaluarsa da
 
     $this->info("Auto-Expire selesai (>{$minutes} menit): {$result['orders']} Pesanan, {$result['topups']} Top Up Saldo, {$result['resellers']} Registrasi Reseller dibatalkan (expired).");
     return 0;
-})->purpose('Batalkan otomatis tagihan QRIS (Pesanan, Top Up, Reseller) yang belum dibayar lebih dari 30 menit');
+})->purpose('Batalkan otomatis tagihan QRIS (Pesanan, Top Up, Reseller) yang belum dibayar lebih dari 20 menit');
 
 /**
  * CLI Command: Reset Seluruh Data Testing ke 0 untuk Persiapan Launching Publik
@@ -174,6 +205,51 @@ Artisan::command('store:reset-launch {--keep-users : Hanya reset saldo user ke 0
     }
 })->purpose('Kosongkan seluruh data testing (order, pendapatan, mutasi, produk lokal & API) kembali ke 0 untuk persiapan launching');
 
+Artisan::command('catalog:sync-api-stock', function () {
+    $front = app(\App\Http\Controllers\FrontController::class);
+    $apiData = $front->getApiStockData(true);
+
+    if (empty($apiData)) {
+        $this->warn('Data stok API kosong atau seluruh provider sedang dinonaktifkan.');
+        return;
+    }
+
+    $updatedCount = 0;
+    $cleanedDescCount = 0;
+    $allProducts = \App\Models\Product::all();
+    foreach ($allProducts as $product) {
+        $rawDesc = $product->getRawOriginal('description');
+        $cleanDesc = \App\Models\Product::cleanText($rawDesc);
+        $updates = [];
+
+        if ($rawDesc !== null && $cleanDesc !== $rawDesc) {
+            $updates['description'] = $cleanDesc;
+            $cleanedDescCount++;
+        }
+
+        if ($product->type === 'api') {
+            $apiId = (string) ($product->api_product_id ?? '');
+            if ($apiId !== '' && isset($apiData[$apiId])) {
+                $liveStock = max(0, (int) ($apiData[$apiId]['stock'] ?? 0));
+                if ((int) $product->getRawOriginal('stock') !== $liveStock) {
+                    $updates['stock'] = $liveStock;
+                    $updatedCount++;
+                }
+            }
+        }
+
+        if (!empty($updates)) {
+            \App\Models\Product::whereKey($product->id)->update($updates);
+        }
+    }
+
+    \Illuminate\Support\Facades\Cache::forget('preflix_extra_data');
+    \Illuminate\Support\Facades\Cache::forget('admin_live_api_catalog_v3');
+
+    $this->info('Sinkronisasi stok API selesai (' . count($apiData) . ' item cache diperbarui, ' . $updatedCount . ' stok DB disinkronkan, ' . $cleanedDescCount . ' deskripsi produk dirapikan).');
+})->purpose('Sinkronisasi stok katalog produk API (Premku & Preflix) di background agar halaman beranda selalu instan');
+
 Schedule::command('orders:expire-unpaid')->everyMinute()->withoutOverlapping();
+Schedule::command('catalog:sync-api-stock')->everyTwoMinutes()->withoutOverlapping();
 Schedule::command('ppob:sync-pending')->everyThreeMinutes()->withoutOverlapping();
 Schedule::command('ppob:check-low-balance')->everyThirtyMinutes()->withoutOverlapping();

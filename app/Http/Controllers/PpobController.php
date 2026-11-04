@@ -89,7 +89,7 @@ class PpobController extends Controller
             Log::error('[PPOB-GET-PRODUCTS-ERROR] ' . $e->getMessage());
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Gagal mengambil data produk: ' . $e->getMessage(),
+                'message' => 'Server sedang sibuk memuat daftar produk. Silakan muat ulang sesaat lagi.',
                 'data'    => []
             ], 500);
         }
@@ -164,7 +164,7 @@ class PpobController extends Controller
             Log::error('[PPOB-INQUIRY-ERROR] ' . $e->getMessage());
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Gagal melakukan inquiry tagihan: ' . $e->getMessage(),
+                'message' => 'Server sedang sibuk mengecek tagihan. Silakan coba lagi dalam beberapa saat.',
             ], 500);
         }
     }
@@ -394,14 +394,29 @@ class PpobController extends Controller
         $invoiceNumber = 'PPOB-QRIS-' . strtoupper(Str::random(6)) . '-' . time();
         $callbackUrl   = url('/api/webhook/qris');
 
-        try {
-            $qrisRes = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
-                'nominal'      => (int) round($nominal),
-                'callback_url' => $callbackUrl,
-            ]);
-            $qrisData = $qrisRes->json();
-        } catch (\Exception $e) {
-            Log::error('[PPOB-QRIS-CONNECTION-ERROR] ' . $e->getMessage());
+        $qrisData = null;
+        $lastPpobQrisErr = null;
+        $qrisEndpoints = \App\Services\OrderFulfillmentService::qrisGatewayEndpoints('/api/order');
+
+        foreach ($qrisEndpoints as $endpoint) {
+            try {
+                $qrisRes = Http::connectTimeout(5)->timeout(15)->post($endpoint, [
+                    'nominal'      => (int) round($nominal),
+                    'callback_url' => $callbackUrl,
+                ]);
+                $json = $qrisRes->json();
+                if (is_array($json)) {
+                    $qrisData = $json;
+                    break;
+                }
+            } catch (\Exception $e) {
+                $lastPpobQrisErr = $e->getMessage();
+            }
+        }
+
+        if ($qrisData === null) {
+            Log::error('[PPOB-QRIS-CONNECTION-ERROR] ' . $lastPpobQrisErr);
+            \App\Http\Controllers\FrontController::notifyAdminQrisOffline('Checkout PPOB QRIS (' . $productName . ' - Rp ' . number_format($nominal, 0, ',', '.') . ')', $lastPpobQrisErr);
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Gagal membuat tagihan QRIS. Pastikan server pembayaran aktif.'
@@ -472,8 +487,12 @@ class PpobController extends Controller
             return response()->json(['status' => 'NOT_FOUND'], 404);
         }
 
-        // Otomatis tandai pesanan QRIS pending lebih dari 30 menit sebagai expired
-        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 30) {
+        // Sinkronisasi langsung ke PG QRIS lokal (Port 4061) & jalankan fulfillOrder jika sudah lunas namun belum pernah diproses
+        OrderFulfillmentService::syncPaymentFromLocalGateway($order);
+        $order->refresh();
+
+        // Otomatis tandai pesanan QRIS pending lebih dari 20 menit sebagai expired
+        if (in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true) && $order->created_at && $order->created_at->diffInMinutes(now()) >= 20) {
             Order::whereKey($order->id)
                 ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid')")
                 ->whereRaw("LOWER(order_status) IN ('pending', 'unpaid')")
@@ -486,7 +505,7 @@ class PpobController extends Controller
         if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement'], true)
             && in_array(strtolower((string) $order->order_status), ['processing', 'pending'], true)) {
             $throttleKey = 'ppob_poll_checkstatus_' . $order->id;
-            if (!Cache::has($throttleKey)) {
+            if ((bool) request()->boolean('manual') || !Cache::has($throttleKey)) {
                 Cache::put($throttleKey, 1, 8);
                 try {
                     OrderFulfillmentService::reconcilePendingPpobOrder($order);
@@ -523,6 +542,9 @@ class PpobController extends Controller
         if (!$order) {
             return response()->json(['status' => 'error', 'message' => 'Pesanan tidak ditemukan.'], 404);
         }
+
+        OrderFulfillmentService::syncPaymentFromLocalGateway($order);
+        $order->refresh();
 
         $res = OrderFulfillmentService::reconcilePendingPpobOrder($order);
         $order->refresh();

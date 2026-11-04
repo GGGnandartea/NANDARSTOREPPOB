@@ -400,6 +400,16 @@
                     </span>
                 </a>
 
+                <a href="{{ route('admin.settings.payment') }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.settings.payment*') ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Gateway Payment</span>
+                        <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">QRIS</span>
+                    </span>
+                </a>
+
                 <a href="{{ route('admin.settings', ['section' => 'whatsapp']) }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
                    class="sidebar-link {{ request()->routeIs('admin.settings') && $currentSection === 'whatsapp' ? 'active' : '' }}">

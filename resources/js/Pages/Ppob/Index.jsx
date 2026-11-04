@@ -112,7 +112,8 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkoutModal, setCheckoutModal] = useState(false);
   const [qrisData, setQrisData] = useState(null);
-  const [qrisTimer, setQrisTimer] = useState(300);
+  const [qrisTimer, setQrisTimer] = useState(1200);
+  const [isCheckingQris, setIsCheckingQris] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
   const [pendingRepeatCode, setPendingRepeatCode] = useState('');
@@ -545,7 +546,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
         data = JSON.parse(rawText);
       } catch (jsonErr) {
         console.error('[PPOB-JSON-PARSE-ERR]', rawText);
-        throw new Error('Respon dari server tidak valid (' + res.status + '). Silakan coba lagi.');
+        throw new Error('Server sedang sibuk melayani antrean transaksi. Silakan coba lagi dalam beberapa saat.');
       }
 
       if (res.ok && data.status === 'success') {
@@ -566,16 +567,16 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
           }
           setSuccessOrder(normalizedOrder);
         } else {
-          // QRIS mode
+          // QRIS mode (20 Menit = 1200 detik)
           setCheckoutModal(false);
           setQrisData(normalizedOrder);
-          setQrisTimer(300);
+          setQrisTimer(1200);
         }
       } else {
         Swal.fire({
-          icon: 'error',
-          title: 'Transaksi Gagal',
-          text: data?.message || `Terjadi kesalahan saat memproses pesanan (Kode: ${res.status}).`,
+          icon: 'warning',
+          title: 'Server Sedang Sibuk',
+          text: data?.message || 'Server sedang sibuk memproses antrean pesanan. Silakan coba lagi dalam beberapa saat.',
           confirmButtonColor: '#10b981',
         });
       }
@@ -652,6 +653,50 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       clearInterval(poller);
     };
   }, [qrisData]);
+
+  const manualCheckPpobQris = async () => {
+    if (!qrisData?.order_id || isCheckingQris) return;
+    setIsCheckingQris(true);
+    try {
+      const res = await fetch(`/ppob/status/${encodeURIComponent(qrisData.order_id)}?manual=1`);
+      const data = await res.json();
+      if (data.status === 'completed' || data.payment_status === 'paid') {
+        setQrisData(null);
+        setCheckoutModal(false);
+        if (BILL_TABS.includes(activeTab)) {
+          setTagihanInquiryResult(null);
+          setSelectedProduct(null);
+        }
+        setSuccessOrder({
+          ...qrisData,
+          ...data,
+        });
+      } else if (['expired', 'failed', 'canceled'].includes(data.payment_status)) {
+        setQrisData(null);
+        Swal.fire({ icon: 'warning', title: 'Pembayaran berakhir', text: 'Silakan buat pesanan baru.', confirmButtonColor: '#10b981' });
+      } else {
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'info',
+          title: 'Pembayaran belum masuk. Pastikan nominal QRIS sesuai.',
+          showConfirmButton: false,
+          timer: 2500,
+        });
+      }
+    } catch {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'warning',
+        title: 'Gagal mengecek status pembayaran. Coba lagi.',
+        showConfirmButton: false,
+        timer: 2500,
+      });
+    } finally {
+      setIsCheckingQris(false);
+    }
+  };
 
   const copyToClipboard = (text) => {
     if (!text) return;
@@ -833,6 +878,26 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
         onConfirmPayment={handleConfirmPayment}
       />
 
+      {/* LOADING OVERLAY SAAT MENYIAPKAN QRIS PPOB */}
+      {isSubmitting && paymentMethod === 'qris' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#111827] border border-emerald-200 dark:border-emerald-500/30 rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl">
+            <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-2xl border-4 border-emerald-100 dark:border-emerald-900/40"></div>
+              <div className="absolute inset-0 rounded-2xl border-4 border-transparent border-t-emerald-500 border-r-teal-400 animate-spin"></div>
+              <span className="text-2xl">📲</span>
+            </div>
+            <h3 className="text-base font-black text-gray-900 dark:text-white mb-1">Menyiapkan Kode QRIS...</h3>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-relaxed mb-3">
+              Sedang membuat tagihan QRIS otomatis untuk <strong className="text-emerald-600 dark:text-emerald-400">{selectedProduct?.name}</strong>. Mohon tunggu sebentar.
+            </p>
+            <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full w-2/3 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QRIS POPUP DISPLAY */}
       <PpobQrisModal
         qrisData={qrisData}
@@ -840,6 +905,8 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
         qrisTimer={qrisTimer}
         copyToClipboard={copyToClipboard}
         isCopied={isCopied}
+        onManualCheck={manualCheckPpobQris}
+        isCheckingQris={isCheckingQris}
       />
 
       {/* SUCCESS MODAL POPUP */}

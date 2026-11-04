@@ -666,19 +666,122 @@ class AdminController extends Controller
     }
 
     public function paymentSettings() {
-        $tripayEnv = Setting::where('key', 'tripay_env')->value('value') ?? 'sandbox';
-        $tripayMerchant = Setting::where('key', 'tripay_merchant')->value('value');
-        $tripayApiKey = Setting::where('key', 'tripay_api_key')->value('value');
+        $qrisCfg        = \App\Services\OrderFulfillmentService::qrisGatewayConfig();
+        $qrisProtocol   = $qrisCfg['protocol'];
+        $qrisHost       = $qrisCfg['host'];
+        $qrisPort       = $qrisCfg['port'];
+        $qrisGatewayUrl = $qrisCfg['base_url'];
+
+        $tripayEnv        = Setting::where('key', 'tripay_env')->value('value') ?? 'sandbox';
+        $tripayMerchant   = Setting::where('key', 'tripay_merchant')->value('value');
+        $tripayApiKey     = Setting::where('key', 'tripay_api_key')->value('value');
         $tripayPrivateKey = Setting::where('key', 'tripay_private_key')->value('value');
-        return view('admin.payment_settings', compact('tripayEnv', 'tripayMerchant', 'tripayApiKey', 'tripayPrivateKey'));
+
+        return view('admin.payment_settings', compact(
+            'qrisProtocol',
+            'qrisHost',
+            'qrisPort',
+            'qrisGatewayUrl',
+            'tripayEnv',
+            'tripayMerchant',
+            'tripayApiKey',
+            'tripayPrivateKey'
+        ));
     }
 
     public function savePaymentSettings(Request $request) {
-        Setting::updateOrCreate(['key' => 'tripay_env'], ['value' => $request->tripay_env]);
-        Setting::updateOrCreate(['key' => 'tripay_merchant'], ['value' => $request->tripay_merchant]);
-        Setting::updateOrCreate(['key' => 'tripay_api_key'], ['value' => $request->tripay_api_key]);
-        Setting::updateOrCreate(['key' => 'tripay_private_key'], ['value' => $request->tripay_private_key]);
-        return back()->with('success', 'Konfigurasi Tripay berhasil disimpan!');
+        if ($request->has('qris_gateway_host') || $request->has('qris_gateway_port') || $request->has('qris_gateway_url')) {
+            $protocol  = strtolower(trim((string) $request->input('qris_gateway_protocol', 'http'))) === 'https' ? 'https' : 'http';
+            $rawHost   = trim((string) $request->input('qris_gateway_host', '127.0.0.1'));
+            $rawPort   = preg_replace('/[^0-9]/', '', (string) $request->input('qris_gateway_port', '4061')) ?: '4061';
+            $customUrl = rtrim(trim((string) $request->input('qris_gateway_url', '')), '/');
+
+            // Jika admin mengisi URL penuh di kolom qris_gateway_url (seperti modal URL Gateway WA), ekstrak protokol, host, dan port otomatis
+            if ($customUrl !== '' && !$request->filled('qris_gateway_host')) {
+                $parsed = parse_url($customUrl);
+                if (is_array($parsed) && !empty($parsed['host'])) {
+                    $protocol = strtolower((string) ($parsed['scheme'] ?? 'http')) === 'https' ? 'https' : 'http';
+                    $rawHost  = $parsed['host'];
+                    $rawPort  = !empty($parsed['port']) ? (string) $parsed['port'] : ($protocol === 'https' ? '443' : '4061');
+                }
+            } else {
+                $rawHost = preg_replace('#^https?://#i', '', $rawHost);
+                $rawHost = trim(explode('/', $rawHost)[0]) ?: '127.0.0.1';
+                if (str_contains($rawHost, ':')) {
+                    [$hPart, $pPart] = explode(':', $rawHost, 2);
+                    $rawHost = trim($hPart) ?: '127.0.0.1';
+                    if (preg_match('/^\d+$/', trim($pPart))) {
+                        $rawPort = trim($pPart);
+                    }
+                }
+                $customUrl = (($rawPort === '80' && $protocol === 'http') || ($rawPort === '443' && $protocol === 'https'))
+                    ? "{$protocol}://{$rawHost}"
+                    : "{$protocol}://{$rawHost}:{$rawPort}";
+            }
+
+            Setting::updateOrCreate(['key' => 'qris_gateway_protocol'], ['value' => $protocol]);
+            Setting::updateOrCreate(['key' => 'qris_gateway_host'], ['value' => $rawHost]);
+            Setting::updateOrCreate(['key' => 'qris_gateway_port'], ['value' => $rawPort]);
+            Setting::updateOrCreate(['key' => 'qris_gateway_url'], ['value' => $customUrl]);
+        }
+
+        if ($request->has('tripay_env') || $request->has('tripay_merchant') || $request->has('tripay_api_key') || $request->has('tripay_private_key')) {
+            Setting::updateOrCreate(['key' => 'tripay_env'], ['value' => $request->tripay_env ?? 'sandbox']);
+            Setting::updateOrCreate(['key' => 'tripay_merchant'], ['value' => $request->tripay_merchant]);
+            Setting::updateOrCreate(['key' => 'tripay_api_key'], ['value' => $request->tripay_api_key]);
+            Setting::updateOrCreate(['key' => 'tripay_private_key'], ['value' => $request->tripay_private_key]);
+        }
+
+        $cfg = \App\Services\OrderFulfillmentService::qrisGatewayConfig();
+        return back()->with('success', 'Konfigurasi Server Payment Gateway (' . $cfg['base_url'] . ') berhasil disimpan!');
+    }
+
+    public function paymentGatewayStatus() {
+        $cfg   = \App\Services\OrderFulfillmentService::qrisGatewayConfig();
+        $host  = $cfg['host'];
+        $port  = (int) ($cfg['port'] ?: 4061);
+        $base  = $cfg['base_url'];
+        $start = microtime(true);
+
+        $isPortOpen = false;
+        $fp = @fsockopen($host, $port, $errno, $errstr, 1.5);
+        if (!$fp && in_array($host, ['127.0.0.1', 'localhost'], true)) {
+            $altHost = $host === '127.0.0.1' ? 'localhost' : '127.0.0.1';
+            $fp = @fsockopen($altHost, $port, $errno, $errstr, 1.5);
+        }
+        if ($fp) {
+            $isPortOpen = true;
+            @fclose($fp);
+        }
+
+        $latencyMs = (int) round((microtime(true) - $start) * 1000);
+
+        return response()->json([
+            'status'     => $isPortOpen ? 'online' : 'offline',
+            'connected'  => $isPortOpen,
+            'protocol'   => $cfg['protocol'],
+            'host'       => $host,
+            'port'       => (string) $port,
+            'base_url'   => $base,
+            'latency_ms' => $latencyMs,
+        ]);
+    }
+
+    public function paymentGatewayTestConnection(Request $request) {
+        $cfg   = \App\Services\OrderFulfillmentService::qrisGatewayConfig();
+        $host  = $cfg['host'];
+        $port  = (int) ($cfg['port'] ?: 4061);
+        $base  = $cfg['base_url'];
+        $start = microtime(true);
+
+        $fp = @fsockopen($host, $port, $errno, $errstr, 2.0);
+        if ($fp) {
+            @fclose($fp);
+            $latencyMs = (int) round((microtime(true) - $start) * 1000);
+            return back()->with('success', "Koneksi ke Server Payment Gateway ({$base} — IP/Host: {$host}, Port: {$port}) BERHASIL & AKTIF! (Respon: {$latencyMs} ms)");
+        }
+
+        return back()->with('error', "Server Payment Gateway di {$base} (IP/Host: {$host}, Port: {$port}) belum merespons / sedang Offline. Pastikan service Node.js payment_gateway berjalan di port {$port}.");
     }
 
     public function terms() {
@@ -761,7 +864,7 @@ class AdminController extends Controller
                             ? $p['description']
                             : (isset($p['catatan']) && is_string($p['catatan']) ? $p['catatan'] : null);
                         if ($desc) {
-                            $desc = str_replace($mojibake, $fixed, $desc);
+                            $desc = Product::cleanText($desc);
                         }
                         $apiId = 'PREMKU-' . $p['id'];
                         $fetched[$apiId] = [
@@ -840,8 +943,7 @@ class AdminController extends Controller
                                             }
                                             $desc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? $p['deskripsi'] : null;
                                             if ($desc) {
-                                                $desc = str_replace(['\r\n', '\n'], "\n", $desc);
-                                                $desc = str_replace($mojibake, $fixed, $desc);
+                                                $desc = Product::cleanText($desc);
                                             }
                                             $preflixExtraData['PREFLIX-' . $p['id_produk']] = [
                                                 'icon'      => isset($p['icon']) && is_string($p['icon']) ? $p['icon'] : null,
@@ -878,7 +980,7 @@ class AdminController extends Controller
                                     continue;
                                 }
                                 $apiId = 'PREFLIX-' . $p['id_produk'];
-                                $fallbackDesc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? str_replace($mojibake, $fixed, $p['deskripsi']) : null;
+                                $fallbackDesc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? Product::cleanText($p['deskripsi']) : null;
                                 $fallbackIcon = isset($p['icon']) && is_string($p['icon']) ? $p['icon'] : null;
 
                                 $fetched[$apiId] = [
@@ -888,7 +990,7 @@ class AdminController extends Controller
                                     'stock'          => max(0, (int) ($p['stok'] ?? 0)),
                                     'provider'       => 'Preflix',
                                     'image'          => $preflixExtraData[$apiId]['icon'] ?? $fallbackIcon,
-                                    'description'    => $preflixExtraData[$apiId]['deskripsi'] ?? $fallbackDesc,
+                                    'description'    => Product::cleanText($preflixExtraData[$apiId]['deskripsi'] ?? $fallbackDesc),
                                 ];
                             }
                         }
@@ -952,7 +1054,7 @@ class AdminController extends Controller
         $dbMarkups = Product::where('type', 'api')->get()->keyBy('api_product_id');
         foreach ($dbMarkups as $key => $item) {
             if (!empty($item->description) && is_string($item->description)) {
-                $item->description = str_replace($mojibake, $fixed, $item->description);
+                $item->description = Product::cleanText($item->description);
             }
         }
 

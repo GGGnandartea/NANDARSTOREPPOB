@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icons, fmt } from './PpobConstants';
 
 export default function PpobQrisModal({
@@ -7,7 +7,31 @@ export default function PpobQrisModal({
   qrisTimer,
   copyToClipboard,
   isCopied,
+  onManualCheck,
+  isCheckingQris = false,
 }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    setImgLoaded(false);
+    setCooldown(0);
+  }, [qrisData?.url_qris]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => {
+      setCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
+
+  const handleManualCheckClick = () => {
+    if (cooldown > 0 || isCheckingQris || !onManualCheck) return;
+    setCooldown(100);
+    onManualCheck();
+  };
+
   if (!qrisData) return null;
 
   return (
@@ -15,24 +39,28 @@ export default function PpobQrisModal({
       <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/10 rounded-3xl w-full max-w-sm p-5 sm:p-6 text-center shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto">
         <div>
           <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/40">
-            Menunggu Pembayaran QRIS
+            Menunggu Pembayaran QRIS (20 Menit)
           </span>
           <h3 className="text-base font-black text-gray-900 dark:text-white mt-2">Scan QRIS untuk Membayar</h3>
-          <p className="text-xs text-gray-400">Selesaikan sebelum waktu berakhir</p>
+          <p className="text-xs text-gray-400">Selesaikan sesuai nominal unik sebelum waktu berakhir</p>
         </div>
 
-        {qrisData.invoice_url && (
-          <div className="text-xs text-gray-500">
-            <a href={qrisData.invoice_url} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-600 underline">
-              Buka dan simpan tautan invoice
-            </a>
-            <p className="mt-1">Simpan tautan ini secara pribadi untuk mengakses pesanan tamu.</p>
-          </div>
-        )}
-
         {qrisData.url_qris && (
-          <div className="p-3 bg-white rounded-2xl border inline-block shadow-inner">
-            <img src={qrisData.url_qris} alt="QRIS" className="w-52 h-52 mx-auto object-contain" />
+          <div className="p-3 bg-white rounded-2xl border inline-block shadow-inner relative min-w-[208px] min-h-[208px]">
+            {!imgLoaded && (
+              <div className="w-52 h-52 flex flex-col items-center justify-center bg-slate-50 rounded-xl animate-pulse">
+                <div className="w-10 h-10 rounded-full border-4 border-emerald-200 border-t-emerald-500 animate-spin mb-2"></div>
+                <p className="text-xs font-black text-slate-700">Menyiapkan QRIS...</p>
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Memuat kode QR pembayaran</p>
+              </div>
+            )}
+            <img
+              src={qrisData.url_qris}
+              alt="QRIS"
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgLoaded(true)}
+              className={`w-52 h-52 mx-auto object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0 absolute inset-3'}`}
+            />
           </div>
         )}
 
@@ -53,18 +81,52 @@ export default function PpobQrisModal({
           <p className="text-[11px] font-bold text-amber-500 mt-1 flex items-center justify-center gap-1">
             <Icons.Clock className="w-3.5 h-3.5" />
             <span>
-              Waktu tersisa: {Math.floor(qrisTimer / 60)}:{(qrisTimer % 60).toString().padStart(2, '0')}
+              Waktu tersisa (20 Menit): {Math.floor(qrisTimer / 60)}:{(qrisTimer % 60).toString().padStart(2, '0')}
             </span>
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 font-bold text-xs hover:bg-gray-200 transition"
-        >
-          Batalkan
-        </button>
+        {/* TOMBOL CEK PEMBAYARAN & INVOICE YANG MUDAH TERLIHAT DI HP */}
+        <div className="space-y-2 pt-1">
+          {onManualCheck && (
+            <button
+              type="button"
+              onClick={handleManualCheckClick}
+              disabled={isCheckingQris || cooldown > 0}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCheckingQris ? (
+                <>
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                  <span>Mengecek Status Pembayaran...</span>
+                </>
+              ) : cooldown > 0 ? (
+                <span>⏱️ Cek Pembayaran ({cooldown}s)</span>
+              ) : (
+                <span>🔄 Sudah Bayar? Cek Pembayaran Sekarang</span>
+              )}
+            </button>
+          )}
+
+          {qrisData.invoice_url && (
+            <a
+              href={qrisData.invoice_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-300 font-bold text-xs hover:bg-emerald-100 transition flex items-center justify-center gap-1.5"
+            >
+              <span>📄 Buka &amp; Simpan Halaman Invoice</span>
+            </a>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 font-bold text-xs hover:bg-gray-200 transition"
+          >
+            Tutup / Batalkan
+          </button>
+        </div>
       </div>
     </div>
   );

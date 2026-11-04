@@ -310,23 +310,43 @@
                 <p class="text-xs font-semibold text-gray-400 mb-4">Layanan gateway & API pihak ketiga</p>
 
                 @php
+                    $qrisCfgDash = \App\Services\OrderFulfillmentService::qrisGatewayConfig();
+                    $qrisDashHost = $qrisCfgDash['host'] ?: '127.0.0.1';
+                    $qrisDashPort = (int) ($qrisCfgDash['port'] ?: 4061);
                     $isQrisOnline = false;
-                    $qrisFp = @fsockopen('127.0.0.1', 4061, $qErrNo, $qErrStr, 1.0);
-                    if (!$qrisFp) {
-                        $qrisFp = @fsockopen('localhost', 4061, $qErrNo, $qErrStr, 1.0);
+                    $qrisFp = @fsockopen($qrisDashHost, $qrisDashPort, $qErrNo, $qErrStr, 1.0);
+                    if (!$qrisFp && in_array($qrisDashHost, ['127.0.0.1', 'localhost'], true)) {
+                        $qrisFp = @fsockopen($qrisDashHost === '127.0.0.1' ? 'localhost' : '127.0.0.1', $qrisDashPort, $qErrNo, $qErrStr, 1.0);
                     }
                     if ($qrisFp) {
                         $isQrisOnline = true;
                         @fclose($qrisFp);
                     }
+
+                    $isWaPortOpen = false;
+                    $isWaConnected = false;
+                    $waFp = @fsockopen('127.0.0.1', 5001, $wErrNo, $wErrStr, 1.0);
+                    if (!$waFp) {
+                        $waFp = @fsockopen('localhost', 5001, $wErrNo, $wErrStr, 1.0);
+                    }
+                    if ($waFp) {
+                        $isWaPortOpen = true;
+                        @fclose($waFp);
+                        try {
+                            $waRes = \Illuminate\Support\Facades\Http::connectTimeout(1)->timeout(1)->get('http://127.0.0.1:5001/api/status');
+                            if ($waRes->successful() && !empty($waRes->json('connected'))) {
+                                $isWaConnected = true;
+                            }
+                        } catch (\Throwable $e) {}
+                    }
                 @endphp
                 <div class="space-y-3">
-                    <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
+                    <a href="{{ route('admin.settings.payment') }}" class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5 hover:border-blue-500/30 transition-colors">
                         <div class="flex items-center gap-2.5">
                             <span class="w-2.5 h-2.5 rounded-full {{ $isQrisOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500' }}"></span>
                             <div>
                                 <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Payment Gateway Node.js</p>
-                                <p class="text-[10px] text-gray-400 font-mono">Port 4061 (QRIS Realtime)</p>
+                                <p class="text-[10px] text-gray-400 font-mono">{{ $qrisDashHost }}:{{ $qrisDashPort }} (QRIS Realtime)</p>
                             </div>
                         </div>
                         @if($isQrisOnline)
@@ -338,14 +358,37 @@
                                 Mati / Offline
                             </span>
                         @endif
-                    </div>
+                    </a>
+
+                    <a href="{{ route('admin.wa_verifications', ['section' => 'gateway']) }}" class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5 hover:border-orange-500/30 transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-2.5 h-2.5 rounded-full {{ $isWaConnected ? 'bg-emerald-500 animate-pulse' : ($isWaPortOpen ? 'bg-amber-500 animate-pulse' : 'bg-rose-500') }}"></span>
+                            <div>
+                                <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Bot WhatsApp Gateway</p>
+                                <p class="text-[10px] text-gray-400 font-mono">Port 5001 (Notifikasi & OTP WA)</p>
+                            </div>
+                        </div>
+                        @if($isWaConnected)
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                Terhubung
+                            </span>
+                        @elseif($isWaPortOpen)
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                                Perlu Scan QR
+                            </span>
+                        @else
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                                Mati / Offline
+                            </span>
+                        @endif
+                    </a>
 
                     <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
                         <div class="flex items-center gap-2.5">
                             <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                             <div>
                                 <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Database MySQL</p>
-                                <p class="text-[10px] text-gray-400 font-mono">XAMPP Server</p>
+                                <p class="text-[10px] text-gray-400 font-mono">MySQL / MariaDB Server</p>
                             </div>
                         </div>
                         <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">

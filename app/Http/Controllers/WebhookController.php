@@ -30,8 +30,9 @@ class WebhookController extends Controller
             return response()->json(['error' => 'Akses Ditolak (Signature Salah)'], 403);
         }
 
-        if ($event_header === 'payment.success' && ($payload['status'] ?? '') === 'terbayar') {
-            $orderId = $payload['orderId'] ?? null;
+        $rawStatus = strtolower(trim((string) ($payload['data']['status'] ?? $payload['status'] ?? $payload['payment_status'] ?? '')));
+        if (($event_header === 'payment.success' || empty($event_header)) && in_array($rawStatus, ['terbayar', 'paid', 'lunas', 'settlement', 'berhasil', 'success'], true)) {
+            $orderId = $payload['orderId'] ?? $payload['order_id'] ?? ($payload['data']['orderId'] ?? null);
             if (!is_string($orderId) || $orderId === '') {
                 return response()->json(['error' => 'Invalid orderId'], 400);
             }

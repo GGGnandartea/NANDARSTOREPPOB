@@ -31,23 +31,56 @@ export default function Register() {
     const [showQrisModal, setShowQrisModal] = useState(false);
     const [qrisData, setQrisData] = useState(null);
     const [paymentStatus, setPaymentStatus] = useState('pending'); // pending | paid | failed
+    const [qrisImgLoaded, setQrisImgLoaded] = useState(false);
+    const [qrisTimeLeft, setQrisTimeLeft] = useState(1200);
+    const [checkingManual, setCheckingManual] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+    const [checkMsg, setCheckMsg] = useState('');
     const pollingRef = useRef(null);
+
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const t = setInterval(() => setCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+        return () => clearInterval(t);
+    }, [cooldown]);
+
+    useEffect(() => {
+        if (!showQrisModal || paymentStatus !== 'pending' || qrisTimeLeft <= 0) return;
+        const t = setInterval(() => setQrisTimeLeft((prev) => Math.max(0, prev - 1)), 1000);
+        return () => clearInterval(t);
+    }, [showQrisModal, paymentStatus, qrisTimeLeft]);
+
+    const checkResellerPaymentOnce = async (isManual = false) => {
+        if (!qrisData?.order_id || (isManual && (cooldown > 0 || checkingManual))) return;
+        if (isManual) {
+            setCheckingManual(true);
+            setCooldown(100);
+            setCheckMsg('');
+        }
+        try {
+            const res = await fetch(`/reseller/payment-status/${qrisData.order_id}`);
+            const data = await res.json();
+            if (data.status === 'paid' || data.status === 'PAID') {
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                setPaymentStatus('paid');
+                setTimeout(() => {
+                    window.location.href = '/login?registered=reseller';
+                }, 2500);
+            } else if (isManual) {
+                setCheckMsg('Pembayaran belum terdeteksi. Pastikan nominal unik sesuai.');
+            }
+        } catch (e) {
+            if (isManual) setCheckMsg('Gagal mengecek status pembayaran.');
+        } finally {
+            if (isManual) setCheckingManual(false);
+        }
+    };
 
     // Polling status pembayaran reseller
     useEffect(() => {
         if (showQrisModal && qrisData?.order_id && paymentStatus === 'pending') {
-            pollingRef.current = setInterval(async () => {
-                try {
-                    const res = await fetch(`/reseller/payment-status/${qrisData.order_id}`);
-                    const data = await res.json();
-                    if (data.status === 'paid' || data.status === 'PAID') {
-                        clearInterval(pollingRef.current);
-                        setPaymentStatus('paid');
-                        setTimeout(() => {
-                            window.location.href = '/login?registered=reseller';
-                        }, 2500);
-                    }
-                } catch (e) {}
+            pollingRef.current = setInterval(() => {
+                checkResellerPaymentOnce(false);
             }, 3000);
         }
 
@@ -81,6 +114,10 @@ export default function Register() {
         try {
             const data = await submitAuth('/register', payload);
             if (data.status === 'reseller_payment_required') {
+                setQrisImgLoaded(false);
+                setQrisTimeLeft(1200);
+                setCooldown(0);
+                setCheckMsg('');
                 setQrisData(data);
                 setPaymentStatus('pending');
                 setShowQrisModal(true);
@@ -392,21 +429,41 @@ export default function Register() {
                             {paymentStatus === 'pending' ? (
                                 <>
                                     <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Total Pembayaran</p>
-                                    <p className="text-3xl font-black text-amber-400 mb-4">
+                                    <p className="text-3xl font-black text-amber-400 mb-2">
                                         Rp {new Intl.NumberFormat('id-ID').format(qrisData?.total_nominal || 20000)}
+                                    </p>
+                                    <p className="text-[11px] font-bold text-amber-400 mb-3">
+                                        ⏳ Batas Waktu (20 Menit): {String(Math.floor(qrisTimeLeft / 60)).padStart(2, '0')}:{String(qrisTimeLeft % 60).padStart(2, '0')}
                                     </p>
 
                                     {/* QRIS Container */}
-                                    <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mb-4">
-                                        {qrisData?.url_qris ? (
-                                            <img src={qrisData.url_qris} alt="QRIS Reseller" className="w-52 h-52 object-contain" />
-                                        ) : (
-                                            <div className="w-52 h-52 flex flex-col items-center justify-center text-gray-600 font-bold text-xs p-4">
-                                                <svg className="w-10 h-10 text-gray-400 mb-2 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8H3m2 0V6m1 2h12M3 16h2m0 0v2m0-2h4m4 0h6m-6-8h.01M5 16h.01"></path></svg>
-                                                Scan QRIS pada aplikasi e-wallet Anda
+                                    <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mb-4 relative min-w-[208px] min-h-[208px]">
+                                        {!qrisImgLoaded && (
+                                            <div className="w-52 h-52 flex flex-col items-center justify-center text-gray-600 font-bold text-xs p-4 animate-pulse">
+                                                <div className="w-9 h-9 rounded-full border-4 border-amber-200 border-t-amber-500 animate-spin mb-2"></div>
+                                                <span>Menyiapkan QRIS...</span>
                                             </div>
                                         )}
+                                        {qrisData?.url_qris && (
+                                            <img
+                                                src={qrisData.url_qris}
+                                                alt="QRIS Reseller"
+                                                onLoad={() => setQrisImgLoaded(true)}
+                                                onError={() => setQrisImgLoaded(true)}
+                                                className={`w-52 h-52 object-contain transition-opacity duration-300 ${qrisImgLoaded ? 'opacity-100' : 'opacity-0 absolute inset-3'}`}
+                                            />
+                                        )}
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => checkResellerPaymentOnce(true)}
+                                        disabled={checkingManual || cooldown > 0}
+                                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mb-2.5"
+                                    >
+                                        {checkingManual ? 'Mengecek Pembayaran...' : cooldown > 0 ? `⏱️ Cek Pembayaran (${cooldown}s)` : '🔄 Sudah Bayar? Cek Pembayaran Sekarang'}
+                                    </button>
+                                    {checkMsg && <p className="text-[11px] font-bold text-amber-300 mb-2">{checkMsg}</p>}
 
                                     {/* Indikator Menunggu */}
                                     <div className="flex items-center justify-center gap-2 text-amber-400 font-bold text-xs bg-amber-500/10 py-2.5 rounded-xl border border-amber-500/20 mb-3 animate-pulse">

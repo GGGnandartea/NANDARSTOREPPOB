@@ -607,19 +607,55 @@
             <div class="invoice-title-block">
                 <div class="invoice-label">Official Invoice</div>
                 <div class="invoice-number">{{ $order->invoice_number }}</div>
+                @php
+                    $invPayStatusLower = strtolower((string) ($order->payment_status ?? ''));
+                    $rawAccountTop = $order->sn_or_account ?: ($order->account_details ?: '');
+                    $isWaitingTop = \App\Services\OrderFulfillmentService::isWaitingText($rawAccountTop);
+                @endphp
                 @if(in_array($invStatusLower, ['refunded', 'failed', 'canceled', 'cancelled'], true))
                     <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
                         {{ $isGuestOrder ? '✕ DIBATALKAN OLEH SERVER — KLAIM REFUND ADMIN' : '✕ DIBATALKAN OLEH SERVER — SALDO DI-REFUND' }}
+                    </div>
+                @elseif($invPayStatusLower === 'expired')
+                    <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
+                        ✕ KEDALUWARSA
+                    </div>
+                @elseif(in_array($invPayStatusLower, ['pending', 'unpaid'], true))
+                    <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #d97706; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
+                        ⏳ MENUNGGU PEMBAYARAN
                     </div>
                 @elseif($invIsPpob && in_array($invStatusLower, ['processing', 'pending'], true))
                     <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #d97706; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
                         ⏳ PENDING (DIPROSES)
                     </div>
+                @elseif($isWaitingTop && $invPayStatusLower === 'paid')
+                    <div style="display: inline-block; padding: 6px 14px; border-radius: 999px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #d97706; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px;">
+                        ⏳ LUNAS — MENYIAPKAN AKUN
+                    </div>
                 @else
-                    <div class="badge-paid">✓ {{ $invIsPpob && in_array($invStatusLower, ['completed', 'success', 'lunas'], true) ? 'BERHASIL' : strtoupper($order->payment_status ?? 'LUNAS') }}</div>
+                    <div class="badge-paid">✓ {{ $invIsPpob && in_array($invStatusLower, ['completed', 'success', 'lunas'], true) ? 'BERHASIL' : 'LUNAS' }}</div>
                 @endif
             </div>
         </div>
+
+        @if(!in_array($invStatusLower, ['refunded', 'failed', 'canceled', 'cancelled'], true) && !$invIsPpob && ($isWaitingTop || in_array($invPayStatusLower, ['pending', 'unpaid'], true)))
+        <!-- TOMBOL CEK STATUS PEMBAYARAN & AMBIL AKUN DI BAGIAN ATAS AGAR LANGSUNG TERLIHAT DI HP -->
+        <div id="invoice-top-check-bar" class="no-print" style="background: linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%); border: 2px solid #f59e0b; border-radius: 16px; padding: 14px 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.25);">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 12px; font-weight: 800; color: #92400e; line-height: 1.4;">
+                    @if(in_array($invPayStatusLower, ['pending', 'unpaid'], true))
+                        ⏳ Sudah membayar QRIS? Klik tombol di bawah untuk sinkronisasi pembayaran &amp; ambil akun otomatis:
+                    @else
+                        ✅ Pembayaran sudah LUNAS! Klik tombol di bawah jika akun belum muncul otomatis:
+                    @endif
+                </div>
+                <button type="button" id="btn-top-check-order" onclick="checkInvoiceOrderStatus()" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border-radius: 12px; background: linear-gradient(135deg, #f97316, #ea580c); color: #ffffff; border: none; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);">
+                    <span id="btn-top-check-label">🔄 Sudah Bayar? Cek Pembayaran &amp; Ambil Akun Sekarang</span>
+                </button>
+            </div>
+            <div id="invoice-top-check-feedback" style="display: none; padding: 9px 12px; border-radius: 10px; background: #ffffff; border: 1px solid #fcd34d; color: #92400e; font-size: 12px; font-weight: 700; text-align: center;"></div>
+        </div>
+        @endif
 
         <!-- INFO GRID -->
         <div class="info-grid">
@@ -653,6 +689,15 @@
                             if (in_array($invStatusLower, ['failed', 'refunded', 'canceled', 'cancelled'], true)) {
                                 $statusLayananLabel = $isGuestOrder ? 'DIBATALKAN OLEH SERVER (KLAIM REFUND)' : 'DIBATALKAN OLEH SERVER (SALDO DI-REFUND)';
                                 $statusLayananColor = '#dc2626';
+                            } elseif (in_array($invPayStatusLower, ['pending', 'unpaid'], true)) {
+                                $statusLayananLabel = 'MENUNGGU PEMBAYARAN';
+                                $statusLayananColor = '#d97706';
+                            } elseif ($isWaitingTop || in_array($invStatusLower, ['processing', 'pending'], true)) {
+                                $statusLayananLabel = 'SEDANG DIPROSES OTOMATIS';
+                                $statusLayananColor = '#d97706';
+                            } elseif (in_array($invStatusLower, ['completed', 'success', 'lunas'], true)) {
+                                $statusLayananLabel = 'SELESAI (TERKIRIM)';
+                                $statusLayananColor = '#15803d';
                             }
                         }
                     @endphp
@@ -949,7 +994,7 @@
                 <div style="max-width: 280px; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 0 auto 12px auto; position: relative;">
                     <div style="width: 55%; height: 100%; background: linear-gradient(90deg, #f97316, #fbbf24); border-radius: 999px; animation: live-progress 1.5s ease-in-out infinite alternate;"></div>
                 </div>
-                <span style="font-size: 11px; font-weight: 600; color: #64748b;">
+                <span style="font-size: 11px; font-weight: 600; color: #64748b; display: block;">
                     Sedang memproses dan menyiapkan lisensi Anda secara otomatis...
                 </span>
             </div>
@@ -1001,27 +1046,135 @@
             });
         }
 
-        @if($isWaiting)
+        @if($isWaiting || in_array(strtolower((string) ($order->payment_status ?? '')), ['pending', 'unpaid'], true))
+        var invoiceStatusUrl = @json(route('checkout.status', array_filter(['orderId' => $order->invoice_number, 'token' => $order->user_id ? null : $order->guest_access_token])));
+        var initialPaymentStatus = @json(strtolower((string) ($order->payment_status ?? '')));
+        var invoiceCheckCooldown = 0;
+        var invoiceCooldownTimer = null;
+
+        function startInvoiceCheckCooldown() {
+            invoiceCheckCooldown = 100;
+            var topBtn = document.getElementById('btn-top-check-order');
+            var topLabel = document.getElementById('btn-top-check-label');
+            if (invoiceCooldownTimer) clearInterval(invoiceCooldownTimer);
+
+            function updateCooldownUi() {
+                if (invoiceCheckCooldown > 0) {
+                    if (topBtn) {
+                        topBtn.disabled = true;
+                        topBtn.style.opacity = '0.65';
+                        topBtn.style.cursor = 'not-allowed';
+                    }
+                    if (topLabel) {
+                        topLabel.innerText = '⏱️ Cek Pembayaran (' + invoiceCheckCooldown + 's)';
+                    }
+                } else {
+                    clearInterval(invoiceCooldownTimer);
+                    invoiceCooldownTimer = null;
+                    if (topBtn) {
+                        topBtn.disabled = false;
+                        topBtn.style.opacity = '1';
+                        topBtn.style.cursor = 'pointer';
+                    }
+                    if (topLabel) {
+                        topLabel.innerText = '🔄 Sudah Bayar? Cek Pembayaran & Ambil Akun Sekarang';
+                    }
+                }
+            }
+
+            updateCooldownUi();
+            invoiceCooldownTimer = setInterval(function() {
+                invoiceCheckCooldown = Math.max(0, invoiceCheckCooldown - 1);
+                updateCooldownUi();
+            }, 1000);
+        }
+
+        function checkInvoiceOrderStatus() {
+            if (invoiceCheckCooldown > 0) return;
+            var topBtn = document.getElementById('btn-top-check-order');
+            var topLabel = document.getElementById('btn-top-check-label');
+            var topFeedback = document.getElementById('invoice-top-check-feedback');
+
+            if (topBtn) { topBtn.disabled = true; topBtn.style.opacity = '0.7'; }
+            if (topLabel) topLabel.innerText = '⏳ Mengecek Pembayaran & Server Provider...';
+
+            var manualUrl = invoiceStatusUrl + (invoiceStatusUrl.indexOf('?') !== -1 ? '&manual=1' : '?manual=1');
+
+            fetch(manualUrl)
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data && data.is_ready && data.sn_or_account) {
+                        var waitingCard = document.getElementById('credential-waiting-card');
+                        var topBar = document.getElementById('invoice-top-check-bar');
+                        var credContainer = document.getElementById('credential-container');
+                        var credText = document.getElementById('credential-text');
+
+                        if (waitingCard) waitingCard.style.display = 'none';
+                        if (topBar) topBar.style.display = 'none';
+                        if (credContainer) credContainer.style.display = 'block';
+                        if (credText) credText.innerText = data.sn_or_account;
+                        if (initialPaymentStatus !== 'paid') {
+                            window.location.reload();
+                        }
+                        return;
+                    }
+
+                    var st = String((data && data.order_status) || '').toLowerCase();
+                    var paySt = String((data && data.status) || '').toLowerCase();
+
+                    if (['completed', 'success', 'lunas', 'failed', 'refunded'].indexOf(st) !== -1) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    var msg = 'Pembayaran QRIS belum terdeteksi di sistem. Pastikan nominal unik sesuai.';
+                    if (paySt === 'paid') {
+                        msg = '✅ Pembayaran sudah LUNAS! Sistem sedang menembak API order & menyiapkan akun Anda secara otomatis, mohon tunggu beberapa detik...';
+                        if (initialPaymentStatus !== 'paid') {
+                            setTimeout(function() { window.location.reload(); }, 1500);
+                        }
+                    } else if (paySt === 'expired') {
+                        msg = '⚠️ Waktu pembayaran QRIS (20 menit) telah berakhir.';
+                    }
+
+                    if (topFeedback) { topFeedback.style.display = 'block'; topFeedback.innerText = msg; }
+                })
+                .catch(function() {
+                    var errMsg = 'Gagal menghubungi server. Silakan coba lagi.';
+                    if (topFeedback) { topFeedback.style.display = 'block'; topFeedback.innerText = errMsg; }
+                })
+                .finally(function() {
+                    startInvoiceCheckCooldown();
+                });
+        }
+
         (function() {
-            var statusUrl = @json(route('checkout.status', array_filter(['orderId' => $order->invoice_number, 'token' => $order->user_id ? null : $order->guest_access_token])));
             var pollCount = 0;
-            var maxPoll = 50;
+            var maxPoll = 120;
             var pollInterval = setInterval(function() {
                 pollCount++;
-                fetch(statusUrl)
+                fetch(invoiceStatusUrl)
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
                         if (data && data.is_ready && data.sn_or_account) {
                             clearInterval(pollInterval);
                             var waitingCard = document.getElementById('credential-waiting-card');
+                            var topBar = document.getElementById('invoice-top-check-bar');
                             var credContainer = document.getElementById('credential-container');
                             var credText = document.getElementById('credential-text');
 
                             if (waitingCard) waitingCard.style.display = 'none';
+                            if (topBar) topBar.style.display = 'none';
                             if (credContainer) credContainer.style.display = 'block';
                             if (credText) credText.innerText = data.sn_or_account;
+                            if (initialPaymentStatus !== 'paid') {
+                                window.location.reload();
+                            }
                         } else if (data && data.order_status && ['completed', 'success', 'lunas', 'failed', 'refunded'].indexOf(String(data.order_status).toLowerCase()) !== -1) {
                             clearInterval(pollInterval);
+                            window.location.reload();
+                        } else if (initialPaymentStatus !== 'paid' && data && String(data.status || '').toLowerCase() === 'paid') {
+                            initialPaymentStatus = 'paid';
                             window.location.reload();
                         } else if (pollCount >= maxPoll) {
                             clearInterval(pollInterval);

@@ -13,7 +13,18 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [qrisData, setQrisData] = useState(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(1200);
+  const [checking, setChecking] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [checkMsg, setCheckMsg] = useState('');
   const pollingRef = useRef(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((prev) => (prev > 0 ? prev - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
 
   const getCsrf = () => {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -53,6 +64,8 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
           setStep('done');
           setTimeout(() => window.location.reload(), 2000);
         } else {
+          setImgLoaded(false);
+          setTimeLeft(1200);
           setQrisData(data);
           setStep('qris');
           startPolling(data.order_id);
@@ -64,19 +77,37 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
     setLoading(false);
   };
 
+  const checkStatusOnce = async (orderId, isManual = false) => {
+    if (!orderId || (isManual && cooldown > 0)) return;
+    if (isManual) { setChecking(true); setCooldown(100); setCheckMsg(''); }
+    try {
+      const res = await fetch(`/reseller/payment-status/${orderId}`);
+      const data = await res.json();
+      if (data.status === 'paid' || data.status === 'PAID') {
+        clearInterval(pollingRef.current);
+        setStep('done');
+        setTimeout(() => window.location.reload(), 2000);
+      } else if (isManual) {
+        setCheckMsg('Pembayaran belum terdeteksi. Pastikan nominal unik sesuai.');
+      }
+    } catch {
+      if (isManual) setCheckMsg('Gagal mengecek status pembayaran.');
+    } finally {
+      if (isManual) setChecking(false);
+    }
+  };
+
   const startPolling = (orderId) => {
-    pollingRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/reseller/payment-status/${orderId}`);
-        const data = await res.json();
-        if (data.status === 'paid' || data.status === 'PAID') {
-          clearInterval(pollingRef.current);
-          setStep('done');
-          setTimeout(() => window.location.reload(), 2000);
-        }
-      } catch {}
+    pollingRef.current = setInterval(() => {
+      checkStatusOnce(orderId, false);
     }, 3000);
   };
+
+  useEffect(() => {
+    if (step !== 'qris' || timeLeft <= 0) return;
+    const t = setInterval(() => setTimeLeft(prev => Math.max(0, prev - 1)), 1000);
+    return () => clearInterval(t);
+  }, [step, timeLeft]);
 
   useEffect(() => () => clearInterval(pollingRef.current), []);
 
@@ -194,7 +225,7 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
                     disabled={loading}
                     className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:brightness-110 text-gray-950 font-black py-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-3"
                   >
-                    {loading ? 'Memproses...' : method === 'balance' ? `Bayar ${fmt.rp(fee)} dari Saldo` : 'Tampilkan QRIS Pembayaran →'}
+                    {loading ? 'Menyiapkan QRIS...' : method === 'balance' ? `Bayar ${fmt.rp(fee)} dari Saldo` : 'Tampilkan QRIS Pembayaran →'}
                   </button>
                 </>
               )}
@@ -204,18 +235,41 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
           {step === 'qris' && (
             <div className="text-center">
               <p className="text-xs text-gray-400 font-medium uppercase mb-1">Total Pembayaran</p>
-              <p className="text-3xl font-black text-amber-400 mb-4">{fmt.rp(qrisData?.total_nominal || 20000)}</p>
+              <p className="text-3xl font-black text-amber-400 mb-2">{fmt.rp(qrisData?.total_nominal || 20000)}</p>
+              <p className="text-[11px] font-bold text-amber-400 mb-3">
+                ⏳ Batas Waktu (20 Menit): {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+              </p>
               
-              <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mb-4">
-                {qrisData?.url_qris ? (
-                  <img src={qrisData.url_qris} alt="QRIS Upgrade" className="w-48 h-48 object-contain" />
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-gray-500 text-xs font-bold">Memuat QRIS...</div>
+              <div className="bg-white p-3 rounded-2xl inline-block shadow-lg mb-4 relative min-w-[192px] min-h-[192px]">
+                {!imgLoaded && (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center text-gray-500 text-xs font-bold animate-pulse">
+                    <div className="w-9 h-9 rounded-full border-4 border-amber-200 border-t-amber-500 animate-spin mb-2"></div>
+                    <span>Menyiapkan QRIS...</span>
+                  </div>
+                )}
+                {qrisData?.url_qris && (
+                  <img
+                    src={qrisData.url_qris}
+                    alt="QRIS Upgrade"
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => setImgLoaded(true)}
+                    className={`w-48 h-48 object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0 absolute inset-3'}`}
+                  />
                 )}
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-amber-400 font-bold text-xs bg-amber-500/10 py-2.5 rounded-xl border border-amber-500/20 mb-3 animate-pulse">
-                <div className="w-2 h-2 rounded-full bg-amber-400"></div>Menunggu pembayaran...
+              <button
+                type="button"
+                onClick={() => checkStatusOnce(qrisData?.order_id, true)}
+                disabled={checking || cooldown > 0}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mb-2.5"
+              >
+                {checking ? 'Mengecek Pembayaran...' : cooldown > 0 ? `⏱️ Cek Pembayaran (${cooldown}s)` : '🔄 Sudah Bayar? Cek Pembayaran Sekarang'}
+              </button>
+              {checkMsg && <p className="text-[11px] font-bold text-amber-300 mb-2">{checkMsg}</p>}
+
+              <div className="flex items-center justify-center gap-2 text-amber-400 font-bold text-xs bg-amber-500/10 py-2 rounded-xl border border-amber-500/20 mb-3 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-amber-400"></div>Menunggu pembayaran otomatis...
               </div>
               <p className="text-[11px] text-gray-400 mb-2">ID: <span className="font-mono text-gray-300">{qrisData?.order_id}</span></p>
               <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-300 font-bold transition cursor-pointer">Tutup (bayar nanti)</button>
@@ -236,4 +290,3 @@ export default function UpgradeResellerModal({ onClose, userBalance, resellerSet
     </div>
   );
 }
-

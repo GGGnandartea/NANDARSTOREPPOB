@@ -17,6 +17,9 @@ export default function CheckoutSuccessSection({
   waSentSuccess,
   handleResendWa,
   isResendingWa,
+  manualCheckPayment,
+  isCheckingManual = false,
+  cooldown = 0,
   fmt,
 }) {
   const rawAccountText = completedOrder?.sn_or_account || balanceSuccess?.sn_or_account;
@@ -236,13 +239,29 @@ export default function CheckoutSuccessSection({
           </div>
 
           {/* Animated Progress Bar */}
-          <div className="max-w-xs mx-auto space-y-2 relative z-10">
+          <div className="max-w-xs mx-auto space-y-2.5 relative z-10">
             <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden relative shadow-inner">
               <div className="h-full w-1/2 bg-gradient-to-r from-orange-500 via-amber-400 to-orange-500 rounded-full animate-progress-slide"></div>
             </div>
             <p className="text-[11px] text-gray-400 dark:text-gray-300 font-medium">
               Sedang memproses dan menyiapkan lisensi Anda secara otomatis...
             </p>
+            {manualCheckPayment && (
+              <button
+                type="button"
+                onClick={manualCheckPayment}
+                disabled={isCheckingManual || cooldown > 0}
+                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-60 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isCheckingManual ? (
+                  <span>⏳ Mengecek Akun ke Server...</span>
+                ) : cooldown > 0 ? (
+                  <span>⏱️ Cek Status Akun ({cooldown}s)</span>
+                ) : (
+                  <span>🔄 Cek &amp; Ambil Akun Sekarang</span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       ) : (
