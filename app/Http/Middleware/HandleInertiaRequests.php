@@ -17,7 +17,15 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $adminWa = \App\Models\Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
+        $allSettings = \Illuminate\Support\Facades\Cache::remember('inertia_shared_settings', 15, function () {
+            try {
+                return \App\Models\Setting::pluck('value', 'key')->all();
+            } catch (\Throwable $e) {
+                return [];
+            }
+        });
+
+        $adminWa = $allSettings['admin_whatsapp'] ?? '082317458496';
         $adminWaClean = preg_replace('/[^0-9]/', '', $adminWa);
         if (str_starts_with($adminWaClean, '0')) {
             $adminWaClean = '62' . substr($adminWaClean, 1);
@@ -29,18 +37,18 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'favoriteProductIds' => fn () => $request->user()?->favoriteProducts()->pluck('products.id')->all() ?? [],
             'store' => [
-                'name'                => \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita',
-                'logo'                => \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null,
-                'tagline'             => \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis',
+                'name'                => ($allSettings['store_name'] ?? null) ?: 'PremiumKita',
+                'logo'                => ($allSettings['store_logo'] ?? null) ?: null,
+                'tagline'             => ($allSettings['store_tagline'] ?? null) ?: 'Platform Digital & Akun Premium Otomatis',
                 'admin_whatsapp'      => $adminWaClean,
-                'whatsapp_group_link' => \App\Models\Setting::where('key', 'whatsapp_group_link')->value('value') ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H',
+                'whatsapp_group_link' => ($allSettings['whatsapp_group_link'] ?? null) ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H',
                 'announcement'        => [
-                    'enabled' => \App\Models\Setting::where('key', 'announcement_enabled')->value('value') === '1',
-                    'text'    => \App\Models\Setting::where('key', 'announcement_text')->value('value') ?: '',
-                    'badge'   => \App\Models\Setting::where('key', 'announcement_badge')->value('value') ?: 'INFO',
-                    'theme'   => \App\Models\Setting::where('key', 'announcement_theme')->value('value') ?: 'promo',
-                    'speed'   => \App\Models\Setting::where('key', 'announcement_speed')->value('value') ?: 'normal',
-                    'link'    => \App\Models\Setting::where('key', 'announcement_link')->value('value') ?: '',
+                    'enabled' => ($allSettings['announcement_enabled'] ?? '0') === '1',
+                    'text'    => ($allSettings['announcement_text'] ?? null) ?: '',
+                    'badge'   => ($allSettings['announcement_badge'] ?? null) ?: 'INFO',
+                    'theme'   => ($allSettings['announcement_theme'] ?? null) ?: 'promo',
+                    'speed'   => ($allSettings['announcement_speed'] ?? null) ?: 'normal',
+                    'link'    => ($allSettings['announcement_link'] ?? null) ?: '',
                 ],
                 'ppob_status'         => $ppobStatus,
             ],

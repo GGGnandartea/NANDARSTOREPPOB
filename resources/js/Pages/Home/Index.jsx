@@ -118,10 +118,11 @@ export default function Home({
         };
         document.addEventListener('mousedown', handleClickOutside);
 
-        // Polling realtime ringan untuk produk & penjualan hari ini
+        // Polling ringan hanya saat tab sedang aktif dibuka (mencegah lonjakan CPU VPS)
         const silentRefresh = setInterval(() => {
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
             router.reload({ only: ['products', 'topSellingToday'], preserveState: true, preserveScroll: true, replace: true });
-        }, 12000);
+        }, 45000);
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
@@ -135,6 +136,7 @@ export default function Home({
     useEffect(() => {
         let isMounted = true;
         const fetchLiveTopSelling = async () => {
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
             try {
                 const res = await fetch('/api/top-selling-today');
                 if (res.ok) {
@@ -146,7 +148,7 @@ export default function Home({
             } catch (err) {}
         };
 
-        const timer = setInterval(fetchLiveTopSelling, 15000);
+        const timer = setInterval(fetchLiveTopSelling, 45000);
         return () => {
             isMounted = false;
             clearInterval(timer);

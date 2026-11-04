@@ -598,16 +598,33 @@ class FrontController extends Controller
 
         $callbackUrl = url('/api/webhook/qris'); // Pastikan ini URL Publik Anda nanti
 
-        try {
-            // Tembak QRIS Server Lokal Anda
-            $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
-                'nominal' => round($nominal), 
-                'callback_url' => $callbackUrl
-            ]);
-            $data = $response->json();
-        } catch (\Exception $e) { 
-            \Illuminate\Support\Facades\Log::error('QRIS Node.js API connection error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Gagal terhubung ke Node.js QRIS API Lokal. Pastikan server nyala.']); 
+        $data = null;
+        $lastQrisError = null;
+        $qrisEndpoints = array_unique(array_filter([
+            rtrim((string) env('QRIS_GATEWAY_URL', 'http://127.0.0.1:4061'), '/') . '/api/order',
+            'http://127.0.0.1:4061/api/order',
+            'http://localhost:4061/api/order',
+        ]));
+
+        foreach ($qrisEndpoints as $endpoint) {
+            try {
+                $response = Http::connectTimeout(5)->timeout(15)->post($endpoint, [
+                    'nominal'      => round($nominal),
+                    'callback_url' => $callbackUrl,
+                ]);
+                $json = $response->json();
+                if (is_array($json)) {
+                    $data = $json;
+                    break;
+                }
+            } catch (\Exception $e) {
+                $lastQrisError = $e->getMessage();
+            }
+        }
+
+        if ($data === null) {
+            \Illuminate\Support\Facades\Log::error('QRIS Node.js API connection error: ' . $lastQrisError);
+            return response()->json(['status' => 'error', 'message' => 'Gagal terhubung ke Node.js QRIS API Lokal (Port 4061). Pastikan service QRIS Node.js di VPS sedang berjalan.']);
         }
 
         if (empty($data['data']['orderId'])) {
@@ -1323,7 +1340,7 @@ class FrontController extends Controller
         $callbackUrl = url('/api/webhook/topup-qris');
 
         try {
-            $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
+            $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
                 'nominal'      => (int) $request->amount,
                 'callback_url' => $callbackUrl,
             ]);
@@ -1489,7 +1506,7 @@ class FrontController extends Controller
         $callbackUrl = url('/api/webhook/reseller-qris');
 
         try {
-            $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
+            $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
                 'nominal'      => $fee,
                 'callback_url' => $callbackUrl,
             ]);

@@ -395,7 +395,7 @@ class PpobController extends Controller
         $callbackUrl   = url('/api/webhook/qris');
 
         try {
-            $qrisRes = Http::timeout(6)->post('http://127.0.0.1:4061/api/order', [
+            $qrisRes = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
                 'nominal'      => (int) round($nominal),
                 'callback_url' => $callbackUrl,
             ]);

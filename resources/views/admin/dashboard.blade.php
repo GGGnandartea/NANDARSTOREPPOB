@@ -309,18 +309,35 @@
                 <h3 class="text-base font-black text-gray-900 dark:text-white mb-1">Status Integrasi Sistem</h3>
                 <p class="text-xs font-semibold text-gray-400 mb-4">Layanan gateway & API pihak ketiga</p>
 
+                @php
+                    $isQrisOnline = false;
+                    $qrisFp = @fsockopen('127.0.0.1', 4061, $qErrNo, $qErrStr, 1.0);
+                    if (!$qrisFp) {
+                        $qrisFp = @fsockopen('localhost', 4061, $qErrNo, $qErrStr, 1.0);
+                    }
+                    if ($qrisFp) {
+                        $isQrisOnline = true;
+                        @fclose($qrisFp);
+                    }
+                @endphp
                 <div class="space-y-3">
                     <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">
                         <div class="flex items-center gap-2.5">
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span class="w-2.5 h-2.5 rounded-full {{ $isQrisOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500' }}"></span>
                             <div>
                                 <p class="text-xs font-bold text-gray-800 dark:text-gray-200">Payment Gateway Node.js</p>
                                 <p class="text-[10px] text-gray-400 font-mono">Port 4061 (QRIS Realtime)</p>
                             </div>
                         </div>
-                        <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                            Aktif
-                        </span>
+                        @if($isQrisOnline)
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                Aktif
+                            </span>
+                        @else
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                                Mati / Offline
+                            </span>
+                        @endif
                     </div>
 
                     <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5">

@@ -291,7 +291,7 @@ class AuthController extends Controller
             $totalNominal = $fee;
 
             try {
-                $response = Http::timeout(5)->post('http://127.0.0.1:4061/api/order', [
+                $response = Http::connectTimeout(5)->timeout(15)->post('http://127.0.0.1:4061/api/order', [
                     'nominal'      => $fee,
                     'callback_url' => $callbackUrl,
                 ]);
