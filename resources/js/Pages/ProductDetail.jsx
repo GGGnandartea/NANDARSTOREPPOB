@@ -195,12 +195,12 @@ export default function ProductDetail({ product, auth }) {
                                             <p className="text-[11px] text-slate-300">Akun Admin tidak dapat checkout / belanja.</p>
                                         </div>
                                     </div>
-                                    <Link 
+                                    <a 
                                         href="/admin/dashboard" 
                                         className="w-full sm:w-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-xs rounded-xl transition text-center shrink-0"
                                     >
                                         Dashboard Admin →
-                                    </Link>
+                                    </a>
                                 </div>
                             ) : isOutOfStock ? (
                                 <button disabled className="w-full bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 font-extrabold py-4 rounded-2xl cursor-not-allowed">

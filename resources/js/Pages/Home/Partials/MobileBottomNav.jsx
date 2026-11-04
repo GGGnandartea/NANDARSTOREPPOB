@@ -97,10 +97,17 @@ export default function MobileBottomNav({
                 </button>
 
                 {/* 5. Profil / Masuk */}
-                <Link href={auth?.user ? (auth.user.role === 'admin' ? '/admin/dashboard' : '/profile') : '/login'} className="min-h-12 flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-300 hover:text-orange-500 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                    <span className="text-[11px] font-medium mt-1 tracking-tight">{auth?.user ? 'Profil' : 'Masuk'}</span>
-                </Link>
+                {auth?.user?.role === 'admin' ? (
+                    <a href="/admin/dashboard" className="min-h-12 flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-300 hover:text-orange-500 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span className="text-[11px] font-medium mt-1 tracking-tight">Admin</span>
+                    </a>
+                ) : (
+                    <Link href={auth?.user ? '/profile' : '/login'} className="min-h-12 flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-300 hover:text-orange-500 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <span className="text-[11px] font-medium mt-1 tracking-tight">{auth?.user ? 'Profil' : 'Masuk'}</span>
+                    </Link>
+                )}
             </div>
         </div>
     );

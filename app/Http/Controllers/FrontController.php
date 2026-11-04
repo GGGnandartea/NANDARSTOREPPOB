@@ -907,6 +907,9 @@ class FrontController extends Controller
     public function profile() {
         $user = Auth::user();
         if ($user && $user->role === 'admin') {
+            if (request()->header('X-Inertia')) {
+                return Inertia::location(route('admin.dashboard', [], false));
+            }
             return redirect()->route('admin.dashboard');
         }
 

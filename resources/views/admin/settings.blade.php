@@ -285,7 +285,7 @@
                 <ol class="text-xs text-gray-600 dark:text-gray-300 space-y-2.5 list-decimal list-inside leading-relaxed font-medium">
                     <li>Login ke <strong>dash.cloudflare.com</strong> lalu pilih menu <strong>Turnstile</strong> di sidebar kiri.</li>
                     <li>Klik tombol <strong>Add Widget</strong> dan beri nama (misal: <code class="font-mono text-orange-500">PremiumKita</code>).</li>
-                    <li>Tambahkan domain Anda (<code class="font-mono">v2.premiumkita.com</code> dan <code class="font-mono">premiumkita.com</code>).</li>
+                    <li>Tambahkan domain Anda (<code class="font-mono">premiumkita.com</code>).</li>
                     <li>Pilih mode <strong>Managed (Recommended)</strong> lalu klik <strong>Create</strong>.</li>
                     <li>Salin <strong>Site Key</strong> &amp; <strong>Secret Key</strong> ke formulir di samping, ubah status menjadi <strong>AKTIF</strong>, lalu klik Simpan.</li>
                 </ol>

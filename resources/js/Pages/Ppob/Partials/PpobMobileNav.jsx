@@ -47,15 +47,27 @@ export default function PpobMobileNav({ user }) {
         </Link>
 
         {/* 5. Profil */}
-        <Link
-          href={user ? (user.role === 'admin' ? '/admin/dashboard' : '/profile') : '/login'}
-          className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
-          <span className="text-[8.5px] font-black mt-0.5 tracking-tight">{user ? 'Profil' : 'Masuk'}</span>
-        </Link>
+        {user?.role === 'admin' ? (
+          <a
+            href="/admin/dashboard"
+            className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            <span className="text-[8.5px] font-black mt-0.5 tracking-tight">Admin</span>
+          </a>
+        ) : (
+          <Link
+            href={user ? '/profile' : '/login'}
+            className="flex flex-col items-center justify-center py-1 text-gray-500 dark:text-gray-400 hover:text-orange-500"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+            <span className="text-[8.5px] font-black mt-0.5 tracking-tight">{user ? 'Profil' : 'Masuk'}</span>
+          </Link>
+        )}
       </div>
     </div>
   );

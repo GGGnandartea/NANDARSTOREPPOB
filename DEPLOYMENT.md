@@ -1,17 +1,17 @@
 # Deploy NandarStore ke VPS aaPanel
 
-## Perbaikan error daftar pada v2.premiumkita.com
+## Perbaikan error daftar pada premiumkita.com
 
 Pemeriksaan respons situs menemukan cookie `XSRF-TOKEN` dan cookie sesi dikirim
 dengan `Domain=v2.nandarstore.my.id`, padahal situs diakses melalui
-`v2.premiumkita.com`. Browser menolak cookie lintas domain tersebut. Akibatnya,
+`premiumkita.com`. Browser menolak cookie lintas domain tersebut. Akibatnya,
 token dari `/auth/session` tidak memiliki sesi yang sama saat POST `/register`
 dan Laravel mengembalikan 419. Ini bukan masalah kata sandi atau izin cookie browser.
 
 Di aaPanel, edit `.env` pada **root aplikasi VPS**. Gabungkan pengaturan pada
 `deploy/aapanel.env.example` ke file yang sudah ada; jangan mengganti seluruh
 file atau menyalin `.env` lokal. Pastikan setiap nama pengaturan hanya muncul sekali.
-Perubahan utama adalah `APP_URL=https://v2.premiumkita.com` dan
+Perubahan utama adalah `APP_URL=https://premiumkita.com` dan
 `SESSION_DOMAIN=null` (tanpa domain lama). Pertahankan APP_KEY dan kredensial database.
 
 Setelah menyimpan, jalankan di root aplikasi melalui terminal aaPanel:
@@ -28,7 +28,7 @@ Hapus cache HTML Cloudflare jika sebelumnya memakai aturan Cache Everything,
 lalu coba mendaftar dari jendela privat.
 
 Cookie baru harus **tidak memiliki atribut Domain**. Cookie host-only tersebut
-otomatis berlaku untuk `v2.premiumkita.com`. Berpindah nama cookie akan meminta
+otomatis berlaku untuk `premiumkita.com`. Berpindah nama cookie akan meminta
 pengguna yang sebelumnya login untuk masuk kembali.
 
 ## File aplikasi
@@ -45,9 +45,9 @@ Sesuaikan `.env` **di VPS**, bukan menyalin `.env` lokal:
 ```dotenv
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://v2.premiumkita.com
+APP_URL=https://premiumkita.com
 SESSION_DRIVER=file
-SESSION_COOKIE=nandarstore_v2_session
+SESSION_COOKIE=premiumkita_session
 SESSION_DOMAIN=null
 SESSION_PATH=/
 SESSION_SECURE_COOKIE=true

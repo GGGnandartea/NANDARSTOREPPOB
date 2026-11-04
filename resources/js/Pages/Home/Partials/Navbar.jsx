@@ -53,13 +53,13 @@ export default function Navbar({
                             <span className="font-black text-orange-400">Mode Pantau Admin:</span>
                             <span className="text-[11px] text-slate-300 hidden sm:inline">Akun profil, saldo pelanggan, checkout, dan top-up dinonaktifkan.</span>
                         </div>
-                        <Link
+                        <a
                             href="/admin/dashboard"
                             className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-[11px] rounded-lg transition shrink-0 shadow-sm"
                         >
                             <span>Dashboard Admin</span>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                        </Link>
+                        </a>
                     </div>
                 </div>
             )}
@@ -217,7 +217,7 @@ export default function Navbar({
 
                                             {/* Menu Items for Admin */}
                                             <div className="p-2 flex flex-col gap-1">
-                                                <Link
+                                                <a
                                                     href="/admin/dashboard"
                                                     onClick={() => setShowProfileMenu(false)}
                                                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-orange-600 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors cursor-pointer group"
@@ -229,7 +229,7 @@ export default function Navbar({
                                                         <p className="font-black text-sm">Dashboard Admin</p>
                                                         <p className="text-[11px] text-gray-500 dark:text-gray-300">Kembali ke panel kelola</p>
                                                     </div>
-                                                </Link>
+                                                </a>
 
                                                 <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
 

@@ -44,19 +44,31 @@ export default function PpobHeader({ store, user, userBalance, isDark, toggleDar
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* User Info / Balance */}
           {user ? (
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <div className="text-left">
-                <p className="text-[9px] font-bold text-gray-400 leading-none hidden sm:block">Saldo Akun</p>
-                <p className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 leading-tight">{fmt.rp(userBalance)}</p>
-              </div>
-              <Link
-                href="/profile"
-                className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline pl-0.5"
+            user.role === 'admin' ? (
+              <a
+                href="/admin/dashboard"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black shadow-sm transition"
               >
-                +Topup
-              </Link>
-            </div>
+                <span>Dashboard Admin</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </a>
+            ) : (
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div className="text-left">
+                  <p className="text-[9px] font-bold text-gray-400 leading-none hidden sm:block">Saldo Akun</p>
+                  <p className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 leading-tight">{fmt.rp(userBalance)}</p>
+                </div>
+                <Link
+                  href="/profile"
+                  className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline pl-0.5"
+                >
+                  +Topup
+                </Link>
+              </div>
+            )
           ) : (
             <Link
               href="/login"

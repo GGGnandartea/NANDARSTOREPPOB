@@ -14,7 +14,7 @@ export default function CheckoutAdminAlert() {
         </p>
       </div>
       <div className="pt-2">
-        <Link
+        <a
           href="/admin/dashboard"
           className="inline-flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-black dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-black text-xs py-3.5 px-4 rounded-xl transition shadow-md cursor-pointer"
         >
@@ -22,7 +22,7 @@ export default function CheckoutAdminAlert() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           Kembali ke Dashboard Admin
-        </Link>
+        </a>
       </div>
     </div>
   );
