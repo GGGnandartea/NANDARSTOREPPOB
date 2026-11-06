@@ -1,2 +1,20 @@
 User-agent: *
-Disallow:
+Allow: /
+Allow: /ppob
+Allow: /product/
+Allow: /terms
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /checkout/
+Disallow: /invoice/
+Disallow: /profile
+Disallow: /cart
+
+User-agent: Googlebot
+Allow: /
+Allow: /ppob
+Allow: /product/
+
+User-agent: Googlebot-Image
+Allow: /

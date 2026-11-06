@@ -19,7 +19,10 @@
                 Kelola logo utama toko, favicon tab browser, animasi logo loading awal (preloader), serta nama dan tagline brand Anda
             </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.seo') }}" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-blue-500/20">
+                <span>🔍 Pengaturan SEO &amp; Google Search Console</span>
+            </a>
             <a href="/" target="_blank" class="px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 hover:text-orange-500 hover:border-orange-500/50 transition flex items-center gap-1.5 shadow-xs">
                 <span>Lihat Website</span>
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>

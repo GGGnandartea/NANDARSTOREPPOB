@@ -33,13 +33,20 @@ class HandleInertiaRequests extends Middleware
 
         $ppobStatus = (new \App\Services\KiosbankService())->getCutoffStatus();
 
+        $seoCfg = \App\Services\SeoService::getConfig();
+
         return [
             ...parent::share($request),
             'favoriteProductIds' => fn () => $request->user()?->favoriteProducts()->pluck('products.id')->all() ?? [],
             'store' => [
                 'name'                => ($allSettings['store_name'] ?? null) ?: 'PremiumKita',
                 'logo'                => ($allSettings['store_logo'] ?? null) ?: null,
-                'tagline'             => ($allSettings['store_tagline'] ?? null) ?: 'Platform Digital & Akun Premium Otomatis',
+                'tagline'             => $seoCfg['store_tagline'] ?: 'Platform Digital, Akun Premium & Layanan PPOB Otomatis 24 Jam',
+                'secondary_tagline'   => $seoCfg['seo_secondary_tagline'] ?? '',
+                'seo_home_title'      => \App\Services\SeoService::resolveHomeTitle($seoCfg),
+                'seo_ppob_title'      => $seoCfg['seo_ppob_title'] . ' ' . $seoCfg['seo_title_separator'] . ' ' . $seoCfg['store_name'],
+                'seo_separator'       => $seoCfg['seo_title_separator'] ?: '-',
+                'description'         => $seoCfg['store_description'] ?? '',
                 'admin_whatsapp'      => $adminWaClean,
                 'whatsapp_group_link' => ($allSettings['whatsapp_group_link'] ?? null) ?: 'https://chat.whatsapp.com/KfdDhTYboOlLX1PBOkV36H',
                 'announcement'        => [

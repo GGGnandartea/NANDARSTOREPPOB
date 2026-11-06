@@ -7,6 +7,9 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PpobController;
 // --- RUTE HALAMAN DEPAN & CHECKOUT ---
 Route::get('/', [FrontController::class, 'index'])->name('home');
+Route::get('/sitemap.xml', [FrontController::class, 'sitemapXml'])->name('seo.sitemap');
+Route::get('/robots.txt', [FrontController::class, 'robotsTxt'])->name('seo.robots');
+Route::get('/google{code}.html', [FrontController::class, 'googleVerificationFile'])->where('code', '[a-zA-Z0-9]+')->name('seo.google_verify_file');
 Route::get('/product/{id}', [FrontController::class, 'show'])->name('product.detail')->whereNumber('id');
 
 Route::get('/checkout/{id}', [FrontController::class, 'checkout'])->name('checkout')->whereNumber('id');
@@ -85,6 +88,9 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/settings', [AdminController::class, 'saveSettings'])->name('settings.save');
     Route::get('/branding', [AdminController::class, 'branding'])->name('branding');
     Route::post('/branding', [AdminController::class, 'saveBranding'])->name('branding.save');
+    Route::get('/seo', [AdminController::class, 'seoSettings'])->name('seo');
+    Route::post('/seo', [AdminController::class, 'saveSeoSettings'])->name('seo.save');
+    Route::post('/seo/ping-sitemap', [AdminController::class, 'pingSitemap'])->name('seo.ping_sitemap');
     Route::get('/settings/api-status', [AdminController::class, 'checkApiLiveStatus'])->name('settings.api_status');
     Route::post('/settings/premku/deposit', [AdminController::class, 'premkuCreateDeposit'])->name('settings.premku.deposit');
     Route::post('/settings/premku/check-deposit', [AdminController::class, 'premkuCheckDeposit'])->name('settings.premku.check_deposit');

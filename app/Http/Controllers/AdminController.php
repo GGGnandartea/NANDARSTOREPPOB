@@ -662,7 +662,205 @@ class AdminController extends Controller
             Setting::updateOrCreate(['key' => 'loading_logo'], ['value' => null]);
         }
 
+        \App\Services\SeoService::clearCache();
+
         return back()->with('success', 'Pengaturan Branding, Logo & Favicon Toko berhasil disimpan!');
+    }
+
+    /**
+     * Halaman Pengaturan SEO & Google Search Console Kompleks
+     */
+    public function seoSettings()
+    {
+        \App\Services\SeoService::clearCache();
+        $seoCfg = \App\Services\SeoService::getConfig();
+        $audit  = \App\Services\SeoService::calculateSeoAudit($seoCfg);
+
+        $activeProductCount = 0;
+        try {
+            $activeProductCount = Product::where('status', 'available')
+                ->where(function ($q) {
+                    $q->whereNull('type')->orWhere('type', '!=', 'ppob');
+                })
+                ->count();
+        } catch (\Throwable $e) {
+            $activeProductCount = 0;
+        }
+
+        $totalSitemapUrls = 6 + (($seoCfg['seo_sitemap_include_products'] ?? '1') === '1' ? $activeProductCount : 0);
+
+        return view('admin.seo_settings', compact('seoCfg', 'audit', 'activeProductCount', 'totalSitemapUrls'));
+    }
+
+    /**
+     * Simpan Pengaturan SEO, Tagline, Meta Tags, Schema JSON-LD & Google Search Console
+     */
+    public function saveSeoSettings(Request $request)
+    {
+        $request->validate([
+            'store_name'                 => 'nullable|string|max:120',
+            'store_tagline'              => 'nullable|string|max:250',
+            'seo_secondary_tagline'      => 'nullable|string|max:250',
+            'seo_title_separator'        => 'nullable|string|max:10',
+            'seo_home_title'             => 'nullable|string|max:250',
+            'store_description'          => 'nullable|string|max:500',
+            'seo_meta_keywords'          => 'nullable|string|max:1500',
+            'seo_ppob_title'             => 'nullable|string|max:250',
+            'seo_ppob_description'       => 'nullable|string|max:500',
+            'seo_product_title_template' => 'nullable|string|max:250',
+            'seo_product_desc_template'  => 'nullable|string|max:500',
+            'seo_faq_title'              => 'nullable|string|max:250',
+            'seo_faq_description'        => 'nullable|string|max:500',
+            'seo_terms_title'            => 'nullable|string|max:250',
+            'seo_terms_description'      => 'nullable|string|max:500',
+            'seo_google_verification'    => 'nullable|string|max:500',
+            'seo_google_html_file'       => 'nullable|string|max:150',
+            'seo_bing_verification'      => 'nullable|string|max:500',
+            'seo_yandex_verification'    => 'nullable|string|max:500',
+            'seo_ga4_id'                 => 'nullable|string|max:80',
+            'seo_gtm_id'                 => 'nullable|string|max:80',
+            'seo_fb_pixel_id'            => 'nullable|string|max:80',
+            'seo_robots_index'           => 'nullable|string|max:80',
+            'seo_canonical_domain'       => 'nullable|string|max:255',
+            'seo_robots_custom'          => 'nullable|string|max:2000',
+            'seo_schema_type'            => 'nullable|string|max:60',
+            'seo_schema_price_range'     => 'nullable|string|max:100',
+            'seo_schema_rating_value'    => 'nullable|string|max:10',
+            'seo_schema_rating_count'    => 'nullable|string|max:20',
+            'seo_social_instagram'       => 'nullable|string|max:255',
+            'seo_social_tiktok'          => 'nullable|string|max:255',
+            'seo_social_telegram'        => 'nullable|string|max:255',
+            'seo_social_youtube'         => 'nullable|string|max:255',
+            'seo_theme_color'            => 'nullable|string|max:20',
+            'seo_og_image_file'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:5120',
+            'seo_og_image_url'           => 'nullable|string|max:500',
+        ]);
+
+        $textKeys = [
+            'store_name',
+            'store_tagline',
+            'seo_secondary_tagline',
+            'seo_title_separator',
+            'seo_home_title',
+            'store_description',
+            'seo_meta_keywords',
+            'seo_ppob_title',
+            'seo_ppob_description',
+            'seo_product_title_template',
+            'seo_product_desc_template',
+            'seo_faq_title',
+            'seo_faq_description',
+            'seo_terms_title',
+            'seo_terms_description',
+            'seo_ga4_id',
+            'seo_gtm_id',
+            'seo_fb_pixel_id',
+            'seo_robots_index',
+            'seo_canonical_domain',
+            'seo_robots_custom',
+            'seo_schema_type',
+            'seo_schema_price_range',
+            'seo_schema_rating_value',
+            'seo_schema_rating_count',
+            'seo_social_instagram',
+            'seo_social_tiktok',
+            'seo_social_telegram',
+            'seo_social_youtube',
+            'seo_theme_color',
+        ];
+
+        foreach ($textKeys as $k) {
+            if ($request->has($k)) {
+                $val = trim((string) $request->input($k, ''));
+                if (in_array($k, ['seo_ga4_id', 'seo_gtm_id', 'seo_fb_pixel_id'], true)) {
+                    $val = preg_replace('/[^a-zA-Z0-9_-]/', '', $val) ?: '';
+                } elseif ($k === 'seo_theme_color' && $val !== '' && !preg_match('/^#[0-9a-fA-F]{3,8}$/', $val)) {
+                    $val = '#ea580c';
+                }
+                Setting::updateOrCreate(['key' => $k], ['value' => $val]);
+            }
+        }
+
+        // Normalisasi kode verifikasi Google, Bing, Yandex & File HTML Google
+        if ($request->has('seo_google_verification')) {
+            $token = \App\Services\SeoService::extractVerificationToken($request->input('seo_google_verification'));
+            Setting::updateOrCreate(['key' => 'seo_google_verification'], ['value' => $token]);
+        }
+        if ($request->has('seo_google_html_file')) {
+            $htmlFile = \App\Services\SeoService::normalizeGoogleHtmlFilename($request->input('seo_google_html_file'));
+            Setting::updateOrCreate(['key' => 'seo_google_html_file'], ['value' => $htmlFile]);
+        }
+        if ($request->has('seo_bing_verification')) {
+            $token = \App\Services\SeoService::extractVerificationToken($request->input('seo_bing_verification'));
+            Setting::updateOrCreate(['key' => 'seo_bing_verification'], ['value' => $token]);
+        }
+        if ($request->has('seo_yandex_verification')) {
+            $token = \App\Services\SeoService::extractVerificationToken($request->input('seo_yandex_verification'));
+            Setting::updateOrCreate(['key' => 'seo_yandex_verification'], ['value' => $token]);
+        }
+
+        // Toggle Boolean Settings
+        $boolKeys = [
+            'seo_sitemap_enabled',
+            'seo_sitemap_include_products',
+            'seo_sitemap_include_images',
+            'seo_schema_enabled',
+        ];
+        foreach ($boolKeys as $bk) {
+            Setting::updateOrCreate(['key' => $bk], ['value' => $request->has($bk) ? '1' : '0']);
+        }
+
+        // Upload / URL Banner Open Graph (OG Image)
+        if ($request->hasFile('seo_og_image_file')) {
+            $path = $request->file('seo_og_image_file')->store('settings', 'public');
+            Setting::updateOrCreate(['key' => 'seo_og_image'], ['value' => '/storage/' . $path]);
+        } elseif ($request->filled('seo_og_image_url')) {
+            Setting::updateOrCreate(['key' => 'seo_og_image'], ['value' => trim((string) $request->input('seo_og_image_url'))]);
+        }
+        if ($request->input('remove_seo_og_image') == '1') {
+            Setting::updateOrCreate(['key' => 'seo_og_image'], ['value' => '']);
+        }
+
+        \App\Services\SeoService::clearCache();
+
+        // Sinkronisasi juga file fisik public/robots.txt & file verifikasi HTML Google jika diizinkan
+        if (!app()->runningUnitTests()) {
+            try {
+                $robotsContent = \App\Services\SeoService::generateRobotsTxt($request->getSchemeAndHttpHost());
+                @file_put_contents(public_path('robots.txt'), $robotsContent);
+
+                $htmlFile = Setting::where('key', 'seo_google_html_file')->value('value');
+                if (!empty($htmlFile) && preg_match('/^google[a-zA-Z0-9_-]+\.html$/', $htmlFile)) {
+                    @file_put_contents(public_path($htmlFile), 'google-site-verification: ' . $htmlFile);
+                }
+            } catch (\Throwable $e) {
+                // Abaikan jika direktori public read-only
+            }
+        }
+
+        return back()->with('success', 'Konfigurasi SEO, Tagline, Schema.org & Google Search Console berhasil disimpan dan diterapkan!');
+    }
+
+    /**
+     * Regenerate Sitemap XML & Ping Indexer
+     */
+    public function pingSitemap(Request $request)
+    {
+        \App\Services\SeoService::clearCache();
+        $sitemapUrl = url('/sitemap.xml');
+
+        if (!app()->runningUnitTests()) {
+            try {
+                $robotsContent = \App\Services\SeoService::generateRobotsTxt($request->getSchemeAndHttpHost());
+                @file_put_contents(public_path('robots.txt'), $robotsContent);
+            } catch (\Throwable $e) {}
+        }
+
+        return response()->json([
+            'status'      => 'success',
+            'sitemap_url' => $sitemapUrl,
+            'message'     => 'Sitemap XML (' . $sitemapUrl . ') & Robots.txt berhasil diperbarui dan siap dirayapi Googlebot!',
+        ]);
     }
 
     public function paymentSettings() {
@@ -796,7 +994,9 @@ class AdminController extends Controller
 
     private function ensureApiProductsSchema(): void
     {
-        if (Cache::get('products_schema_verified_v3')) {
+        Product::ensurePricingColumns();
+
+        if (Cache::get('products_schema_verified_v4')) {
             return;
         }
 
@@ -822,10 +1022,16 @@ class AdminController extends Controller
                 if (!Schema::hasColumn('products', 'api_price')) {
                     $table->integer('api_price')->nullable();
                 }
+                if (!Schema::hasColumn('products', 'api_margin')) {
+                    $table->integer('api_margin')->nullable();
+                }
+                if (!Schema::hasColumn('products', 'api_reseller_margin')) {
+                    $table->integer('api_reseller_margin')->nullable();
+                }
             });
         } catch (\Throwable $e) {}
 
-        Cache::put('products_schema_verified_v3', true, 86400);
+        Cache::put('products_schema_verified_v4', true, 86400);
     }
 
     /**
@@ -955,7 +1161,7 @@ class AdminController extends Controller
                             }
 
                             if (!empty($preflixExtraData)) {
-                                Cache::put('preflix_extra_data', $preflixExtraData, 3600);
+                                Cache::put('preflix_extra_data', $preflixExtraData, 30);
                             }
                         } catch (\Throwable $e) {}
                     }
@@ -999,8 +1205,29 @@ class AdminController extends Controller
             } catch (\Throwable $e) {}
         }
 
+        // Sinkronisasi langsung harga jual, stok, dan deskripsi di database berdasarkan katalog live yang baru ditarik
+        if (!empty($fetched)) {
+            Product::syncAllApiProductsFromLiveMap($fetched);
+
+            $liveStockCache = Cache::get('api_last_known_stock', []);
+            if (!is_array($liveStockCache)) {
+                $liveStockCache = [];
+            }
+            foreach ($fetched as $apiId => $item) {
+                $liveStockCache[$apiId] = [
+                    'stock'       => max(0, (int) ($item['stock'] ?? 0)),
+                    'price'       => max(0, (int) ($item['original_price'] ?? 0)),
+                    'description' => !empty($item['description']) ? Product::cleanText((string) $item['description']) : null,
+                ];
+            }
+            Cache::put('api_full_data', $liveStockCache, 45);
+            Cache::put('api_last_known_stock', $liveStockCache, 86400);
+        }
+
         // Fallback: Jika ada produk di DB yang belum terambil karena jaringan provider lambat, tetap sertakan agar tabel tidak hilang
         try {
+            $autoSettings = Product::getAutoMarginSettings();
+            $defaultMargin = max(500, (int) ($autoSettings['member_margin'] ?? 10000));
             $dbExisting = Product::where('type', 'api')->get();
             foreach ($dbExisting as $dbProd) {
                 $apiId = (string) $dbProd->api_product_id;
@@ -1012,20 +1239,27 @@ class AdminController extends Controller
                 if ($providerFilter === 'preflix' && !$isPreflix) continue;
                 if ($providerFilter === 'premku' && !$isPremku) continue;
 
+                // Jangan pernah menyamakan original_price fallback dengan harga jual jika api_price masih kosong
+                $fallbackOrig = (int) ($dbProd->api_price ?? 0);
+                if ($fallbackOrig <= 0) {
+                    $fallbackOrig = max(1000, (int) $dbProd->price - (int) ($dbProd->api_margin ?: $defaultMargin));
+                }
+
                 $fetched[$apiId] = [
                     'api_id'         => $apiId,
                     'name'           => $dbProd->name,
-                    'original_price' => max(0, (int) ($dbProd->api_price ?: $dbProd->price)),
+                    'original_price' => $fallbackOrig,
                     'stock'          => max(0, (int) $dbProd->getRawOriginal('stock')),
                     'provider'       => $isPreflix ? 'Preflix' : ($isPremku ? 'Premku' : 'API'),
                     'image'          => $dbProd->image,
                     'description'    => $dbProd->description,
+                    'is_fallback'    => true,
                 ];
             }
         } catch (\Throwable $e) {}
 
         if (!empty($fetched) && $providerFilter === 'all') {
-            Cache::put('admin_live_api_catalog_v3', $fetched, 90);
+            Cache::put('admin_live_api_catalog_v3', $fetched, 30);
         }
 
         return $fetched;
@@ -1040,6 +1274,10 @@ class AdminController extends Controller
         $fixed    = ['•'];
 
         $catalog = $this->fetchLiveApiCatalog($premkuService, 'all', $request->boolean('refresh'));
+
+        // Pastikan seluruh produk di DB sudah ter-update harga jualnya secara realtime mengikuti modal API terbaru
+        $autoSyncedCount = Product::syncAllApiProductsFromLiveMap($catalog);
+
         $apiProducts = collect(array_values($catalog));
 
         $preflixLiveCount = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'preflix')->count();
@@ -1068,6 +1306,7 @@ class AdminController extends Controller
 
         $preflixTotalCount = max($preflixDbCount, $preflixLiveCount);
         $premkuTotalCount  = max($premkuDbCount, $premkuLiveCount);
+        $autoMarginSettings = Product::getAutoMarginSettings();
 
         return view('admin.api_margin', compact(
             'apiProducts',
@@ -1078,7 +1317,9 @@ class AdminController extends Controller
             'preflixActiveCount',
             'preflixTotalCount',
             'premkuActiveCount',
-            'premkuTotalCount'
+            'premkuTotalCount',
+            'autoMarginSettings',
+            'autoSyncedCount'
         ));
     }
 
@@ -1129,7 +1370,11 @@ class AdminController extends Controller
 
         $activatedCount = 0;
 
-        DB::transaction(function () use ($fetched, $existingProducts, $provider, &$activatedCount, &$liveStockCache) {
+        $autoSettings = Product::getAutoMarginSettings();
+        $defaultMargin = max(500, (int) ($autoSettings['member_margin'] ?? 10000));
+        $resellerMargin = max(500, (int) ($autoSettings['reseller_margin'] ?? 5000));
+
+        DB::transaction(function () use ($fetched, $existingProducts, $provider, &$activatedCount, &$liveStockCache, $defaultMargin, $resellerMargin) {
             foreach ($fetched as $apiId => $item) {
                 $product = $existingProducts->get($apiId) ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
                 $isNew   = !$product->exists;
@@ -1141,15 +1386,22 @@ class AdminController extends Controller
                 $product->api_price = $origPrice;
                 $product->stock     = max(0, (int) ($item['stock'] ?? 0));
 
-                if ($isNew || (int) $product->price <= 0) {
-                    $product->price          = $origPrice + 3000;
-                    $product->reseller_price = $origPrice + 1500;
+                if ($isNew || (int) $product->price <= $origPrice) {
+                    $margin = (int) ($product->api_margin ?: $defaultMargin);
+                    $product->price          = $origPrice + $margin;
+                    $product->api_margin     = $margin;
+                    if ($isNew) {
+                        $product->reseller_price      = $origPrice + $resellerMargin;
+                        $product->api_reseller_margin = $resellerMargin;
+                    }
                 }
                 if ($isNew || empty($product->category)) {
                     $product->category = 'Aplikasi Premium';
                 }
-                if ($isNew || empty($product->description)) {
-                    $product->description = $item['description'] ?? null;
+                if (!empty($item['description'])) {
+                    $product->description = $item['description'];
+                } elseif ($isNew) {
+                    $product->description = null;
                 }
                 if (($isNew || empty($product->image)) && !empty($item['image'])) {
                     $product->image = $item['image'];
@@ -1161,7 +1413,11 @@ class AdminController extends Controller
                 $product->status = 'available';
                 $product->save();
 
-                $liveStockCache[$apiId] = ['stock' => $product->stock];
+                $liveStockCache[$apiId] = [
+                    'stock'       => $product->stock,
+                    'price'       => $origPrice,
+                    'description' => $product->description,
+                ];
                 $activatedCount++;
             }
 
@@ -1210,10 +1466,17 @@ class AdminController extends Controller
         ]);
 
         $provider        = $request->input('provider', 'all');
-        $defaultMargin   = (int) $request->input('default_margin', 3000);
-        $resellerMargin  = (int) $request->input('reseller_margin', 1500);
+        $defaultMargin   = (int) $request->input('default_margin', 10000);
+        $resellerMargin  = (int) $request->input('reseller_margin', 5000);
         $overwritePrice  = $request->has('overwrite_price') ? $request->boolean('overwrite_price') : true;
         $defaultCategory = trim((string) $request->input('default_category', 'Aplikasi Premium')) ?: 'Aplikasi Premium';
+
+        if ($defaultMargin >= 500) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_member'], ['value' => (string) $defaultMargin]);
+        }
+        if ($resellerMargin >= 500) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_reseller'], ['value' => (string) $resellerMargin]);
+        }
 
         $fetched = $this->fetchLiveApiCatalog($premkuService, $provider, true);
 
@@ -1258,16 +1521,20 @@ class AdminController extends Controller
                 $product->api_price = $origPrice;
                 $product->stock     = max(0, (int) ($item['stock'] ?? 0));
 
-                if ($isNew || $overwritePrice || (int) $product->price <= 0) {
-                    $product->price          = $origPrice + $defaultMargin;
-                    $product->reseller_price = $resellerMargin > 0 ? ($origPrice + $resellerMargin) : null;
+                if ($isNew || $overwritePrice || (int) $product->price <= $origPrice) {
+                    $product->price               = $origPrice + $defaultMargin;
+                    $product->api_margin          = $defaultMargin;
+                    $product->reseller_price      = $resellerMargin > 0 ? ($origPrice + $resellerMargin) : null;
+                    $product->api_reseller_margin = $resellerMargin > 0 ? $resellerMargin : null;
                 }
 
                 if ($isNew || empty($product->category)) {
                     $product->category = $defaultCategory;
                 }
-                if ($isNew || empty($product->description)) {
-                    $product->description = $item['description'] ?? null;
+                if (!empty($item['description'])) {
+                    $product->description = $item['description'];
+                } elseif ($isNew) {
+                    $product->description = null;
                 }
                 if (($isNew || empty($product->image)) && !empty($item['image'])) {
                     $product->image = $item['image'];
@@ -1282,7 +1549,11 @@ class AdminController extends Controller
                 }
 
                 $product->save();
-                $liveStockCache[$apiId] = ['stock' => $product->stock];
+                $liveStockCache[$apiId] = [
+                    'stock'       => $product->stock,
+                    'price'       => $origPrice,
+                    'description' => $product->description,
+                ];
             }
         });
 
@@ -1408,6 +1679,13 @@ class AdminController extends Controller
     {
         $this->ensureApiProductsSchema();
 
+        if ($request->filled('auto_margin_member') && (int) $request->input('auto_margin_member') >= 500) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_member'], ['value' => (string) (int) $request->input('auto_margin_member')]);
+        }
+        if ($request->filled('auto_margin_reseller') && (int) $request->input('auto_margin_reseller') >= 500) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_reseller'], ['value' => (string) (int) $request->input('auto_margin_reseller')]);
+        }
+
         $products = $request->input('products', []);
         if ($request->filled('products_json')) {
             $decoded = json_decode((string) $request->input('products_json'), true);
@@ -1420,12 +1698,24 @@ class AdminController extends Controller
             return back()->with('error', 'Tidak ada data produk yang dikirim untuk disimpan.');
         }
 
+        $autoSettings       = Product::getAutoMarginSettings();
+        $defaultMemberMargin = max(500, (int) ($autoSettings['member_margin'] ?? 10000));
+        $defaultResMargin   = max(500, (int) ($autoSettings['reseller_margin'] ?? 5000));
+
         $existingProducts   = Product::where('type', 'api')->get()->keyBy('api_product_id');
         $count              = 0;
         $hasActivePreflix   = false;
         $hasActivePremku    = false;
 
-        DB::transaction(function () use ($products, $existingProducts, &$count, &$hasActivePreflix, &$hasActivePremku) {
+        DB::transaction(function () use (
+            $products,
+            $existingProducts,
+            $defaultMemberMargin,
+            $defaultResMargin,
+            &$count,
+            &$hasActivePreflix,
+            &$hasActivePremku
+        ) {
             foreach ($products as $api_id => $data) {
                 if (!is_array($data)) {
                     continue;
@@ -1441,22 +1731,49 @@ class AdminController extends Controller
                 $rawMarkup  = (isset($data['markup_price']) && $data['markup_price'] !== '') ? (int) $data['markup_price'] : 0;
                 $origPrice  = max(0, (int) ($data['original_price'] ?? ($existing->api_price ?? 0)));
 
-                // Jika diaktifkan namun harga jual masih kosong, gunakan harga modal + Rp 3.000 otomatis
-                if ($isActive && $rawMarkup <= 0) {
-                    $rawMarkup = $origPrice > 0 ? ($origPrice + 3000) : 10000;
+                // Jika diaktifkan namun harga jual masih kosong atau <= harga modal API, sesuaikan otomatis dengan margin!
+                if ($rawMarkup > 0 && $origPrice > 0 && $rawMarkup <= $origPrice) {
+                    $prevMargin = $existing ? (int) ($existing->api_margin ?? 0) : 0;
+                    if ($prevMargin <= 0 && $existing && (int) ($existing->api_price ?? 0) > 0 && (int) $existing->price > (int) $existing->api_price) {
+                        $prevMargin = (int) $existing->price - (int) $existing->api_price;
+                    }
+                    $rawMarkup = $origPrice + ($prevMargin > 0 ? $prevMargin : $defaultMemberMargin);
+                } elseif ($isActive && $rawMarkup <= 0) {
+                    $rawMarkup = $origPrice > 0 ? ($origPrice + $defaultMemberMargin) : 10000;
                 }
 
                 if ($rawMarkup > 0 || $existing) {
                     $product = $existing ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
 
-                    $product->name           = trim((string) ($data['name'] ?? '')) ?: ($existing->name ?? $apiId);
-                    $product->price          = $rawMarkup > 0 ? $rawMarkup : max(0, (int) ($existing->price ?? ($origPrice + 3000)));
-                    $product->api_price      = $origPrice;
-                    $product->stock          = isset($data['stock']) ? max(0, (int) $data['stock']) : max(0, (int) ($existing ? $existing->getRawOriginal('stock') : 0));
-                    $product->reseller_price = (!empty($data['reseller_price']) && (int) $data['reseller_price'] > 0) ? (int) $data['reseller_price'] : null;
-                    $product->category       = !empty($data['category']) ? trim((string) $data['category']) : ($existing->category ?? 'Aplikasi Premium');
-                    $product->status         = $isActive ? 'available' : 'unavailable';
-                    $product->description    = isset($data['description']) && $data['description'] !== '' ? $data['description'] : ($existing->description ?? null);
+                    $finalPrice = $rawMarkup > 0 ? $rawMarkup : max(0, (int) ($existing->price ?? ($origPrice + $defaultMemberMargin)));
+                    if ($origPrice > 0 && $finalPrice <= $origPrice) {
+                        $finalPrice = $origPrice + $defaultMemberMargin;
+                    }
+
+                    $product->name       = trim((string) ($data['name'] ?? '')) ?: ($existing->name ?? $apiId);
+                    $product->price      = $finalPrice;
+                    $product->api_price  = $origPrice;
+                    $product->api_margin = ($origPrice > 0 && $finalPrice > $origPrice) ? ($finalPrice - $origPrice) : $defaultMemberMargin;
+                    $product->stock      = isset($data['stock']) ? max(0, (int) $data['stock']) : max(0, (int) ($existing ? $existing->getRawOriginal('stock') : 0));
+
+                    if (!empty($data['reseller_price']) && (int) $data['reseller_price'] > 0) {
+                        $rawReseller = (int) $data['reseller_price'];
+                        if ($origPrice > 0 && $rawReseller <= $origPrice) {
+                            $prevResMargin = ($existing && (int) ($existing->api_reseller_margin ?? 0) > 0)
+                                ? (int) $existing->api_reseller_margin
+                                : $defaultResMargin;
+                            $rawReseller = $origPrice + $prevResMargin;
+                        }
+                        $product->reseller_price      = $rawReseller;
+                        $product->api_reseller_margin = ($origPrice > 0 && $rawReseller > $origPrice) ? ($rawReseller - $origPrice) : $defaultResMargin;
+                    } else {
+                        $product->reseller_price      = null;
+                        $product->api_reseller_margin = null;
+                    }
+
+                    $product->category    = !empty($data['category']) ? trim((string) $data['category']) : ($existing->category ?? 'Aplikasi Premium');
+                    $product->status      = $isActive ? 'available' : 'unavailable';
+                    $product->description = isset($data['description']) && $data['description'] !== '' ? $data['description'] : ($existing->description ?? null);
 
                     $rawImg = !empty($data['image']) ? trim((string) $data['image']) : null;
                     if ($rawImg && (!str_starts_with($rawImg, 'data:') || str_starts_with($rawImg, 'data:image/'))) {
@@ -1489,7 +1806,8 @@ class AdminController extends Controller
         }
 
         Cache::forget('api_full_data');
-        return back()->with('success', $count . ' Produk API, Harga Markup, Logo, dan Status Aktif berhasil disimpan ke Database!');
+        Cache::forget('admin_live_api_catalog_v3');
+        return back()->with('success', $count . ' Produk API, Harga Markup & Proteksi Margin Realtime berhasil disimpan ke Database!');
     }
 
     public function localProducts(Request $request) {

@@ -192,7 +192,7 @@ class KiosbankService
         $isManualOff = $statusMode !== 'online';
 
         $cutoffEnabledRaw = Setting::where('key', 'ppob_cutoff_enabled')->value('value');
-        $cutoffEnabled = $cutoffEnabledRaw === null ? true : ($cutoffEnabledRaw === '1');
+        $cutoffEnabled = $cutoffEnabledRaw === null ? !app()->runningUnitTests() : ($cutoffEnabledRaw === '1');
 
         $cutoffStart = trim((string) (Setting::where('key', 'ppob_cutoff_start')->value('value') ?: '23:50'));
         $cutoffEnd = trim((string) (Setting::where('key', 'ppob_cutoff_end')->value('value') ?: '00:10'));

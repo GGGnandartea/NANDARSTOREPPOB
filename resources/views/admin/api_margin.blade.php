@@ -30,26 +30,35 @@
         </div>
     @endif
 
-    <!-- Header Banner dengan Alat Untung Massal -->
+    @if(!empty($autoSyncedCount) && $autoSyncedCount > 0)
+        <div class="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 text-blue-800 dark:text-blue-300 font-bold text-xs sm:text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shrink-0">↻</div>
+            <div>
+                <strong>Auto-Sync Realtime Aktif:</strong> Sebanyak <strong>{{ $autoSyncedCount }} produk API</strong> telah otomatis disesuaikan harga jual & stoknya mengikuti kenaikan/perubahan harga modal terbaru dari provider API.
+            </div>
+        </div>
+    @endif
+
+    <!-- Header Banner dengan Alat Untung Massal & Proteksi Margin Realtime -->
     <div class="relative overflow-hidden rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-gray-900 via-slate-800 to-gray-900 text-white shadow-xl border border-white/10 flex flex-col xl:flex-row items-center justify-between gap-6">
         <div class="text-center xl:text-left w-full xl:w-auto">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-black uppercase tracking-wider mb-2">
-                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                <span>Sinkronisasi Otomatis API</span>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-black uppercase tracking-wider mb-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Auto-Adjust Harga Realtime Aktif</span>
             </div>
             <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Katalog API & Penetapan Harga</h1>
             <p class="text-gray-400 text-xs sm:text-sm mt-1 max-w-lg font-medium">
-                Tentukan harga jual (markup margin), harga khusus reseller VIP, serta kategori produk dari Server Pusat.
+                Jika harga modal di provider API naik sewaktu-waktu, harga jual ke pembeli & reseller otomatis naik menyesuaikan margin secara realtime tanpa takut rugi.
             </p>
         </div>
         
-        <!-- Box Untung Massal -->
+        <!-- Box Untung Massal & Default Margin Realtime -->
         <div class="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto bg-black/40 p-2.5 rounded-2xl border border-white/10 backdrop-blur-md">
             <div class="px-4 py-1.5 w-full sm:w-auto">
-                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Set Untung Massal</span>
+                <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Set Untung Massal / Auto-Margin</span>
                 <div class="flex items-center gap-1.5">
                     <span class="text-orange-500 font-black text-sm">Rp</span>
-                    <input type="number" id="mass_margin_value" placeholder="Cth: 5000" class="w-full sm:w-32 bg-transparent border-b border-gray-600 text-white focus:outline-none focus:border-orange-500 font-black text-base placeholder-gray-600">
+                    <input type="number" id="mass_margin_value" value="{{ $autoMarginSettings['member_margin'] ?? 10000 }}" placeholder="Cth: 10000" class="w-full sm:w-32 bg-transparent border-b border-gray-600 text-white focus:outline-none focus:border-orange-500 font-black text-base placeholder-gray-600">
                 </div>
             </div>
             <button type="button" onclick="applyMassMargin()" class="w-full sm:w-auto gradient-orange text-white font-black py-3 px-6 rounded-xl transition-all shadow-md hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer text-xs">
@@ -65,13 +74,13 @@
             @csrf
             <div class="space-y-1 max-w-xl">
                 <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider border border-blue-200 dark:border-blue-800/40">
-                    <span>Import & Panggil Otomatis dari Server Pusat</span>
+                    <span>Import & Sinkronisasi Realtime dari Server Pusat</span>
                 </div>
                 <h3 class="text-base sm:text-lg font-black text-gray-900 dark:text-white">
-                    Panggil Produk API ke Database ({{ count($dbMarkups) }} Tersimpan di Database)
+                    Panggil & Sinkronkan Harga Produk API ({{ count($dbMarkups) }} Tersimpan di Database)
                 </h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    Setelah database dikosongkan ke 0, gunakan tombol ini untuk langsung memanggil dan mengaktifkan seluruh katalog produk live dari <strong>Premku</strong> & <strong>Preflix</strong> ke etalase toko Anda dalam 1 klik.
+                    Gunakan tombol ini untuk menarik katalog terbaru dari <strong>Premku</strong> & <strong>Preflix</strong> sekaligus mengatur standar <strong>Untung Otomatis Realtime</strong> (saat harga API naik, harga jual otomatis naik mengikuti margin ini).
                 </p>
             </div>
 
@@ -86,11 +95,11 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Untung Member (Rp)</label>
-                    <input type="number" name="default_margin" value="3000" min="0" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="3000">
+                    <input type="number" name="default_margin" value="{{ $autoMarginSettings['member_margin'] ?? 10000 }}" min="500" class="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="10000">
                 </div>
                 <div>
                     <label class="block text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">Untung Reseller (Rp)</label>
-                    <input type="number" name="reseller_margin" value="1500" min="0" class="w-full px-3 py-2.5 rounded-xl bg-amber-50/40 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="1500">
+                    <input type="number" name="reseller_margin" value="{{ $autoMarginSettings['reseller_margin'] ?? 5000 }}" min="500" class="w-full px-3 py-2.5 rounded-xl bg-amber-50/40 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 text-xs font-black text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="5000">
                 </div>
                 <div>
                     <input type="hidden" name="auto_activate" value="1">
@@ -222,6 +231,7 @@
     <form action="{{ route('admin.products.api.bulk_markup') }}" method="POST" id="bulkMarkupForm" onsubmit="return prepareBulkMarkupSubmit(this);" class="pb-24 space-y-4">
         @csrf
         <input type="hidden" name="products_json" id="products_json" value="">
+        <input type="hidden" name="auto_margin_member" id="hidden_auto_margin_member" value="{{ $autoMarginSettings['member_margin'] ?? 10000 }}">
 
         <div class="admin-card overflow-hidden">
             <!-- Search Filter Bar & Provider Tabs -->
@@ -237,7 +247,7 @@
                     <svg class="w-4 h-4 absolute left-4 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
 
-                <!-- Provider Tabs -->
+                <!-- Provider Tabs & Refresh Live Button -->
                 <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
                     <button type="button" onclick="filterProvider('all')" id="btnFilter_all" class="prov-filter-btn px-3 py-1.5 rounded-xl text-xs font-black bg-orange-500 text-white shadow-sm cursor-pointer transition">
                         Semua ({{ count($apiProducts) }})
@@ -248,6 +258,10 @@
                     <button type="button" onclick="filterProvider('premku')" id="btnFilter_premku" class="prov-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition">
                         Premku ({{ $premkuTotalCount }})
                     </button>
+                    <a href="{{ route('admin.products.api', ['refresh' => 1]) }}" class="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span>Refresh Harga Live</span>
+                    </a>
                 </div>
             </div>
 
@@ -271,7 +285,7 @@
                                 $isActive = $isSaved && $dbMarkups[$item['api_id']]->status == 'available';
                                 $isPromo = ($isSaved && isset($dbMarkups[$item['api_id']]->is_promo)) ? $dbMarkups[$item['api_id']]->is_promo : 1;
                                 $savedImage = ($isSaved && !empty($dbMarkups[$item['api_id']]->image)) ? $dbMarkups[$item['api_id']]->image : $item['image'];
-                                $savedDesc = ($isSaved && !empty($dbMarkups[$item['api_id']]->description)) ? $dbMarkups[$item['api_id']]->description : $item['description'];
+                                $savedDesc = !empty($item['description']) ? $item['description'] : (($isSaved && !empty($dbMarkups[$item['api_id']]->description)) ? $dbMarkups[$item['api_id']]->description : '');
                                 $savedCat = $isSaved ? $dbMarkups[$item['api_id']]->category : '';
                                 $savedName = ($isSaved && !empty($dbMarkups[$item['api_id']]->name)) ? $dbMarkups[$item['api_id']]->name : $item['name'];
                                 
@@ -342,9 +356,23 @@
                                 
                                 <!-- Kolom 3: Harga Jual (Markup) -->
                                 <td>
-                                    <div class="relative w-28 sm:w-32">
-                                        <span class="absolute left-2.5 top-2.5 text-gray-400 font-bold text-xs">Rp</span>
-                                        <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $isSaved ? $dbMarkups[$item['api_id']]->price : '' }}" class="markup-input row-markup-price w-full pl-8 pr-2.5 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
+                                    @php
+                                        $currentSellPrice = $isSaved ? (int) $dbMarkups[$item['api_id']]->price : 0;
+                                        $currentModalPrice = (int) ($item['original_price'] ?? 0);
+                                        $currentProfit = $currentSellPrice > 0 ? ($currentSellPrice - $currentModalPrice) : 0;
+                                    @endphp
+                                    <div class="flex flex-col gap-1">
+                                        <div class="relative w-28 sm:w-32">
+                                            <span class="absolute left-2.5 top-2.5 text-gray-400 font-bold text-xs">Rp</span>
+                                            <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $currentSellPrice > 0 ? $currentSellPrice : '' }}" oninput="updateRowMarginBadge(this)" class="markup-input row-markup-price w-full pl-8 pr-2.5 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
+                                        </div>
+                                        <span class="row-profit-badge text-[10px] font-bold {{ $currentProfit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500' }}">
+                                            @if($currentSellPrice > 0)
+                                                Untung: {{ $currentProfit >= 0 ? '+Rp ' . number_format($currentProfit, 0, ',', '.') : '-Rp ' . number_format(abs($currentProfit), 0, ',', '.') }}
+                                            @else
+                                                Auto +Rp {{ number_format($autoMarginSettings['member_margin'] ?? 10000, 0, ',', '.') }}
+                                            @endif
+                                        </span>
                                     </div>
                                 </td>
 
@@ -495,16 +523,44 @@
             }; img.src = e.target.result;
         }; reader.readAsDataURL(file);
     }
+    function updateRowMarginBadge(inputEl) {
+        const row = inputEl.closest('.markup-row');
+        if (!row) return;
+        const badge = row.querySelector('.row-profit-badge');
+        if (!badge) return;
+        const original = parseInt(row.getAttribute('data-original-price') || '0', 10);
+        const sell = parseInt(inputEl.value || '0', 10);
+        if (!sell || sell <= 0) {
+            badge.className = 'row-profit-badge text-[10px] font-bold text-gray-400';
+            badge.innerText = 'Kosong (Otomatis)';
+            return;
+        }
+        const profit = sell - original;
+        if (profit > 0) {
+            badge.className = 'row-profit-badge text-[10px] font-bold text-emerald-600 dark:text-emerald-400';
+            badge.innerText = 'Untung: +Rp ' + profit.toLocaleString('id-ID');
+        } else {
+            badge.className = 'row-profit-badge text-[10px] font-bold text-rose-500';
+            badge.innerText = 'Auto-Adjust saat simpan';
+        }
+    }
     function applyMassMargin() {
         const margin = parseInt(document.getElementById('mass_margin_value').value);
         if(!margin || margin <= 0) return (window.showAdminToast ? window.showAdminToast('Masukkan nominal keuntungan (Rp) yang valid!', 'error') : alert('Masukkan nominal keuntungan (Rp) yang valid!'));
+        const hiddenAutoMargin = document.getElementById('hidden_auto_margin_member');
+        if (hiddenAutoMargin) {
+            hiddenAutoMargin.value = margin;
+        }
         const rows = document.querySelectorAll('.markup-row'); let count = 0;
         rows.forEach(row => {
             if(row.style.display !== 'none') {
                 const original = parseInt(row.getAttribute('data-original-price'));
                 const input = row.querySelector('.markup-input');
                 const checkbox = row.querySelector('.status-checkbox');
-                input.value = original + margin; checkbox.checked = true; count++;
+                input.value = original + margin;
+                checkbox.checked = true;
+                updateRowMarginBadge(input);
+                count++;
             }
         });
         if (window.showAdminToast) {

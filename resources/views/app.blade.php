@@ -4,7 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title inertia>PremiumKita</title>
+    @php
+        $seoData = \App\Services\SeoService::resolveForRequest(request());
+        $seoCfg = $seoData['config'];
+        $appStoreName = $seoCfg['store_name'] ?: 'PremiumKita';
+        $appStoreLogo = $seoCfg['store_logo'] ?: null;
+        $appStoreFavicon = $seoCfg['store_favicon'] ?: ($appStoreLogo ?: null);
+        $appLoadingLogo = \App\Models\Setting::where('key', 'loading_logo')->value('value') ?: ($appStoreLogo ?: null);
+        $appStoreTagline = $seoCfg['store_tagline'] ?: 'Platform Digital, Akun Premium & Layanan PPOB Otomatis 24 Jam';
+        $ogTitle = $seoData['title'];
+        $ogDescription = $seoData['description'];
+        $ogImage = $seoData['og_image'];
+        $currentUrl = $seoData['canonical_url'];
+    @endphp
+    <title inertia>{{ $ogTitle }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -141,63 +154,43 @@
             text-align: center;
         }
     </style>
-    @php
-        $appStoreName = \App\Models\Setting::where('key', 'store_name')->value('value') ?: 'PremiumKita';
-        $appStoreLogo = \App\Models\Setting::where('key', 'store_logo')->value('value') ?: null;
-        $appStoreFavicon = \App\Models\Setting::where('key', 'store_favicon')->value('value') ?: ($appStoreLogo ?: null);
-        $appLoadingLogo = \App\Models\Setting::where('key', 'loading_logo')->value('value') ?: ($appStoreLogo ?: null);
-        $appStoreTagline = \App\Models\Setting::where('key', 'store_tagline')->value('value') ?: 'Platform Digital & Akun Premium Otomatis';
-        $appStoreDesc = \App\Models\Setting::where('key', 'store_description')->value('value') 
-            ?: 'Pusat belanja akun premium murah, pulsa, token listrik PLN, top-up e-wallet DANA/OVO/GoPay, voucher game, dan tagihan PPOB otomatis dan terpercaya.';
-
-        // Logika Dynamic SEO & Open Graph Preview
-        $currentUrl = url()->current();
-        $ogTitle = $appStoreName . ' - ' . $appStoreTagline;
-        $ogDescription = $appStoreDesc;
-        $ogImage = asset('images/og-preview.png');
-
-        if (request()->is('product/*')) {
-            $productId = request()->segment(2);
-            $productModel = \App\Models\Product::find($productId);
-            if ($productModel) {
-                $ogTitle = $productModel->name . ' - ' . $appStoreName;
-                $formattedPrice = 'Rp ' . number_format($productModel->price, 0, ',', '.');
-                $ogDescription = 'Beli ' . $productModel->name . ' harga spesial ' . $formattedPrice . '. Proses otomatis instan dan bergaransi hanya di ' . $appStoreName . '.';
-                if ($productModel->image) {
-                    $ogImage = str_starts_with($productModel->image, 'http') ? $productModel->image : url($productModel->image);
-                }
-            }
-        } elseif (request()->is('ppob*')) {
-            $ogTitle = 'Pusat Layanan PPOB, Pulsa & Tagihan - ' . $appStoreName;
-            $ogDescription = 'Beli pulsa semua operator, paket data, token PLN, e-wallet DANA/OVO/GoPay, voucher game MLBB/FF, dan tagihan PDAM otomatis detik ini juga.';
-        } elseif (request()->is('faq*')) {
-            $ogTitle = 'Pusat Bantuan & Pertanyaan Umum (FAQ) - ' . $appStoreName;
-            $ogDescription = 'Pertanyaan seputar cara order akun, pembayaran QRIS / Saldo akun, garansi, serta transaksi PPOB otomatis di ' . $appStoreName . '.';
-        } elseif (request()->is('terms*') || request()->is('syarat-ketentuan*')) {
-            $ogTitle = 'Syarat & Ketentuan Layanan - ' . $appStoreName;
-            $ogDescription = 'Syarat, ketentuan garansi, kebijakan privasi, dan aturan transaksi di ' . $appStoreName . '.';
-        } elseif ($appStoreLogo) {
-            $ogImage = str_starts_with($appStoreLogo, 'http') ? $appStoreLogo : url($appStoreLogo);
-        }
-
-        if ($ogImage && !str_starts_with($ogImage, 'http')) {
-            $ogImage = url($ogImage);
-        }
-    @endphp
-
-    <!-- SEO Meta Tags -->
-    <meta name="description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 160) }}">
-    <meta name="keywords" content="akun premium, netflix murah, spotify premium, canva pro, youtube premium, pulsa murah, token pln, ppob otomatis, {{ $appStoreName }}">
+    <!-- SEO & Google Search Console Meta Tags -->
+    <meta name="description" content="{{ $seoData['description'] }}">
+    <meta name="keywords" content="{{ $seoData['keywords'] }}">
     <meta name="author" content="{{ $appStoreName }}">
-    <meta name="robots" content="index, follow">
+    <meta name="publisher" content="{{ $appStoreName }}">
+    <meta name="application-name" content="{{ $appStoreName }}">
+    <meta name="apple-mobile-web-app-title" content="{{ $appStoreName }}">
+    <meta name="theme-color" content="{{ $seoCfg['seo_theme_color'] ?? '#f97316' }}">
+    <meta name="robots" content="{{ $seoData['robots'] }}">
+    <meta name="googlebot" content="{{ $seoData['robots'] }}">
+    <meta name="bingbot" content="{{ $seoData['robots'] }}">
+    <meta name="geo.region" content="ID">
+    <meta name="geo.country" content="ID">
+    <meta http-equiv="content-language" content="id-ID">
     <link rel="canonical" href="{{ $currentUrl }}">
+    @if(($seoCfg['seo_sitemap_enabled'] ?? '1') === '1')
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="{{ url('/sitemap.xml') }}">
+    @endif
 
-    <!-- Open Graph / WhatsApp / Facebook / Telegram -->
-    <meta property="og:type" content="website">
+    <!-- Webmaster Verification Tags (Google Search Console, Bing, Yandex) -->
+    @if(!empty($seoCfg['seo_google_verification']))
+    <meta name="google-site-verification" content="{{ $seoCfg['seo_google_verification'] }}">
+    @endif
+    @if(!empty($seoCfg['seo_bing_verification']))
+    <meta name="msvalidate.01" content="{{ $seoCfg['seo_bing_verification'] }}">
+    @endif
+    @if(!empty($seoCfg['seo_yandex_verification']))
+    <meta name="yandex-verification" content="{{ $seoCfg['seo_yandex_verification'] }}">
+    @endif
+
+    <!-- Open Graph / WhatsApp / Facebook / Telegram / Google Discover -->
+    <meta property="og:locale" content="id_ID">
+    <meta property="og:type" content="{{ $seoData['og_type'] }}">
     <meta property="og:site_name" content="{{ $appStoreName }}">
     <meta property="og:url" content="{{ $currentUrl }}">
     <meta property="og:title" content="{{ $ogTitle }}">
-    <meta property="og:description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 200) }}">
+    <meta property="og:description" content="{{ $seoData['og_description'] }}">
     @if($ogImage)
     <meta property="og:image" content="{{ $ogImage }}">
     <meta property="og:image:secure_url" content="{{ $ogImage }}">
@@ -206,18 +199,53 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="{{ $ogTitle }}">
     @endif
+    @if(!empty($seoData['product']))
+    <meta property="product:price:amount" content="{{ (int) $seoData['product']->price }}">
+    <meta property="product:price:currency" content="IDR">
+    <meta property="product:availability" content="{{ ((int) $seoData['product']->stock > 0) ? 'in stock' : 'out of stock' }}">
+    @endif
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ $currentUrl }}">
     <meta name="twitter:title" content="{{ $ogTitle }}">
-    <meta name="twitter:description" content="{{ \Illuminate\Support\Str::limit($ogDescription, 200) }}">
+    <meta name="twitter:description" content="{{ $seoData['og_description'] }}">
     @if($ogImage)
     <meta name="twitter:image" content="{{ $ogImage }}">
     @endif
 
+    <!-- Structured Data JSON-LD (Schema.org Rich Snippets & Google Sitelinks) -->
+    @if(!empty($seoData['schemas']))
+        @foreach($seoData['schemas'] as $schemaItem)
+            <script type="application/ld+json">{!! json_encode($schemaItem, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
+        @endforeach
+    @endif
+
+    <!-- Google Analytics 4 (GA4) -->
+    @if(!empty($seoCfg['seo_ga4_id']))
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ urlencode($seoCfg['seo_ga4_id']) }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', @json($seoCfg['seo_ga4_id']));
+    </script>
+    @endif
+
+    <!-- Google Tag Manager (GTM) -->
+    @if(!empty($seoCfg['seo_gtm_id']))
+    <script>
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer',@json($seoCfg['seo_gtm_id']));
+    </script>
+    @endif
+
     @if($appStoreFavicon)
     <link rel="icon" href="{{ $appStoreFavicon }}">
+    <link rel="apple-touch-icon" href="{{ $appStoreFavicon }}">
     @endif
     <script>
         (function() {
@@ -258,6 +286,30 @@
         </div>
         <div class="ns-status-ticker" id="ns-preloader-status">Memuat Sistem...</div>
     </div>
+
+    @if(!empty($seoCfg['seo_gtm_id']))
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ urlencode($seoCfg['seo_gtm_id']) }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    @endif
+
+    <noscript>
+        <section style="padding:24px;max-width:960px;margin:0 auto;font-family:sans-serif;">
+            <h1>{{ $ogTitle }}</h1>
+            <h2>{{ $appStoreTagline }}</h2>
+            @if(!empty($seoCfg['seo_secondary_tagline']))
+            <p><strong>{{ $seoCfg['seo_secondary_tagline'] }}</strong></p>
+            @endif
+            <p>{{ $ogDescription }}</p>
+            <nav aria-label="Navigasi Utama {{ $appStoreName }}">
+                <ul>
+                    <li><a href="{{ url('/') }}">Katalog Akun Premium - {{ $appStoreName }}</a></li>
+                    <li><a href="{{ url('/ppob') }}">Layanan PPOB, Pulsa, Paket Data, Token PLN &amp; Top Up Game</a></li>
+                    <li><a href="{{ url('/register') }}">Daftar Member &amp; Reseller VIP {{ $appStoreName }}</a></li>
+                    <li><a href="{{ url('/faq') }}">Pusat Bantuan &amp; FAQ {{ $appStoreName }}</a></li>
+                    <li><a href="{{ url('/syarat-ketentuan') }}">Syarat &amp; Ketentuan Garansi {{ $appStoreName }}</a></li>
+                </ul>
+            </nav>
+        </section>
+    </noscript>
 
     @inertia
 
