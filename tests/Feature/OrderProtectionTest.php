@@ -164,4 +164,51 @@ class OrderProtectionTest extends TestCase
         $this->assertNull($order->fresh()->fulfillment_started_at);
         Http::assertNothingSent();
     }
+
+    public function test_premku_unclaimed_order_after_connect_timeout_automatically_retries_and_completes(): void
+    {
+        $product = Product::create(['name' => 'VD Mobile 1 Bulan', 'type' => 'api', 'price' => 30030, 'api_product_id' => 'PREMKU-122']);
+        $order = $this->order($product);
+        $orderCalls = 0;
+
+        Http::fake(function ($request) use (&$orderCalls) {
+            if (str_ends_with($request->url(), '/api/order')) {
+                $orderCalls++;
+                if ($orderCalls === 1) {
+                    throw new ConnectionException('cURL error 28: Connection timed out after 5001 milliseconds');
+                }
+                return Http::response([
+                    'success' => true,
+                    'data' => [
+                        'invoice' => 'INV-PREMKU-999',
+                        'accounts' => [
+                            ['username' => 'vd@example.com', 'password' => 'secret123'],
+                        ],
+                    ],
+                ]);
+            }
+            if (str_ends_with($request->url(), '/api/status')) {
+                return Http::response([
+                    'success' => false,
+                    'result' => false,
+                    'message' => 'Order tidak ditemukan',
+                ]);
+            }
+            return Http::response(['success' => true]);
+        });
+
+        // 1st attempt times out, checks status ("Order tidak ditemukan"), and unlocks fulfillment_started_at
+        $this->deliverCallback($order);
+        $this->assertSame(1, $orderCalls);
+        $this->assertNull($order->fresh()->fulfillment_started_at);
+        $this->assertNull($order->fresh()->api_trx_id);
+
+        // Next poll automatically places the Premku order and completes it
+        $syncResult = OrderFulfillmentService::checkAndSyncApiOrder($order->fresh());
+        $this->assertTrue($syncResult['is_ready']);
+        $this->assertSame(2, $orderCalls);
+        $this->assertSame('completed', $order->fresh()->order_status);
+        $this->assertSame('INV-PREMKU-999', $order->fresh()->api_trx_id);
+        $this->assertStringContainsString('vd@example.com', (string) $order->fresh()->sn_or_account);
+    }
 }

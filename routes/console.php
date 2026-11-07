@@ -112,7 +112,8 @@ Artisan::command('orders:expire-unpaid {--minutes=20 : Batas waktu kadaluarsa da
             OrderFulfillmentService::syncPaymentFromLocalGateway($paidOrd);
             $paidOrd->refresh();
             if ($paidOrd->product_type === 'api' && OrderFulfillmentService::isWaitingText($paidOrd->sn_or_account)) {
-                OrderFulfillmentService::checkAndSyncApiOrder($paidOrd);
+                $shouldForceRetry = !$paidOrd->fulfillment_started_at || abs(now()->diffInSeconds($paidOrd->fulfillment_started_at)) >= 12;
+                OrderFulfillmentService::checkAndSyncApiOrder($paidOrd, $shouldForceRetry);
             }
         }
     } catch (\Throwable $e) {}

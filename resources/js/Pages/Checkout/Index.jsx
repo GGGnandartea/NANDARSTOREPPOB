@@ -153,10 +153,11 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   };
 
   const manualCheckPayment = async (silent = false) => {
+    const isSilent = silent === true;
     const activeOrderId = completedOrder?.order_id || balanceSuccess?.order_id || orderId;
-    if ((!silent && cooldown > 0) || isCheckingManual || !activeOrderId) return;
+    if ((!isSilent && cooldown > 0) || isCheckingManual || !activeOrderId) return;
     setIsCheckingManual(true);
-    if (!silent) setCooldown(100);
+    if (!isSilent) setCooldown(100);
     try {
       const res = await fetch(`/checkout/status/${activeOrderId}?manual=1`);
       const data = await res.json();
@@ -173,7 +174,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         if (balanceSuccess && data.sn_or_account) {
           setBalanceSuccess((prev) => ({ ...(prev || {}), sn_or_account: data.sn_or_account }));
         }
-        if (!silent) {
+        if (!isSilent) {
           Swal.fire({
             toast: true,
             position: 'top-end',
@@ -185,7 +186,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
             timer: 3000,
           });
         }
-      } else if (!silent) {
+      } else if (!isSilent) {
         Swal.fire({
           toast: true,
           position: 'top-end',
@@ -196,7 +197,7 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         });
       }
     } catch {
-      if (!silent) {
+      if (!isSilent) {
         Swal.fire('Error', 'Gagal memeriksa status pembayaran.', 'error');
       }
     }
@@ -257,7 +258,8 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
       apiInterval = setInterval(async () => {
         pollCount++;
         try {
-          const res = await fetch(`/checkout/status/${currentOrderId}`);
+          const queryParam = pollCount >= 2 ? '?manual=1' : '';
+          const res = await fetch(`/checkout/status/${currentOrderId}${queryParam}`);
           const data = await res.json();
           if (res.ok && data.order_id) setTrackingData(data);
           if (data && data.sn_or_account && !isAccountPending(data.sn_or_account)) {

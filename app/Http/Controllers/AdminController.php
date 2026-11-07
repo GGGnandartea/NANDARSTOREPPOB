@@ -15,6 +15,7 @@ use App\Models\PpobProduct;
 use App\Models\KiosbankDeposit;
 use App\Services\PremkuApiService;
 use App\Services\PreflixApiService;
+use App\Services\TelegramBotApiService;
 use App\Services\KiosbankService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -94,10 +95,11 @@ class AdminController extends Controller
         $premkuStatus = null;
         if (!empty($premkuApiKey)) {
             try {
-                $pRes = (new \App\Services\PremkuApiService())->profile();
+                $premkuService = new \App\Services\PremkuApiService();
+                $pRes = $premkuService->profile();
                 if (isset($pRes['success']) && $pRes['success'] === true) {
-                    $pData = $pRes['data'] ?? [];
-                    $rawSaldo = (int) ($pData['saldo'] ?? $pRes['saldo'] ?? $pRes['balance'] ?? 0);
+                    $pData = $pRes['data'] ?? $pRes['user'] ?? [];
+                    $rawSaldo = (int) ($pData['saldo'] ?? $pData['balance'] ?? $pRes['saldo'] ?? $pRes['balance'] ?? 0);
                     $premkuStatus = [
                         'ok'                  => true,
                         'raw_saldo'           => $rawSaldo,
@@ -109,6 +111,9 @@ class AdminController extends Controller
                         'active_product_count'=> Product::where('api_product_id', 'LIKE', 'PREMKU-%')->where('status', 'available')->count(),
                         'message'             => 'Terhubung! Saldo: Rp ' . number_format($rawSaldo, 0, ',', '.')
                     ];
+                    try {
+                        $premkuService->checkAndNotifyLowBalance($rawSaldo);
+                    } catch (\Throwable $ignore) {}
                 } else {
                     $premkuStatus = [
                         'ok'        => false,
@@ -121,6 +126,15 @@ class AdminController extends Controller
                 $premkuStatus = ['ok' => false, 'raw_saldo' => 0, 'saldo' => '0', 'message' => 'Gagal koneksi: ' . $e->getMessage()];
             }
         }
+
+        $premkuThresholdVal = (int) (Setting::where('key', 'premku_low_balance_threshold')->value('value') ?? 50000);
+        $premkuLowBalanceSettings = [
+            'enabled'        => (string) (Setting::where('key', 'premku_low_balance_alert_enabled')->value('value') ?? '1') === '1',
+            'threshold'      => $premkuThresholdVal,
+            'admin_whatsapp' => $adminWhatsapp,
+            'last_alert_at'  => Setting::where('key', 'premku_low_balance_last_alert_at')->value('value'),
+            'is_low'         => ($premkuStatus['ok'] ?? false) && ((int) ($premkuStatus['raw_saldo'] ?? 0) <= $premkuThresholdVal),
+        ];
 
         // Cek status koneksi realtime ke Preflix
         $preflixStatus = null;
@@ -196,7 +210,7 @@ class AdminController extends Controller
 
         return view('admin.settings', compact(
             'premkuApiKey', 'premkuApiSecret', 'premkuWebhookUrl', 'preflixIdUser', 'preflixKeyUser', 'promoMarkup', 'promoText',
-            'adminWhatsapp', 'botWhatsapp', 'whatsappGroupLink', 'premkuStatus', 'preflixStatus',
+            'adminWhatsapp', 'botWhatsapp', 'whatsappGroupLink', 'premkuStatus', 'preflixStatus', 'premkuLowBalanceSettings',
             'storeName', 'storeTagline', 'storeLogo', 'storeFavicon', 'loadingLogo',
             'kiosbankHost', 'kiosbankPort', 'kiosbankProtocol', 'kiosbankUsername', 'kiosbankPassword',
             'kiosbankMitra', 'kiosbankAccountId', 'kiosbankMerchantId', 'kiosbankMerchantName',
@@ -215,10 +229,11 @@ class AdminController extends Controller
         $premku = ['ok' => false, 'saldo' => '0', 'raw_saldo' => 0, 'message' => 'Belum dikonfigurasi'];
         if (!empty($premkuApiKey)) {
             try {
-                $pRes = (new \App\Services\PremkuApiService())->profile();
+                $premkuService = new \App\Services\PremkuApiService();
+                $pRes = $premkuService->profile();
                 if (isset($pRes['success']) && $pRes['success'] === true) {
-                    $pData = $pRes['data'] ?? [];
-                    $rawSaldo = (int) ($pData['saldo'] ?? $pRes['saldo'] ?? $pRes['balance'] ?? 0);
+                    $pData = $pRes['data'] ?? $pRes['user'] ?? [];
+                    $rawSaldo = (int) ($pData['saldo'] ?? $pData['balance'] ?? $pRes['saldo'] ?? $pRes['balance'] ?? 0);
                     $premku = [
                         'ok'                   => true,
                         'raw_saldo'            => $rawSaldo,
@@ -230,6 +245,9 @@ class AdminController extends Controller
                         'active_product_count' => Product::where('api_product_id', 'LIKE', 'PREMKU-%')->where('status', 'available')->count(),
                         'message'              => 'Terhubung! Saldo: Rp ' . number_format($rawSaldo, 0, ',', '.')
                     ];
+                    try {
+                        $premkuService->checkAndNotifyLowBalance($rawSaldo);
+                    } catch (\Throwable $ignore) {}
                 } else {
                     $premku['message'] = $pRes['message'] ?? 'API Key Ditolak oleh Premku';
                 }
@@ -343,6 +361,44 @@ class AdminController extends Controller
         }
     }
 
+    /**
+     * Simpan Pengaturan & Tes Peringatan WhatsApp Saldo Rendah Premku (Low Balance Alert)
+     */
+    public function premkuSaveLowBalanceAlert(Request $request, PremkuApiService $premkuService)
+    {
+        $request->validate([
+            'threshold'      => 'required|numeric|min:5000',
+            'admin_whatsapp' => 'required|string|min:8|max:25',
+        ]);
+
+        $enabled   = $request->boolean('enabled') ? '1' : '0';
+        $threshold = max(5000, (int) $request->input('threshold', 50000));
+        $adminWa   = trim((string) $request->input('admin_whatsapp'));
+
+        Setting::updateOrCreate(['key' => 'premku_low_balance_alert_enabled'], ['value' => $enabled]);
+        Setting::updateOrCreate(['key' => 'premku_low_balance_threshold'], ['value' => (string) $threshold]);
+        Setting::updateOrCreate(['key' => 'admin_whatsapp'], ['value' => $adminWa]);
+
+        Cache::forget('premku_low_balance_alert_sent');
+
+        if ($request->input('action') === 'test') {
+            $res = $premkuService->checkAndNotifyLowBalance(null, true);
+            if ($res['sent'] ?? false) {
+                return back()->with('success', 'Pengaturan tersimpan & ' . $res['message']);
+            }
+            return back()->with('error', 'Pengaturan tersimpan, namun pengiriman WA gagal: ' . ($res['message'] ?? 'Pastikan API Key Premku & Bot WhatsApp Gateway aktif.'));
+        }
+
+        // Evaluasi langsung apakah saldo Premku saat ini berada di bawah threshold baru
+        if ($enabled === '1') {
+            try {
+                $premkuService->checkAndNotifyLowBalance();
+            } catch (\Throwable $ignore) {}
+        }
+
+        return back()->with('success', 'Pengaturan Notifikasi WhatsApp Saldo Rendah Premku (Batas: Rp ' . number_format($threshold, 0, ',', '.') . ') berhasil disimpan!');
+    }
+
     public function retryApiOrder($id) {
         $order = Order::findOrFail($id);
         $isPpob = ($order->product_type === 'ppob') || str_starts_with((string) $order->invoice_number, 'PPOB-');
@@ -360,8 +416,14 @@ class AdminController extends Controller
             return back()->with('info', 'Pesanan PPOB #' . $order->invoice_number . ': ' . ($result['message'] ?? 'Masih berstatus Pending di operator.'));
         }
 
-        $result = ($order->fulfillment_started_at && $order->product_type === 'api')
-            ? \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order)
+        $isApiOrder = ($order->product_type === 'api') || ($order->product && $order->product->type === 'api');
+        if ($isApiOrder && $order->product_type !== 'api') {
+            $order->product_type = 'api';
+            $order->save();
+        }
+
+        $result = ($order->fulfillment_started_at && $isApiOrder)
+            ? \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order, true)
             : \App\Services\OrderFulfillmentService::fulfillOrder($order);
         $order->refresh();
 
@@ -1073,9 +1135,11 @@ class AdminController extends Controller
                             $desc = Product::cleanText($desc);
                         }
                         $apiId = 'PREMKU-' . $p['id'];
+                        $rawName = trim((string) ($p['name'] ?? 'Produk Premku'));
                         $fetched[$apiId] = [
                             'api_id'         => $apiId,
-                            'name'           => trim((string) ($p['name'] ?? 'Produk Premku')),
+                            'name'           => $rawName,
+                            'original_name'  => $rawName,
                             'original_price' => max(0, (int) ($p['price'] ?? 0)),
                             'stock'          => max(0, (int) ($p['stock'] ?? 0)),
                             'provider'       => 'Premku',
@@ -1188,10 +1252,12 @@ class AdminController extends Controller
                                 $apiId = 'PREFLIX-' . $p['id_produk'];
                                 $fallbackDesc = isset($p['deskripsi']) && is_string($p['deskripsi']) ? Product::cleanText($p['deskripsi']) : null;
                                 $fallbackIcon = isset($p['icon']) && is_string($p['icon']) ? $p['icon'] : null;
+                                $rawName = trim((string) ($p['nama_produk'] ?? 'Produk Preflix'));
 
                                 $fetched[$apiId] = [
                                     'api_id'         => $apiId,
-                                    'name'           => trim((string) ($p['nama_produk'] ?? 'Produk Preflix')),
+                                    'name'           => $rawName,
+                                    'original_name'  => $rawName,
                                     'original_price' => max(0, (int) ($p['harga'] ?? 0)),
                                     'stock'          => max(0, (int) ($p['stok'] ?? 0)),
                                     'provider'       => 'Preflix',
@@ -1205,7 +1271,32 @@ class AdminController extends Controller
             } catch (\Throwable $e) {}
         }
 
+        // 3. Panggil produk dari Telegram Bot API (QuantumVault)
+        if (in_array($providerFilter, ['all', 'telegram'], true)) {
+            try {
+                $tgService = new TelegramBotApiService();
+                if ($tgService->hasApiKey() && ($providerFilter === 'telegram' || TelegramBotApiService::isEnabledForUsers())) {
+                    $tgCatalog = $tgService->getNormalizedCatalog(10);
+                    foreach ($tgCatalog as $apiId => $tgItem) {
+                        $fetched[$apiId] = [
+                            'api_id'         => $apiId,
+                            'name'           => $tgItem['name'],
+                            'original_name'  => $tgItem['original_name'] ?? $tgItem['name'],
+                            'original_price' => max(0, (int) ($tgItem['price'] ?? 0)),
+                            'usd_price'      => $tgItem['usd_price'] ?? null,
+                            'currency'       => $tgItem['currency'] ?? 'USD',
+                            'stock'          => max(0, (int) ($tgItem['stock'] ?? 0)),
+                            'provider'       => 'Telegram API',
+                            'image'          => $tgItem['image'] ?? null,
+                            'description'    => $tgItem['description'] ?? null,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
         // Sinkronisasi langsung harga jual, stok, dan deskripsi di database berdasarkan katalog live yang baru ditarik
+        // serta otomatis tambahkan produk baru yang muncul di API provider dengan margin standar!
         if (!empty($fetched)) {
             Product::syncAllApiProductsFromLiveMap($fetched);
 
@@ -1215,9 +1306,12 @@ class AdminController extends Controller
             }
             foreach ($fetched as $apiId => $item) {
                 $liveStockCache[$apiId] = [
+                    'name'        => $item['name'] ?? '',
+                    'provider'    => $item['provider'] ?? 'API',
                     'stock'       => max(0, (int) ($item['stock'] ?? 0)),
                     'price'       => max(0, (int) ($item['original_price'] ?? 0)),
                     'description' => !empty($item['description']) ? Product::cleanText((string) $item['description']) : null,
+                    'image'       => $item['image'] ?? null,
                 ];
             }
             Cache::put('api_full_data', $liveStockCache, 45);
@@ -1234,10 +1328,12 @@ class AdminController extends Controller
                 if ($apiId === '' || isset($fetched[$apiId])) {
                     continue;
                 }
-                $isPreflix = str_starts_with($apiId, 'PREFLIX-');
-                $isPremku  = str_starts_with($apiId, 'PREMKU-');
+                $isPreflix  = str_starts_with($apiId, 'PREFLIX-');
+                $isPremku   = str_starts_with($apiId, 'PREMKU-');
+                $isTelegram = str_starts_with($apiId, 'TG-');
                 if ($providerFilter === 'preflix' && !$isPreflix) continue;
                 if ($providerFilter === 'premku' && !$isPremku) continue;
+                if ($providerFilter === 'telegram' && !$isTelegram) continue;
 
                 // Jangan pernah menyamakan original_price fallback dengan harga jual jika api_price masih kosong
                 $fallbackOrig = (int) ($dbProd->api_price ?? 0);
@@ -1248,9 +1344,10 @@ class AdminController extends Controller
                 $fetched[$apiId] = [
                     'api_id'         => $apiId,
                     'name'           => $dbProd->name,
+                    'original_name'  => $dbProd->name,
                     'original_price' => $fallbackOrig,
                     'stock'          => max(0, (int) $dbProd->getRawOriginal('stock')),
-                    'provider'       => $isPreflix ? 'Preflix' : ($isPremku ? 'Premku' : 'API'),
+                    'provider'       => $isPreflix ? 'Preflix' : ($isPremku ? 'Premku' : ($isTelegram ? 'Telegram API' : 'API')),
                     'image'          => $dbProd->image,
                     'description'    => $dbProd->description,
                     'is_fallback'    => true,
@@ -1270,8 +1367,6 @@ class AdminController extends Controller
         $this->ensureApiProductsSchema();
 
         $search = $request->search;
-        $mojibake = ['&bull;'];
-        $fixed    = ['•'];
 
         $catalog = $this->fetchLiveApiCatalog($premkuService, 'all', $request->boolean('refresh'));
 
@@ -1280,8 +1375,9 @@ class AdminController extends Controller
 
         $apiProducts = collect(array_values($catalog));
 
-        $preflixLiveCount = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'preflix')->count();
-        $premkuLiveCount  = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'premku')->count();
+        $preflixLiveCount  = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'preflix')->count();
+        $premkuLiveCount   = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'premku')->count();
+        $telegramLiveCount = $apiProducts->filter(fn ($item) => strtolower((string) ($item['provider'] ?? '')) === 'telegram api')->count();
 
         if ($search) {
             $apiProducts = $apiProducts->filter(function ($item) use ($search) {
@@ -1296,17 +1392,45 @@ class AdminController extends Controller
             }
         }
 
-        $preflixDisabled = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $premkuDisabled  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $preflixDisabled  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $premkuDisabled   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $telegramDisabled = !TelegramBotApiService::isEnabledForUsers();
 
-        $preflixActiveCount = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->where('status', 'available')->count();
-        $preflixDbCount     = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->count();
-        $premkuActiveCount  = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->where('status', 'available')->count();
-        $premkuDbCount      = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->count();
+        $preflixActiveCount  = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->where('status', 'available')->count();
+        $preflixDbCount      = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREFLIX-%')->count();
+        $premkuActiveCount   = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->where('status', 'available')->count();
+        $premkuDbCount       = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'PREMKU-%')->count();
+        $telegramActiveCount = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'TG-%')->where('status', 'available')->count();
+        $telegramDbCount     = Product::where('type', 'api')->where('api_product_id', 'LIKE', 'TG-%')->count();
 
-        $preflixTotalCount = max($preflixDbCount, $preflixLiveCount);
-        $premkuTotalCount  = max($premkuDbCount, $premkuLiveCount);
+        $preflixTotalCount  = max($preflixDbCount, $preflixLiveCount);
+        $premkuTotalCount   = max($premkuDbCount, $premkuLiveCount);
+        $telegramTotalCount = max($telegramDbCount, $telegramLiveCount);
         $autoMarginSettings = Product::getAutoMarginSettings();
+
+        $premkuDepositInfo = Cache::remember('admin_premku_deposit_summary', 45, function () use ($premkuService) {
+            return $premkuService->checkDeposit();
+        });
+        if ($request->boolean('refresh')) {
+            Cache::forget('admin_premku_deposit_summary');
+            $premkuDepositInfo = $premkuService->checkDeposit();
+        }
+        if (!empty($premkuDepositInfo['ok'])) {
+            try {
+                $premkuService->checkAndNotifyLowBalance((int) ($premkuDepositInfo['saldo'] ?? 0));
+            } catch (\Throwable $ignore) {}
+        }
+
+        $premkuThresholdVal = (int) (Setting::where('key', 'premku_low_balance_threshold')->value('value') ?? 50000);
+        $premkuLowBalanceSettings = [
+            'enabled'        => (string) (Setting::where('key', 'premku_low_balance_alert_enabled')->value('value') ?? '1') === '1',
+            'threshold'      => $premkuThresholdVal,
+            'admin_whatsapp' => Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496',
+            'last_alert_at'  => Setting::where('key', 'premku_low_balance_last_alert_at')->value('value'),
+            'saldo'          => (int) ($premkuDepositInfo['saldo'] ?? 0),
+            'saldo_ok'       => (bool) ($premkuDepositInfo['ok'] ?? false),
+            'is_low'         => ($premkuDepositInfo['ok'] ?? false) && ((int) ($premkuDepositInfo['saldo'] ?? 0) <= $premkuThresholdVal),
+        ];
 
         return view('admin.api_margin', compact(
             'apiProducts',
@@ -1314,12 +1438,16 @@ class AdminController extends Controller
             'search',
             'preflixDisabled',
             'premkuDisabled',
+            'telegramDisabled',
             'preflixActiveCount',
             'preflixTotalCount',
             'premkuActiveCount',
             'premkuTotalCount',
+            'telegramActiveCount',
+            'telegramTotalCount',
             'autoMarginSettings',
-            'autoSyncedCount'
+            'autoSyncedCount',
+            'premkuLowBalanceSettings'
         ));
     }
 
@@ -1328,7 +1456,7 @@ class AdminController extends Controller
         $this->ensureApiProductsSchema();
 
         $request->validate([
-            'provider' => 'required|in:preflix,premku,all',
+            'provider' => 'required|in:preflix,premku,telegram,all',
             'action'   => 'required|in:enable,disable',
         ]);
 
@@ -1341,6 +1469,9 @@ class AdminController extends Controller
         } elseif ($provider === 'premku') {
             $providerName = 'Premku';
             Setting::updateOrCreate(['key' => 'provider_premku_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
+        } elseif ($provider === 'telegram') {
+            $providerName = 'API BOT Telegram';
+            Setting::updateOrCreate(['key' => 'provider_telegram_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
         } else {
             $providerName = 'Semua Provider API';
             Setting::updateOrCreate(['key' => 'provider_preflix_disabled'], ['value' => $action === 'disable' ? '1' : '0']);
@@ -1353,15 +1484,18 @@ class AdminController extends Controller
                 $query->where('api_product_id', 'LIKE', 'PREFLIX-%');
             } elseif ($provider === 'premku') {
                 $query->where('api_product_id', 'LIKE', 'PREMKU-%');
+            } elseif ($provider === 'telegram') {
+                $query->where('api_product_id', 'LIKE', 'TG-%');
             }
             $affected = $query->update(['status' => 'unavailable']);
             Cache::forget('api_full_data');
+            Cache::forget('admin_live_api_catalog_v3');
 
             return back()->with('success', "Berhasil! {$affected} produk dari {$providerName} telah dinonaktifkan (dimatikan) dari etalase toko pembeli.");
         }
 
         // Jika action === 'enable': Pastikan produk provider tersebut dipanggil ke DB (jika belum ada) & diaktifkan semua!
-        $fetched = $this->fetchLiveApiCatalog($premkuService, $provider);
+        $fetched = $this->fetchLiveApiCatalog($premkuService, $provider, true);
         $existingProducts = Product::where('type', 'api')->get()->keyBy('api_product_id');
         $liveStockCache = Cache::get('api_last_known_stock', []);
         if (!is_array($liveStockCache)) {
@@ -1379,7 +1513,7 @@ class AdminController extends Controller
                 $product = $existingProducts->get($apiId) ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
                 $isNew   = !$product->exists;
 
-                if ($isNew || empty($product->name)) {
+                if ($isNew || empty(trim((string) $product->name))) {
                     $product->name = trim((string) ($item['name'] ?? '')) ?: $apiId;
                 }
                 $origPrice = max(0, (int) ($item['original_price'] ?? 0));
@@ -1414,9 +1548,12 @@ class AdminController extends Controller
                 $product->save();
 
                 $liveStockCache[$apiId] = [
+                    'name'        => $item['name'] ?? $product->name,
+                    'provider'    => $item['provider'] ?? 'API',
                     'stock'       => $product->stock,
                     'price'       => $origPrice,
                     'description' => $product->description,
+                    'image'       => $product->image,
                 ];
                 $activatedCount++;
             }
@@ -1427,6 +1564,8 @@ class AdminController extends Controller
                 $q->where('api_product_id', 'LIKE', 'PREFLIX-%');
             } elseif ($provider === 'premku') {
                 $q->where('api_product_id', 'LIKE', 'PREMKU-%');
+            } elseif ($provider === 'telegram') {
+                $q->where('api_product_id', 'LIKE', 'TG-%');
             }
             $dbUpdated = $q->update(['status' => 'available']);
             if ($activatedCount === 0) {
@@ -1434,6 +1573,7 @@ class AdminController extends Controller
             }
         });
 
+        Cache::forget('admin_live_api_catalog_v3');
         if (!empty($liveStockCache)) {
             Cache::put('api_full_data', $liveStockCache, 60);
             Cache::put('api_last_known_stock', $liveStockCache, 86400);
@@ -1442,7 +1582,7 @@ class AdminController extends Controller
         }
 
         if ($activatedCount === 0) {
-            return back()->with('error', "Belum ada produk dari {$providerName} yang dapat diaktifkan. Pastikan API Key {$providerName} sudah benar di menu Provider API.");
+            return back()->with('error', "Belum ada produk dari {$providerName} yang dapat diaktifkan. Pastikan API Key {$providerName} sudah benar.");
         }
 
         return back()->with('success', "Berhasil! {$activatedCount} produk dari {$providerName} telah diaktifkan dan kini tampil di etalase toko.");
@@ -1451,14 +1591,18 @@ class AdminController extends Controller
     public function updateApiMarkup(Request $request, $api_id) {}
 
     /**
-     * Panggil & Sinkronkan Langsung Produk API dari Server Pusat (Premku & Preflix) ke Database
+     * Panggil & Sinkronkan Langsung Produk API dari Server Pusat (Premku, Preflix & Telegram API) ke Database.
+     * PENTING:
+     * 1. Produk yang sudah dinonaktifkan manual oleh Admin ('unavailable') TETAP nonaktif saat sinkronisasi.
+     * 2. Nama produk yang sudah diubah manual oleh Admin TIDAK ikut ter-reset kembali ke nama asli provider.
+     * 3. Produk baru yang muncul di API otomatis ditambahkan & aktif dengan margin yang diset.
      */
     public function syncApiProductsFromProvider(Request $request, PremkuApiService $premkuService)
     {
         $this->ensureApiProductsSchema();
 
         $request->validate([
-            'provider'          => 'nullable|in:all,premku,preflix',
+            'provider'          => 'nullable|in:all,premku,preflix,telegram',
             'default_margin'    => 'nullable|integer|min:0|max:500000',
             'reseller_margin'   => 'nullable|integer|min:0|max:500000',
             'overwrite_price'   => 'nullable|boolean',
@@ -1478,10 +1622,14 @@ class AdminController extends Controller
             Setting::updateOrCreate(['key' => 'api_auto_margin_reseller'], ['value' => (string) $resellerMargin]);
         }
 
+        // Ambil daftar produk yang sudah ada di DB SEBELUM fetchLiveApiCatalog menjalankan auto-sync
+        // agar kita tahu persis mana produk yang benar-benar baru dan mana yang statusnya 'unavailable'
+        $existingProducts = Product::where('type', 'api')->get()->keyBy('api_product_id');
+
         $fetched = $this->fetchLiveApiCatalog($premkuService, $provider, true);
 
         if (empty($fetched)) {
-            return back()->with('error', 'Tidak ada produk yang berhasil dipanggil dari provider API. Pastikan API Key Premku / Preflix sudah terisi dengan benar di menu Provider API.');
+            return back()->with('error', 'Tidak ada produk yang berhasil dipanggil dari provider API. Pastikan API Key sudah terisi dengan benar.');
         }
 
         if (in_array($provider, ['all', 'preflix'], true)) {
@@ -1493,11 +1641,13 @@ class AdminController extends Controller
 
         $importedCount    = 0;
         $updatedCount     = 0;
-        $existingProducts = Product::where('type', 'api')->get()->keyBy('api_product_id');
+        $preservedOffCount = 0;
         $liveStockCache   = Cache::get('api_last_known_stock', []);
         if (!is_array($liveStockCache)) {
             $liveStockCache = [];
         }
+
+        $tgEnabledForUsers = TelegramBotApiService::isEnabledForUsers();
 
         DB::transaction(function () use (
             $fetched,
@@ -1506,65 +1656,88 @@ class AdminController extends Controller
             $resellerMargin,
             $overwritePrice,
             $defaultCategory,
+            $tgEnabledForUsers,
             &$importedCount,
             &$updatedCount,
+            &$preservedOffCount,
             &$liveStockCache
         ) {
             foreach ($fetched as $apiId => $item) {
-                $product = $existingProducts->get($apiId) ?? new Product(['api_product_id' => $apiId, 'type' => 'api']);
-                $isNew   = !$product->exists;
+                $existingBeforeSync = $existingProducts->get($apiId);
+                $product = $existingBeforeSync
+                    ? (Product::find($existingBeforeSync->id) ?? $existingBeforeSync)
+                    : (Product::where('api_product_id', $apiId)->first() ?? new Product(['api_product_id' => $apiId, 'type' => 'api']));
 
-                if ($isNew || empty($product->name)) {
+                $wasBrandNew = ($existingBeforeSync === null);
+
+                // JANGAN reset nama produk yang sudah pernah diubah manual oleh Admin!
+                if ($wasBrandNew || empty(trim((string) $product->name))) {
                     $product->name = trim((string) ($item['name'] ?? '')) ?: $apiId;
                 }
+
                 $origPrice          = max(0, (int) ($item['original_price'] ?? 0));
                 $product->api_price = $origPrice;
                 $product->stock     = max(0, (int) ($item['stock'] ?? 0));
 
-                if ($isNew || $overwritePrice || (int) $product->price <= $origPrice) {
+                if ($wasBrandNew || $overwritePrice || (int) $product->price <= $origPrice) {
                     $product->price               = $origPrice + $defaultMargin;
                     $product->api_margin          = $defaultMargin;
                     $product->reseller_price      = $resellerMargin > 0 ? ($origPrice + $resellerMargin) : null;
                     $product->api_reseller_margin = $resellerMargin > 0 ? $resellerMargin : null;
                 }
 
-                if ($isNew || empty($product->category)) {
+                if ($wasBrandNew || empty($product->category)) {
                     $product->category = $defaultCategory;
                 }
                 if (!empty($item['description'])) {
                     $product->description = $item['description'];
-                } elseif ($isNew) {
+                } elseif ($wasBrandNew) {
                     $product->description = null;
                 }
-                if (($isNew || empty($product->image)) && !empty($item['image'])) {
+                if (($wasBrandNew || empty($product->image)) && !empty($item['image'])) {
                     $product->image = $item['image'];
                 }
 
-                $product->status = 'available';
-                if ($isNew) {
+                if ($wasBrandNew) {
+                    $isTg = str_starts_with($apiId, 'TG-');
+                    $product->status = ($isTg && !$tgEnabledForUsers) ? 'unavailable' : 'available';
                     $product->is_promo = 1;
                     $importedCount++;
                 } else {
+                    // Pertahankan status manual Admin! Jika sebelumnya dinonaktifkan ('unavailable'), tetap 'unavailable'.
+                    $previousStatus = $existingBeforeSync->status ?? $product->status;
+                    if ($previousStatus === 'unavailable') {
+                        $product->status = 'unavailable';
+                        $preservedOffCount++;
+                    } else {
+                        $product->status = 'available';
+                    }
                     $updatedCount++;
                 }
 
                 $product->save();
                 $liveStockCache[$apiId] = [
+                    'name'        => $item['name'] ?? $product->name,
+                    'provider'    => $item['provider'] ?? 'API',
                     'stock'       => $product->stock,
                     'price'       => $origPrice,
                     'description' => $product->description,
+                    'image'       => $product->image,
                 ];
             }
         });
 
+        Cache::forget('admin_live_api_catalog_v3');
         if (!empty($liveStockCache)) {
             Cache::put('api_full_data', $liveStockCache, 60);
             Cache::put('api_last_known_stock', $liveStockCache, 86400);
         }
 
+        $offNote = $preservedOffCount > 0 ? " ({$preservedOffCount} produk yang Anda nonaktifkan manual tetap terjaga nonaktif)" : '';
+
         return back()->with(
             'success',
-            "Sinkronisasi pusat berhasil! {$importedCount} produk API baru ditambahkan dan {$updatedCount} produk diperbarui & diaktifkan (Total: " . count($fetched) . " produk live)."
+            "Sinkronisasi pusat berhasil! {$importedCount} produk API baru ditambahkan dan {$updatedCount} produk diperbarui mengikuti margin tanpa mereset nama kustom{$offNote}."
         );
     }
 
@@ -2223,6 +2396,22 @@ class AdminController extends Controller
                     ]);
                 }
                 \App\Services\OrderFulfillmentService::sendManualOrderAdminWaAlert($manualOrd, $manualOrd->product);
+            }
+
+            // Otomatis dorong & sinkronkan pesanan API yang sudah dibayar namun masih menunggu / belum terkirim ke provider
+            $stuckApiOrders = Order::with('product')
+                ->where('product_type', 'api')
+                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
+                ->whereRaw("LOWER(order_status) IN ('processing', 'pending')")
+                ->where('created_at', '>=', now()->subHours(24))
+                ->orderBy('id', 'desc')
+                ->limit(5)
+                ->get();
+
+            foreach ($stuckApiOrders as $apiOrd) {
+                if (\App\Services\OrderFulfillmentService::isWaitingText($apiOrd->sn_or_account)) {
+                    \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($apiOrd, true);
+                }
             }
         } catch (\Throwable $e) {}
 
@@ -3411,5 +3600,202 @@ class AdminController extends Controller
             return back()->with('success', "Status Saldo Realtime Kiosbank: " . $res['message']);
         }
         return back()->with('error', "Gagal mengambil saldo realtime: " . $res['message']);
+    }
+
+    /**
+     * Halaman Manajemen API BOT Telegram (QuantumVault Store API)
+     */
+    public function telegramApiSettings(Request $request)
+    {
+        $this->ensureApiProductsSchema();
+
+        $settings = Setting::whereIn('key', [
+            'telegram_api_key',
+            'telegram_api_base_url',
+            'telegram_usd_rate',
+            'provider_telegram_disabled',
+            'api_auto_margin_member',
+            'api_auto_margin_reseller',
+        ])->pluck('value', 'key');
+
+        $apiKey      = (string) ($settings['telegram_api_key'] ?? '');
+        $baseUrl     = (string) ($settings['telegram_api_base_url'] ?? 'https://www.quantumvault.me/api/v1');
+        $usdRate     = (int) ($settings['telegram_usd_rate'] ?? 16500);
+        // Default OFF ('1') sesuai permintaan user sebelum rilis
+        $isDisabled  = ($settings['provider_telegram_disabled'] ?? '1') == '1';
+        $isEnabled   = !$isDisabled;
+
+        $autoMarginMember   = (int) ($settings['api_auto_margin_member'] ?? 10000);
+        $autoMarginReseller = (int) ($settings['api_auto_margin_reseller'] ?? 5000);
+
+        $tgService   = new TelegramBotApiService($apiKey, $baseUrl, $usdRate);
+        $accountInfo = null;
+        $balanceInfo = null;
+        $liveCatalog = [];
+        $recentOrders = [];
+        $orderSummary = null;
+        $apiError    = null;
+
+        if ($tgService->hasApiKey()) {
+            $meRes = $tgService->me(8);
+            if (!empty($meRes['ok'])) {
+                $accountInfo = $meRes['data'] ?? null;
+                $balanceInfo = [
+                    'balance'  => $accountInfo['balance'] ?? 0,
+                    'credit'   => $accountInfo['credit'] ?? 0,
+                    'currency' => $accountInfo['currency'] ?? 'USD',
+                ];
+            } else {
+                $apiError = $meRes['error'] ?? 'Gagal terhubung ke API Bot Telegram';
+            }
+
+            $liveCatalog = $tgService->getNormalizedCatalog(10);
+
+            $ordersRes = $tgService->getOrders(20, 8);
+            if (!empty($ordersRes['ok'])) {
+                $recentOrders = $ordersRes['orders'] ?? [];
+                $orderSummary = $ordersRes['summary'] ?? null;
+            }
+        }
+
+        $dbProducts = Product::where('type', 'api')
+            ->where('api_product_id', 'LIKE', 'TG-%')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->keyBy('api_product_id');
+
+        $tgActiveCount = $dbProducts->where('status', 'available')->count();
+        $tgTotalCount  = max($dbProducts->count(), count($liveCatalog));
+
+        return view('admin.telegram_api', compact(
+            'apiKey',
+            'baseUrl',
+            'usdRate',
+            'isEnabled',
+            'isDisabled',
+            'autoMarginMember',
+            'autoMarginReseller',
+            'accountInfo',
+            'balanceInfo',
+            'liveCatalog',
+            'recentOrders',
+            'orderSummary',
+            'apiError',
+            'dbProducts',
+            'tgActiveCount',
+            'tgTotalCount'
+        ));
+    }
+
+    /**
+     * Simpan Konfigurasi API BOT Telegram (API Key, Base URL, Kurs USD->IDR, Status Aktif/Nonaktif)
+     */
+    public function saveTelegramApiSettings(Request $request, PremkuApiService $premkuService)
+    {
+        $request->validate([
+            'telegram_api_key'       => 'nullable|string|max:255',
+            'telegram_api_base_url'  => 'nullable|url|max:255',
+            'telegram_usd_rate'      => 'nullable|numeric|min:1000|max:100000',
+            'auto_margin_member'     => 'nullable|integer|min:0|max:500000',
+            'auto_margin_reseller'   => 'nullable|integer|min:0|max:500000',
+            'is_enabled_for_users'   => 'nullable|boolean',
+        ]);
+
+        $apiKey  = trim((string) $request->input('telegram_api_key', ''));
+        $baseUrl = rtrim(trim((string) $request->input('telegram_api_base_url', 'https://www.quantumvault.me/api/v1')), '/');
+        $usdRate = max(1000, (int) $request->input('telegram_usd_rate', 16500));
+
+        Setting::updateOrCreate(['key' => 'telegram_api_key'], ['value' => $apiKey]);
+        Setting::updateOrCreate(['key' => 'telegram_api_base_url'], ['value' => $baseUrl ?: 'https://www.quantumvault.me/api/v1']);
+        Setting::updateOrCreate(['key' => 'telegram_usd_rate'], ['value' => (string) $usdRate]);
+
+        if ($request->filled('auto_margin_member')) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_member'], ['value' => (string) max(0, (int) $request->input('auto_margin_member'))]);
+        }
+        if ($request->filled('auto_margin_reseller')) {
+            Setting::updateOrCreate(['key' => 'api_auto_margin_reseller'], ['value' => (string) max(0, (int) $request->input('auto_margin_reseller'))]);
+        }
+
+        if ($request->has('is_enabled_for_users')) {
+            $enabled = $request->boolean('is_enabled_for_users');
+            Setting::updateOrCreate(['key' => 'provider_telegram_disabled'], ['value' => $enabled ? '0' : '1']);
+        } elseif (Setting::where('key', 'provider_telegram_disabled')->doesntExist()) {
+            // Pastikan default OFF ('1') jika belum pernah diatur
+            Setting::create(['key' => 'provider_telegram_disabled', 'value' => '1']);
+        }
+
+        Cache::forget('api_full_data');
+        Cache::forget('admin_live_api_catalog_v3');
+
+        if ($request->boolean('sync_now') && $apiKey !== '') {
+            $request->merge([
+                'provider'        => 'telegram',
+                'default_margin'  => (int) $request->input('auto_margin_member', 10000),
+                'reseller_margin' => (int) $request->input('auto_margin_reseller', 5000),
+            ]);
+            return $this->syncApiProductsFromProvider($request, $premkuService);
+        }
+
+        return back()->with('success', 'Konfigurasi API BOT Telegram berhasil disimpan!');
+    }
+
+    /**
+     * Toggle Nyalakan / Matikan API BOT Telegram untuk bisa di-order oleh User
+     */
+    public function toggleTelegramApiStatus(Request $request, PremkuApiService $premkuService)
+    {
+        $action = $request->input('action', 'disable');
+        $enable = ($action === 'enable');
+
+        Setting::updateOrCreate(['key' => 'provider_telegram_disabled'], ['value' => $enable ? '0' : '1']);
+
+        if (!$enable) {
+            Product::where('type', 'api')->where('api_product_id', 'LIKE', 'TG-%')->update(['status' => 'unavailable']);
+            Cache::forget('api_full_data');
+            Cache::forget('admin_live_api_catalog_v3');
+            return back()->with('success', 'API BOT Telegram telah DINONAKTIFKAN (MATI) untuk user. Produk Telegram tidak akan tampil di etalase pembeli.');
+        }
+
+        // Jika dinyalakan, tarik produk jika belum ada & aktifkan yang tersedia
+        $tgService = new TelegramBotApiService();
+        if ($tgService->hasApiKey()) {
+            $fetched = $this->fetchLiveApiCatalog($premkuService, 'telegram', true);
+            Product::syncAllApiProductsFromLiveMap($fetched);
+        }
+        Product::where('type', 'api')->where('api_product_id', 'LIKE', 'TG-%')->update(['status' => 'available']);
+
+        Cache::forget('api_full_data');
+        Cache::forget('admin_live_api_catalog_v3');
+
+        return back()->with('success', 'API BOT Telegram telah DIAKTIFKAN (MENYALA)! Produk kini tampil dan siap di-order otomatis oleh user.');
+    }
+
+    /**
+     * Endpoint Tester Live untuk API BOT Telegram (/me, /balance, /products, /products/:key, /orders, /orders/:id)
+     */
+    public function testTelegramApiEndpoint(Request $request)
+    {
+        $endpoint = trim((string) $request->input('endpoint', 'me'));
+        $param    = trim((string) $request->input('param', ''));
+        $tg       = new TelegramBotApiService();
+
+        if (!$tg->hasApiKey()) {
+            return response()->json([
+                'ok'    => false,
+                'error' => 'API Key belum disimpan. Silakan simpan API Key terlebih dahulu.',
+            ], 400);
+        }
+
+        $result = match ($endpoint) {
+            'me'             => $tg->me(),
+            'balance'        => $tg->balance(),
+            'products'       => $tg->getProducts(),
+            'product_detail' => $param !== '' ? $tg->getProductDetail($param) : ['ok' => false, 'error' => 'Masukkan productKey terlebih dahulu.'],
+            'orders'         => $tg->getOrders(25),
+            'order_detail'   => $param !== '' ? $tg->getOrderDetail($param) : ['ok' => false, 'error' => 'Masukkan orderId / purchaseId terlebih dahulu.'],
+            default          => $tg->me(),
+        };
+
+        return response()->json($result);
     }
 }

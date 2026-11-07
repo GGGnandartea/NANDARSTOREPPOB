@@ -95,6 +95,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/settings/premku/deposit', [AdminController::class, 'premkuCreateDeposit'])->name('settings.premku.deposit');
     Route::post('/settings/premku/check-deposit', [AdminController::class, 'premkuCheckDeposit'])->name('settings.premku.check_deposit');
     Route::post('/settings/premku/cancel-deposit', [AdminController::class, 'premkuCancelDeposit'])->name('settings.premku.cancel_deposit');
+    Route::post('/settings/premku/low-balance-alert', [AdminController::class, 'premkuSaveLowBalanceAlert'])->name('settings.premku.low_balance_alert');
     Route::post('/settings/kiosbank/generate-rsa', [AdminController::class, 'generateKiosbankRsaKeys'])->name('settings.kiosbank.generate_rsa');
     Route::post('/settings/kiosbank/test-signon', [AdminController::class, 'testKiosbankSignOn'])->name('settings.kiosbank.test_signon');
     
@@ -181,6 +182,12 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/banners/{id}/update', [AdminController::class, 'updateBanner'])->name('banners.update');
     Route::post('/banners/{id}/toggle', [AdminController::class, 'toggleBanner'])->name('banners.toggle');
     Route::post('/banners/{id}/delete', [AdminController::class, 'deleteBanner'])->name('banners.delete');
+
+    // --- RUTE API BOT TELEGRAM (QUANTUMVAULT STORE API) ---
+    Route::get('/telegram-api', [AdminController::class, 'telegramApiSettings'])->name('telegram.index');
+    Route::post('/telegram-api/save', [AdminController::class, 'saveTelegramApiSettings'])->name('telegram.save');
+    Route::post('/telegram-api/toggle', [AdminController::class, 'toggleTelegramApiStatus'])->name('telegram.toggle');
+    Route::post('/telegram-api/test-endpoint', [AdminController::class, 'testTelegramApiEndpoint'])->name('telegram.test');
 });
 
 // Route API untuk Frontend (Cek Voucher)

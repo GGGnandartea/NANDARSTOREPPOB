@@ -3,6 +3,19 @@
 @section('title', 'Katalog Premium & Markup API')
 
 @section('content')
+<style>
+    /* Tata letak tabel kompak agar seluruh kolom & tombol muat dalam 1 layar tanpa harus geser ke samping */
+    #apiTable th {
+        padding: 0.65rem 0.5rem !important;
+        font-size: 0.68rem !important;
+        letter-spacing: 0.03em !important;
+    }
+    #apiTable td {
+        padding: 0.6rem 0.5rem !important;
+        font-size: 0.78rem !important;
+        vertical-align: middle !important;
+    }
+</style>
 <datalist id="kategoriList">
     <option value="Aplikasi Premium">
     <option value="Akun Streaming">
@@ -91,6 +104,7 @@
                         <option value="all">Semua (Premku & Preflix)</option>
                         <option value="premku">Hanya Premku</option>
                         <option value="preflix">Hanya Preflix</option>
+                        <option value="telegram">Hanya API BOT Telegram</option>
                     </select>
                 </div>
                 <div>
@@ -171,15 +185,22 @@
         </div>
 
         <!-- KARTU PREMKU -->
-        <div class="admin-card p-5 sm:p-6 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/5 rounded-3xl relative overflow-hidden shadow-sm">
+        <div class="admin-card p-5 sm:p-6 bg-white dark:bg-[#111827] border border-gray-200 dark:border-white/5 rounded-3xl relative overflow-hidden shadow-sm" x-data="{ showPremkuAlertConfig: false }">
             <div class="flex items-start justify-between gap-3 mb-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-purple-500/20 text-sm">
                         PK
                     </div>
                     <div>
-                        <h3 class="text-base font-black text-gray-900 dark:text-white">Premku Server</h3>
-                        <p class="text-[11px] text-gray-400 font-medium">Provider Katalog Otomatis</p>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-base font-black text-gray-900 dark:text-white">Premku Server</h3>
+                            @if(!empty($premkuLowBalanceSettings['saldo_ok']))
+                                <span class="px-2 py-0.5 rounded-lg text-[10px] font-black font-mono {{ !empty($premkuLowBalanceSettings['is_low']) ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800/40' : 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800/40' }}">
+                                    Saldo: Rp {{ number_format($premkuLowBalanceSettings['saldo'] ?? 0, 0, ',', '.') }}
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] text-gray-400 font-medium">Provider Katalog Otomatis &amp; Monitoring Saldo WA</p>
                     </div>
                 </div>
 
@@ -198,9 +219,51 @@
                 @endif
             </div>
 
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                Kelola status seluruh produk dari Premku secara serentak. Klik <strong>Aktifkan Semua</strong> untuk langsung memanggil & mengaktifkan seluruh katalog Premku ke etalase toko.
-            </p>
+            <!-- Bar Status & Pengaturan Cepat Notifikasi WA Saldo Rendah Premku -->
+            <div class="mb-3 p-3 rounded-2xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-800/30">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {{ !empty($premkuLowBalanceSettings['enabled']) ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400' }}"></span>
+                        <span class="text-[11px] font-black text-gray-800 dark:text-gray-200">
+                            Alert WA Saldo Rendah:
+                            <strong class="text-purple-600 dark:text-purple-400">
+                                {{ !empty($premkuLowBalanceSettings['enabled']) ? 'ON (≤ Rp ' . number_format($premkuLowBalanceSettings['threshold'] ?? 50000, 0, ',', '.') . ')' : 'OFF' }}
+                            </strong>
+                        </span>
+                    </div>
+                    <button type="button" @click="showPremkuAlertConfig = !showPremkuAlertConfig" class="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700/50 text-[10px] font-black text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition cursor-pointer">
+                        <span x-text="showPremkuAlertConfig ? 'Tutup Pengaturan' : 'Atur Alert WA Saldo'">Atur Alert WA Saldo</span>
+                    </button>
+                </div>
+
+                <form x-show="showPremkuAlertConfig" style="display: none;" action="{{ route('admin.settings.premku.low_balance_alert') }}" method="POST" class="mt-3 pt-3 border-t border-purple-200/60 dark:border-purple-800/30 space-y-2.5">
+                    @csrf
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 mb-1">Batas Minimum Saldo (Rp)</label>
+                            <input type="number" name="threshold" min="5000" step="5000" value="{{ $premkuLowBalanceSettings['threshold'] ?? 50000 }}" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-black font-mono text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 mb-1">WhatsApp Admin</label>
+                            <input type="text" name="admin_whatsapp" value="{{ $premkuLowBalanceSettings['admin_whatsapp'] ?? '082317458496' }}" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-xs font-bold font-mono text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="enabled" value="1" @checked($premkuLowBalanceSettings['enabled'] ?? true) class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+                            <span>Kirim WA Otomatis Saat Saldo Menipis</span>
+                        </label>
+                        <div class="flex items-center gap-1.5">
+                            <button type="submit" name="action" value="test" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] transition cursor-pointer">
+                                Tes WA
+                            </button>
+                            <button type="submit" name="action" value="save" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] transition cursor-pointer">
+                                Simpan
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
 
             <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
                 <form action="{{ route('admin.products.api.toggle_provider') }}" method="POST" onsubmit="if(!confirm('Yakin ingin MEMATIKAN SEMUA produk Premku dari etalase toko?')) return false; this.querySelector('button').disabled=true; this.querySelector('span').innerText='Mematikan...';" class="flex-1">
@@ -258,6 +321,11 @@
                     <button type="button" onclick="filterProvider('premku')" id="btnFilter_premku" class="prov-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition">
                         Premku ({{ $premkuTotalCount }})
                     </button>
+                    @if(($telegramTotalCount ?? 0) > 0)
+                        <button type="button" onclick="filterProvider('telegram api')" id="btnFilter_telegram api" class="prov-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer transition">
+                            Telegram ({{ $telegramTotalCount }})
+                        </button>
+                    @endif
                     <a href="{{ route('admin.products.api', ['refresh' => 1]) }}" class="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                         <span>Refresh Harga Live</span>
@@ -266,16 +334,16 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left admin-table whitespace-nowrap" id="apiTable">
+                <table class="w-full text-left admin-table" id="apiTable">
                     <thead>
                         <tr>
-                            <th>Logo (256x256 px) & Produk</th>
-                            <th>Provider & Modal</th>
-                            <th>Harga Jual (Markup)</th>
-                            <th class="text-amber-500">👑 Harga Reseller</th>
-                            <th class="text-orange-500">Kategori Tipe</th>
-                            <th class="text-center">Label Promo</th>
-                            <th class="text-center">Aktifkan</th>
+                            <th>Logo &amp; Produk</th>
+                            <th>Provider &amp; Modal</th>
+                            <th>Harga Jual</th>
+                            <th class="text-amber-500">👑 Reseller</th>
+                            <th class="text-orange-500">Kategori</th>
+                            <th class="text-center w-16">Promo</th>
+                            <th class="text-center w-16">Aktifkan</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -287,6 +355,7 @@
                                 $savedImage = ($isSaved && !empty($dbMarkups[$item['api_id']]->image)) ? $dbMarkups[$item['api_id']]->image : $item['image'];
                                 $savedDesc = !empty($item['description']) ? $item['description'] : (($isSaved && !empty($dbMarkups[$item['api_id']]->description)) ? $dbMarkups[$item['api_id']]->description : '');
                                 $savedCat = $isSaved ? $dbMarkups[$item['api_id']]->category : '';
+                                $origProviderName = $item['original_name'] ?? $item['name'];
                                 $savedName = ($isSaved && !empty($dbMarkups[$item['api_id']]->name)) ? $dbMarkups[$item['api_id']]->name : $item['name'];
                                 
                                 $provColor = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'; 
@@ -294,15 +363,17 @@
                                     $provColor = 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-200 dark:border-purple-800/40';
                                 } elseif (strtolower($item['provider']) == 'preflix') {
                                     $provColor = 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-800/40';
+                                } elseif (strtolower($item['provider']) == 'telegram api') {
+                                    $provColor = 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border-sky-200 dark:border-sky-800/40';
                                 }
                             @endphp
                             <tr class="markup-row hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group" data-api-id="{{ $item['api_id'] }}" data-original-price="{{ $item['original_price'] }}" data-provider="{{ strtolower($item['provider']) }}">
                                 
                                 <!-- Kolom 1: Logo & Nama -->
                                 <td>
-                                    <div class="flex items-start gap-3">
-                                        <div class="flex flex-col items-center gap-0.5 shrink-0 mt-0.5" title="Upload Logo Produk (Ukuran Ideal: 256 x 256 px atau 500 x 500 px)">
-                                            <div class="relative group/upload cursor-pointer w-11 h-11 rounded-xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden hover:border-orange-500">
+                                    <div class="flex items-start gap-2.5">
+                                        <div class="flex flex-col items-center gap-0.5 shrink-0 mt-0.5" title="Upload Logo Produk (Ukuran Ideal: 256 x 256 px)">
+                                            <div class="relative group/upload cursor-pointer w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden hover:border-orange-500">
                                                 <img id="preview_{{ $item['api_id'] }}" src="{{ $savedImage }}" class="{{ $savedImage ? '' : 'hidden' }} w-full h-full object-cover">
                                                 <div id="upload_icon_{{ $item['api_id'] }}" class="{{ $savedImage ? 'hidden' : 'flex' }} flex-col items-center justify-center text-gray-400">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
@@ -316,26 +387,26 @@
                                         <input type="hidden" class="row-original-price" name="products[{{ $item['api_id'] }}][original_price]" value="{{ $item['original_price'] }}">
                                         <input type="hidden" class="row-stock" name="products[{{ $item['api_id'] }}][stock]" value="{{ $item['stock'] ?? 0 }}">
                                         
-                                        <div class="flex flex-col min-w-0 w-52 sm:w-64">
-                                            <div class="flex items-center gap-1.5 mb-1">
+                                        <div class="flex flex-col min-w-[165px] max-w-[230px] flex-1">
+                                            <div class="flex items-center gap-1.5 mb-0.5">
                                                 <span class="text-[9px] font-black uppercase text-orange-500 tracking-wider">Nama Produk:</span>
-                                                @if($savedName !== $item['name'])
-                                                    <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 font-bold" title="Nama produk ini telah di-kustom">Kustom</span>
+                                                @if($savedName !== $origProviderName)
+                                                    <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 font-bold" title="Nama produk ini telah di-kustom dan tidak akan ter-reset saat sinkronisasi">Kustom</span>
                                                 @endif
                                             </div>
                                             <input type="text" 
                                                    name="products[{{ $item['api_id'] }}][name]" 
                                                    value="{{ $savedName }}" 
-                                                   class="row-name w-full px-2.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" 
+                                                   class="row-name w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500 transition" 
                                                    placeholder="Kustom nama produk..."
                                                    title="{{ $savedName }}">
-                                            @if($savedName !== $item['name'])
-                                                <span class="text-[9px] text-gray-400 truncate mt-0.5" title="Nama Asli Provider: {{ $item['name'] }}">
-                                                    Asli: {{ $item['name'] }}
+                                            @if($savedName !== $origProviderName)
+                                                <span class="text-[9px] text-gray-400 truncate mt-0.5" title="Nama Asli Provider: {{ $origProviderName }}">
+                                                    Asli: {{ $origProviderName }}
                                                 </span>
                                             @endif
                                             <input type="hidden" id="desc_input_{{ $item['api_id'] }}" class="row-description" name="products[{{ $item['api_id'] }}][description]" value="{{ $savedDesc }}">
-                                            <button type="button" onclick="openDescModal('{{ $item['api_id'] }}', '{{ htmlspecialchars($savedName, ENT_QUOTES) }}')" class="text-[10px] text-orange-500 hover:underline mt-1 font-bold w-fit flex items-center gap-1 cursor-pointer">
+                                            <button type="button" onclick="openDescModal('{{ $item['api_id'] }}', '{{ htmlspecialchars($savedName, ENT_QUOTES) }}')" class="text-[10px] text-orange-500 hover:underline mt-0.5 font-bold w-fit flex items-center gap-1 cursor-pointer">
                                                 <span>✏️ Edit Deskripsi</span>
                                             </button>
                                         </div>
@@ -343,30 +414,30 @@
                                 </td>
                                 
                                 <!-- Kolom 2: Provider & Modal -->
-                                <td>
-                                    <div class="flex flex-col gap-1 items-start">
+                                <td class="whitespace-nowrap">
+                                    <div class="flex flex-col gap-0.5 items-start">
                                         <span class="{{ $provColor }} text-[9px] font-black px-2 py-0.5 rounded-full border">
                                             {{ $item['provider'] }}
                                         </span>
-                                        <span class="font-mono text-xs font-bold text-gray-400">
+                                        <span class="font-mono text-[11px] font-bold text-gray-400">
                                             Rp {{ number_format($item['original_price'], 0, ',', '.') }}
                                         </span>
                                     </div>
                                 </td>
                                 
                                 <!-- Kolom 3: Harga Jual (Markup) -->
-                                <td>
+                                <td class="whitespace-nowrap">
                                     @php
                                         $currentSellPrice = $isSaved ? (int) $dbMarkups[$item['api_id']]->price : 0;
                                         $currentModalPrice = (int) ($item['original_price'] ?? 0);
                                         $currentProfit = $currentSellPrice > 0 ? ($currentSellPrice - $currentModalPrice) : 0;
                                     @endphp
-                                    <div class="flex flex-col gap-1">
-                                        <div class="relative w-28 sm:w-32">
-                                            <span class="absolute left-2.5 top-2.5 text-gray-400 font-bold text-xs">Rp</span>
-                                            <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $currentSellPrice > 0 ? $currentSellPrice : '' }}" oninput="updateRowMarginBadge(this)" class="markup-input row-markup-price w-full pl-8 pr-2.5 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
+                                    <div class="flex flex-col gap-0.5">
+                                        <div class="relative w-24 sm:w-28">
+                                            <span class="absolute left-2 top-2 text-gray-400 font-bold text-[11px]">Rp</span>
+                                            <input type="number" name="products[{{ $item['api_id'] }}][markup_price]" value="{{ $currentSellPrice > 0 ? $currentSellPrice : '' }}" oninput="updateRowMarginBadge(this)" class="markup-input row-markup-price w-full pl-6 pr-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="0">
                                         </div>
-                                        <span class="row-profit-badge text-[10px] font-bold {{ $currentProfit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500' }}">
+                                        <span class="row-profit-badge text-[9px] font-bold {{ $currentProfit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500' }}">
                                             @if($currentSellPrice > 0)
                                                 Untung: {{ $currentProfit >= 0 ? '+Rp ' . number_format($currentProfit, 0, ',', '.') : '-Rp ' . number_format(abs($currentProfit), 0, ',', '.') }}
                                             @else
@@ -377,20 +448,20 @@
                                 </td>
 
                                 <!-- Kolom 4: Harga Reseller VIP -->
-                                <td>
-                                    <div class="relative w-28 sm:w-32">
-                                        <span class="absolute left-2.5 top-2.5 text-amber-500 font-bold text-xs">Rp</span>
-                                        <input type="number" name="products[{{ $item['api_id'] }}][reseller_price]" value="{{ $isSaved && isset($dbMarkups[$item['api_id']]->reseller_price) ? $dbMarkups[$item['api_id']]->reseller_price : '' }}" class="row-reseller-price w-full pl-8 pr-2.5 py-2 bg-amber-50/30 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500" placeholder="Opsional">
+                                <td class="whitespace-nowrap">
+                                    <div class="relative w-24 sm:w-28">
+                                        <span class="absolute left-2 top-2 text-amber-500 font-bold text-[11px]">Rp</span>
+                                        <input type="number" name="products[{{ $item['api_id'] }}][reseller_price]" value="{{ $isSaved && isset($dbMarkups[$item['api_id']]->reseller_price) ? $dbMarkups[$item['api_id']]->reseller_price : '' }}" class="row-reseller-price w-full pl-6 pr-2 py-1.5 bg-amber-50/30 dark:bg-gray-900 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500" placeholder="Opsional">
                                     </div>
                                 </td>
 
                                 <!-- Kolom 5: Kategori Tipe -->
-                                <td>
-                                    <input list="kategoriList" type="text" name="products[{{ $item['api_id'] }}][category]" value="{{ $savedCat }}" class="row-category w-32 sm:w-36 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Pilih / Ketik...">
+                                <td class="whitespace-nowrap">
+                                    <input list="kategoriList" type="text" name="products[{{ $item['api_id'] }}][category]" value="{{ $savedCat }}" class="row-category w-28 sm:w-32 px-2.5 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500" placeholder="Pilih / Ketik...">
                                 </td>
                                 
                                 <!-- Kolom 6: Switch Promo Merah -->
-                                <td class="text-center">
+                                <td class="text-center whitespace-nowrap">
                                     <label class="relative inline-flex items-center cursor-pointer" title="Aktifkan/Matikan Label Promo">
                                         <input type="checkbox" name="products[{{ $item['api_id'] }}][is_promo]" value="1" class="row-is-promo sr-only peer" {{ $isPromo ? 'checked' : '' }}>
                                         <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500 shadow-inner"></div>
@@ -398,8 +469,8 @@
                                 </td>
                                 
                                 <!-- Kolom 7: Switch Status Aktif -->
-                                <td class="text-center">
-                                    <label class="relative inline-flex items-center cursor-pointer">
+                                <td class="text-center whitespace-nowrap">
+                                    <label class="relative inline-flex items-center cursor-pointer" title="Aktifkan/Nonaktifkan Produk di Toko">
                                         <input type="checkbox" name="products[{{ $item['api_id'] }}][is_active]" value="1" class="row-is-active sr-only peer status-checkbox" {{ $isActive ? 'checked' : '' }}>
                                         <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 shadow-inner"></div>
                                     </label>

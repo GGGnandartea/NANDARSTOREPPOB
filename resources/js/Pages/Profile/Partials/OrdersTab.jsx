@@ -827,7 +827,7 @@ export default function OrdersTab({
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {computedPaginatedOrders.map((o, i) => {
             const isOrderPpob = o.product_type === 'ppob' || String(o.invoice_number || '').startsWith('PPOB-');
             const isOrderPaid = ['paid', 'success', 'settlement', 'lunas'].includes(String(o.payment_status || '').toLowerCase());
@@ -837,7 +837,7 @@ export default function OrdersTab({
             return (
               <div
                 key={o.id || i}
-                className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white dark:bg-gray-800/95 rounded-2xl border border-gray-200/90 dark:border-gray-700 p-4 sm:p-5 shadow-md shadow-black/[0.03] dark:shadow-black/25 hover:shadow-lg transition-shadow"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">

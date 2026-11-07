@@ -27,8 +27,17 @@ class PreflixApiService
             'key_user' => $this->keyUser
         ], $data);
 
-        // Tambahan withoutVerifying() untuk mem-bypass error SSL di XAMPP/Localhost
-        return Http::withoutVerifying()->asForm()->post($this->baseUrl, $payload)->json();
+        // Tambahan withoutVerifying() & IPv4 agar stabil di XAMPP/Localhost maupun VPS Dual-Stack
+        $client = Http::withoutVerifying()->connectTimeout(8)->timeout(20);
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $client = $client->withOptions([
+                'curl' => [
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                ],
+            ]);
+        }
+
+        return $client->asForm()->post($this->baseUrl, $payload)->json();
     }
 
     public function getKategori()

@@ -173,6 +173,23 @@
                     </span>
                 </a>
 
+                <a href="{{ route('admin.telegram.index') }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.telegram.*') ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">API BOT Telegram</span>
+                        @php
+                            $isTgEnabledSidebar = \App\Services\TelegramBotApiService::isEnabledForUsers();
+                        @endphp
+                        @if($isTgEnabledSidebar)
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">ON</span>
+                        @else
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-500 text-white">OFF</span>
+                        @endif
+                    </span>
+                </a>
+
                 <a href="{{ route('admin.banners', ['section' => 'list']) }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
                    class="sidebar-link {{ request()->routeIs('admin.banners*') && $currentSection !== 'create' ? 'active' : '' }}">

@@ -17,18 +17,41 @@ use Illuminate\Support\Facades\DB;
 class OrderFulfillmentService
 {
     /**
+     * HTTP Client helper dengan paksaan IPv4 (CURL_IPRESOLVE_V4) agar stabil di VPS Dual-Stack.
+     */
+    private static function httpClient(int $timeout = 15, int $connectTimeout = 8)
+    {
+        $client = Http::withoutVerifying()
+            ->connectTimeout(min($connectTimeout, $timeout))
+            ->timeout($timeout);
+
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $client = $client->withOptions([
+                'curl' => [
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                ],
+            ]);
+        }
+
+        return $client;
+    }
+
+    /**
      * Memproses fulfillment pesanan setelah pembayaran terkonfirmasi (Saldo atau QRIS)
      * Untuk produk API (Preflix / Premku), server akan menunggu hingga provider memberikan akun.
      */
     public static function fulfillOrder(Order $order): array
     {
+        @ignore_user_abort(true);
+        @set_time_limit(120);
+
         $order->refresh();
-        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement'], true)) {
+        if (!in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)) {
             return ['status' => 'error', 'is_ready' => false, 'message' => 'Pembayaran belum dikonfirmasi.'];
         }
 
         if ($order->fulfillment_started_at || $order->api_trx_id
-            || in_array(strtolower($order->order_status), ['completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed'], true)) {
+            || in_array(strtolower((string) $order->order_status), ['completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'failed'], true)) {
             return self::existingResult($order);
         }
 
@@ -43,7 +66,7 @@ class OrderFulfillmentService
             ->where(function ($query) {
                 $query->whereNull('api_trx_id')->orWhere('api_trx_id', '');
             })
-            ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement')")
+            ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
             ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled', 'expired', 'failed')")
             ->update(['fulfillment_started_at' => now()]);
 
@@ -228,11 +251,22 @@ class OrderFulfillmentService
         }
 
         $product = Product::find($order->product_id);
+        if (!$product && !empty($order->product_name)) {
+            $product = Product::where('name', $order->product_name)->first();
+            if ($product) {
+                $order->product_id = $product->id;
+            }
+        }
         if (!$product) {
+            Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
             return [
                 'status'  => 'error',
                 'message' => 'Produk tidak ditemukan.',
             ];
+        }
+
+        if ($product->type === 'api' && $order->product_type !== 'api') {
+            $order->product_type = 'api';
         }
 
         // ─── 1. FULFILLMENT PRODUK LOKAL ───────────────────────────────────────
@@ -324,10 +358,14 @@ class OrderFulfillmentService
             });
         }
 
-        // ─── 2. FULFILLMENT PRODUK API (PREFLIX & PREMKU) ──────────────────────
+        // ─── 2. FULFILLMENT PRODUK API (PREFLIX, PREMKU & TELEGRAM BOT API) ────
         if ($product->type === 'api') {
-            $apiProductId = $product->api_product_id;
-            $order->provider = str_starts_with($apiProductId, 'PREFLIX-') ? 'Preflix' : (str_starts_with($apiProductId, 'PREMKU-') ? 'Premku' : 'API');
+            $apiProductId = trim((string) $product->api_product_id);
+            $order->provider = str_starts_with($apiProductId, 'PREFLIX-')
+                ? 'Preflix'
+                : (str_starts_with($apiProductId, 'PREMKU-')
+                    ? 'Premku'
+                    : (str_starts_with($apiProductId, 'TG-') ? 'Telegram API' : 'API'));
             $snAkun = null;
             $apiTrxId = null;
             $isReady = false;
@@ -350,9 +388,7 @@ class OrderFulfillmentService
 
                         for ($i = 0; $i < $qty; $i++) {
                             $itemCatatan = $order->invoice_number . ($qty > 1 ? "-ITEM" . ($i + 1) : "");
-                            $resOrder = Http::withoutVerifying()
-                                ->connectTimeout(5)
-                                ->timeout(15)
+                            $resOrder = self::httpClient(20, 8)
                                 ->asForm()
                                 ->post('https://h2h.preflix.my.id/app/', [
                                     'koneksi'   => 'order',
@@ -397,7 +433,11 @@ class OrderFulfillmentService
 
                                 if (str_contains(strtolower((string) $failMsg), 'saldo') || str_contains(strtolower((string) $failMsg), 'forbidden')) {
                                     $order->notes = 'Saldo akun Preflix provider sedang tidak mencukupi.';
+                                    self::notifyPreflixInsufficientBalance($order, (string) $failMsg);
+                                } else {
+                                    $order->notes = '[INTERNAL] ' . $failMsg;
                                 }
+                                $order->save();
                             }
                         }
 
@@ -431,8 +471,8 @@ class OrderFulfillmentService
             // B. PROVIDER PREMKU
             elseif (str_starts_with($apiProductId, 'PREMKU-')) {
                 $idProdukAsli = str_replace('PREMKU-', '', $apiProductId);
-                $apiKey = Setting::where('key', 'premku_api_key')->value('value');
                 $premkuService = new PremkuApiService();
+                $hadConnectionTimeout = false;
 
                 try {
                     $qty = max(1, (int) ($order->quantity ?: 1));
@@ -449,6 +489,9 @@ class OrderFulfillmentService
                     $apiTrxId = $resOrder['invoice'] 
                              ?? $resOrder['data']['invoice'] 
                              ?? $resOrder['trx_id'] 
+                             ?? $resOrder['data']['trx_id'] 
+                             ?? $resOrder['order_id'] 
+                             ?? $resOrder['data']['order_id'] 
                              ?? $resOrder['data']['id'] 
                              ?? null;
 
@@ -461,16 +504,12 @@ class OrderFulfillmentService
                     if ($apiTrxId) {
                         $order->api_trx_id = (string) $apiTrxId;
                         $order->save();
-                    } elseif (!$isReady) {
-                        // Jika gagal membuat pesanan di Premku dan belum mendapatkan invoice provider,
-                        // buka kembali fulfillment_started_at agar dapat ditembak ulang saat cek status.
-                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
                     }
 
-                    // SERVER WAITING / POLLING LOOP PREMKU
+                    // SERVER WAITING / POLLING LOOP PREMKU (Cepat & Responsif)
                     if (!$isReady && $apiTrxId) {
-                        for ($attempt = 1; $attempt <= 4; $attempt++) {
-                            sleep(2); // Menunggu 2 detik per iterasi
+                        for ($attempt = 1; $attempt <= 2; $attempt++) {
+                            sleep(1);
 
                             // Cek apakah webhook Premku sudah menyelesaikan atau membatalkan pesanan lebih dulu
                             $order->refresh();
@@ -503,12 +542,113 @@ class OrderFulfillmentService
                             }
                         }
                     }
+                } catch (\Illuminate\Http\Client\ConnectionException $ce) {
+                    $hadConnectionTimeout = true;
+                    Log::error("[PREMKU-ORDER-TIMEOUT] Invoice: {$order->invoice_number} | " . $ce->getMessage());
+
+                    // Cek langsung ke Premku apakah order sempat tercatat sebelum timeout
+                    try {
+                        $checkAfterTimeout = $premkuService->checkStatus($order->invoice_number);
+                        if (is_array($checkAfterTimeout) && isset($checkAfterTimeout['success']) && $checkAfterTimeout['success'] === false) {
+                            // Premku menyatakan "Order tidak ditemukan" -> artinya request sama sekali belum masuk ke Premku!
+                            $hadConnectionTimeout = false;
+                        } elseif (is_array($checkAfterTimeout) && ($checkAfterTimeout['success'] ?? false) === true) {
+                            $recoveredId = $checkAfterTimeout['data']['invoice'] ?? $checkAfterTimeout['invoice'] ?? $order->invoice_number;
+                            $apiTrxId = (string) $recoveredId;
+                            $order->api_trx_id = $apiTrxId;
+                            $order->save();
+                            $recoveredSn = self::extractSnFromData($checkAfterTimeout['data'] ?? $checkAfterTimeout);
+                            if (!empty($recoveredSn)) {
+                                $snAkun = $recoveredSn;
+                                $isReady = true;
+                            }
+                        }
+                    } catch (\Throwable $ignore) {}
                 } catch (\Exception $e) {
-                    Log::error("[PREMKU-ORDER-ERROR] " . $e->getMessage());
+                    Log::error("[PREMKU-ORDER-ERROR] Invoice: {$order->invoice_number} | " . $e->getMessage());
+                }
+
+                // Jika gagal membuat pesanan di Premku (bukan timeout yang menggantung) dan belum mendapatkan invoice provider,
+                // buka kembali fulfillment_started_at agar langsung ditembak ulang otomatis saat polling / cek status.
+                if (!$hadConnectionTimeout && empty($apiTrxId) && !$isReady) {
+                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
+                }
+
+                // Cek & kirim notifikasi WA ke Admin jika saldo Premku sudah menyentuh atau di bawah batas minimum
+                try {
+                    $premkuService->checkAndNotifyLowBalance(null, false, $order->invoice_number);
+                } catch (\Throwable $ignoreAlertErr) {}
+            }
+
+            // C. PROVIDER TELEGRAM BOT API (QUANTUMVAULT STORE API)
+            elseif (str_starts_with($apiProductId, 'TG-')) {
+                $parsedTg = TelegramBotApiService::parseApiProductId($apiProductId);
+                $tgProductKey = $parsedTg['productKey'];
+                $tgVariantKey = $parsedTg['variantKey'];
+                $tgService = new TelegramBotApiService();
+                $hadConnectionTimeout = false;
+
+                try {
+                    $qty = max(1, (int) ($order->quantity ?: 1));
+                    $resOrder = $tgService->purchase($tgProductKey, $tgVariantKey, $qty);
+                    Log::info("[TELEGRAM-API-ORDER-INIT] Invoice: {$order->invoice_number} (Key: {$tgProductKey}, Var: " . ($tgVariantKey ?: '-') . ", Qty: {$qty}) | Status: " . ($resOrder['status'] ?? '-') . " | Ok: " . (!empty($resOrder['ok']) ? 'true' : 'false'));
+
+                    if (!empty($resOrder['ok']) && !empty($resOrder['order'])) {
+                        $tgOrderData = $resOrder['order'];
+                        $tgItems = is_array($tgOrderData['items'] ?? null) ? $tgOrderData['items'] : [];
+                        $tgOrderIds = [];
+                        foreach ($tgItems as $it) {
+                            $oid = $it['orderId'] ?? $it['purchaseId'] ?? null;
+                            if ($oid) {
+                                $tgOrderIds[] = (string) $oid;
+                            }
+                        }
+
+                        if (!empty($tgOrderIds)) {
+                            $apiTrxId = implode(',', array_unique($tgOrderIds));
+                            $order->api_trx_id = $apiTrxId;
+                            $order->save();
+                        }
+
+                        $formattedSn = TelegramBotApiService::formatDeliveredItems($tgItems, $qty);
+                        if (!empty($formattedSn)) {
+                            $snAkun = $formattedSn;
+                            $isReady = true;
+                        }
+                    } else {
+                        $errMsg = $resOrder['error'] ?? 'Gagal membeli produk dari API Bot Telegram';
+                        $order->notes = '[INTERNAL] ' . $errMsg;
+                        $order->save();
+                        Log::warning("[TELEGRAM-API-ORDER-FAIL] Invoice: {$order->invoice_number} | {$errMsg}");
+                    }
+                } catch (\Illuminate\Http\Client\ConnectionException $ce) {
+                    $hadConnectionTimeout = true;
+                    Log::error("[TELEGRAM-API-ORDER-TIMEOUT] Invoice: {$order->invoice_number} | " . $ce->getMessage());
+
+                    // Sesuai dokumentasi QuantumVault: jika purchase timeout, jangan langsung re-buy!
+                    // Cek GET /orders terlebih dahulu untuk memulihkan orderId dan GET /orders/:orderId.
+                    try {
+                        $recovered = self::recoverTelegramApiOrderFromHistory($order, $tgService, $tgProductKey, $tgVariantKey);
+                        if (!empty($recovered['api_trx_id'])) {
+                            $apiTrxId = $recovered['api_trx_id'];
+                            $order->api_trx_id = $apiTrxId;
+                            $order->save();
+                        }
+                        if (!empty($recovered['sn'])) {
+                            $snAkun = $recovered['sn'];
+                            $isReady = true;
+                        }
+                    } catch (\Throwable $ignore) {}
+                } catch (\Exception $e) {
+                    Log::error("[TELEGRAM-API-ORDER-ERROR] Invoice: {$order->invoice_number} | " . $e->getMessage());
+                }
+
+                if (!$hadConnectionTimeout && empty($apiTrxId) && !$isReady) {
+                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
                 }
             }
 
-            // C. SIMPAN HASIL STATUS AKHIR ORDER API KE DATABASE SECARA ATOMIK (ANTI-RACE CONDITION DENGAN WEBHOOK)
+            // D. SIMPAN HASIL STATUS AKHIR ORDER API KE DATABASE SECARA ATOMIK (ANTI-RACE CONDITION DENGAN WEBHOOK)
             $order->refresh();
             $latestStatus = strtolower((string) $order->order_status);
             if (in_array($latestStatus, ['completed', 'success', 'lunas'], true) && !empty($order->sn_or_account) && !self::isWaitingText($order->sn_or_account)) {
@@ -653,27 +793,30 @@ class OrderFulfillmentService
         $payLower = strtolower((string) $order->payment_status);
 
         if (!app()->runningUnitTests() && in_array($payLower, ['pending', 'unpaid', 'expired'], true) && !str_starts_with((string) $order->invoice_number, 'BAL-')) {
-            try {
-                $basePg = self::qrisGatewayBaseUrl();
-                $pgRes = Http::connectTimeout(2)->timeout(3)->get($basePg . '/api/order/status/' . $order->invoice_number);
-                if ($pgRes->successful()) {
-                    $pgData = $pgRes->json();
-                    $rawStatus = strtoupper(trim((string) ($pgData['data']['status'] ?? $pgData['status'] ?? $pgData['payment_status'] ?? '')));
-                    if (in_array($rawStatus, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT', 'BERHASIL'], true)
-                        || ($rawStatus === 'SUCCESS' && !isset($pgData['data']['status']))) {
-                        $markedPaid = Order::whereKey($order->id)
-                            ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
-                            ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
-                            ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
-                        $order->refresh();
-                        if ($markedPaid || !$order->fulfillment_started_at) {
-                            self::fulfillOrder($order);
+            $statusEndpoints = self::qrisGatewayEndpoints('/api/order/status/' . $order->invoice_number);
+            foreach ($statusEndpoints as $endpoint) {
+                try {
+                    $pgRes = Http::connectTimeout(2)->timeout(3)->get($endpoint);
+                    if ($pgRes->successful()) {
+                        $pgData = $pgRes->json();
+                        $rawStatus = strtoupper(trim((string) ($pgData['data']['status'] ?? $pgData['status'] ?? $pgData['payment_status'] ?? '')));
+                        if (in_array($rawStatus, ['TERBAYAR', 'PAID', 'LUNAS', 'SETTLEMENT', 'BERHASIL'], true)
+                            || ($rawStatus === 'SUCCESS' && !isset($pgData['data']['status']))) {
+                            $markedPaid = Order::whereKey($order->id)
+                                ->whereRaw("LOWER(payment_status) IN ('pending', 'unpaid', 'expired')")
+                                ->whereRaw("LOWER(order_status) NOT IN ('completed', 'success', 'lunas', 'refunded', 'canceled', 'cancelled')")
+                                ->update(['payment_status' => 'paid', 'order_status' => 'processing']);
                             $order->refresh();
+                            if ($markedPaid || !$order->fulfillment_started_at) {
+                                self::fulfillOrder($order);
+                                $order->refresh();
+                            }
+                            return true;
                         }
-                        return true;
+                        break;
                     }
-                }
-            } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {}
+            }
         }
 
         // Jika di sistem sudah berstatus lunas (paid) namun belum pernah ditembak ke API / belum pernah di-fulfill,
@@ -697,9 +840,11 @@ class OrderFulfillmentService
      */
     public static function checkAndSyncApiOrder(Order $order, bool $forceRetryIfUnclaimed = false): array
     {
+        @ignore_user_abort(true);
+
         $order->refresh();
-        if (!in_array(strtolower($order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
-            || in_array(strtolower($order->order_status), ['refunded', 'canceled', 'cancelled', 'failed'], true)) {
+        if (!in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
+            || in_array(strtolower((string) $order->order_status), ['refunded', 'canceled', 'cancelled', 'failed'], true)) {
             return self::existingResult($order);
         }
         // Jika sudah ada akun yang sah dan status sudah selesai, langsung kembalikan
@@ -718,6 +863,9 @@ class OrderFulfillmentService
         }
 
         $product = Product::find($order->product_id);
+        if (!$product && !empty($order->product_name)) {
+            $product = Product::where('name', $order->product_name)->first();
+        }
         if (!$product || $product->type !== 'api') {
             return [
                 'status'        => $order->order_status,
@@ -727,12 +875,15 @@ class OrderFulfillmentService
             ];
         }
 
-        $apiProductId = $product->api_product_id;
+        $apiProductId = trim((string) $product->api_product_id);
         $apiTrxId = $order->api_trx_id;
         $snAkun = null;
 
-        // A missing provider ID after a timeout is ambiguous. Status checks must
-        // never place a new purchase as a side effect of reading an invoice.
+        // Jika klaim fulfillment_started_at sudah menggantung >= 12 detik tanpa api_trx_id,
+        // izinkan pemulihan otomatis apabila provider mengonfirmasi order belum pernah masuk.
+        $isStaleUnclaimed = empty($apiTrxId)
+            && $order->fulfillment_started_at
+            && abs(now()->diffInSeconds($order->fulfillment_started_at)) >= 12;
 
         // CEK STATUS KE PREFLIX MENGGUNAKAN get_riwayat
         if (str_starts_with($apiProductId, 'PREFLIX-')) {
@@ -740,9 +891,7 @@ class OrderFulfillmentService
             $keyUser = Setting::where('key', 'preflix_key_user')->value('value');
 
             try {
-                $statusRes = Http::withoutVerifying()
-                    ->connectTimeout(5)
-                    ->timeout(10)
+                $statusRes = self::httpClient(12, 5)
                     ->asForm()
                     ->post('https://h2h.preflix.my.id/app/', [
                         'koneksi'  => 'get_riwayat',
@@ -752,9 +901,9 @@ class OrderFulfillmentService
 
                 $snAkun = self::preflixCredentialsForOrder($order, $statusRes);
 
-                // Jika pembeli menekan tombol Cek Pembayaran Manual ($forceRetryIfUnclaimed = true)
+                // Jika manual retry atau klaim sudah stale (>= 12 detik)
                 // dan pesanan belum memiliki api_trx_id serta tidak ditemukan di riwayat Preflix, tembak ulang!
-                if (empty($snAkun) && $forceRetryIfUnclaimed && empty($order->fresh()->api_trx_id) && !self::preflixOrderExistsInHistory($order, $statusRes)) {
+                if (empty($snAkun) && ($forceRetryIfUnclaimed || $isStaleUnclaimed) && empty($order->fresh()->api_trx_id) && !self::preflixOrderExistsInHistory($order, $statusRes)) {
                     Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
                     return self::fulfillOrder($order->fresh());
                 }
@@ -775,12 +924,67 @@ class OrderFulfillmentService
                         return self::cancelOrFailOrderWithRefund($order, 'canceled');
                     }
                     $snAkun = self::extractSnFromData($statusRes['data'] ?? $statusRes);
-                } elseif ($forceRetryIfUnclaimed) {
-                    Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
-                    return self::fulfillOrder($order->fresh());
+                } else {
+                    // Coba cek berdasarkan ref_id / invoice_number terlebih dahulu
+                    $refRes = $premkuService->checkStatus($order->invoice_number);
+                    if (is_array($refRes) && ($refRes['success'] ?? false) === true) {
+                        $recoveredId = $refRes['data']['invoice'] ?? $refRes['invoice'] ?? $order->invoice_number;
+                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['api_trx_id' => (string) $recoveredId]);
+                        $order->refresh();
+
+                        $premkuStatus = strtolower((string) ($refRes['data']['status'] ?? $refRes['status'] ?? ''));
+                        if (in_array($premkuStatus, ['failed', 'canceled', 'cancelled', 'gagal'], true)) {
+                            return self::cancelOrFailOrderWithRefund($order, 'canceled');
+                        }
+                        $snAkun = self::extractSnFromData($refRes['data'] ?? $refRes);
+                    } elseif ($forceRetryIfUnclaimed || $isStaleUnclaimed) {
+                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
+                        return self::fulfillOrder($order->fresh());
+                    }
                 }
             } catch (\Exception $e) {
                 Log::warning("[PREMKU-SYNC-ERROR] " . $e->getMessage());
+            }
+        }
+
+        // CEK STATUS KE TELEGRAM BOT API (QUANTUMVAULT) MENGGUNAKAN GET /orders/:orderId DAN GET /orders
+        elseif (str_starts_with($apiProductId, 'TG-')) {
+            $parsedTg = TelegramBotApiService::parseApiProductId($apiProductId);
+            $tgProductKey = $parsedTg['productKey'];
+            $tgVariantKey = $parsedTg['variantKey'];
+            $tgService = new TelegramBotApiService();
+            $qty = max(1, (int) ($order->quantity ?: 1));
+
+            try {
+                if (!empty($apiTrxId)) {
+                    $ids = array_values(array_filter(array_map('trim', explode(',', (string) $apiTrxId))));
+                    $recoveredItems = [];
+                    foreach ($ids as $idx => $oid) {
+                        $detailRes = $tgService->getOrderDetail($oid);
+                        if (!empty($detailRes['ok']) && !empty($detailRes['order']) && is_array($detailRes['order'])) {
+                            $ordObj = $detailRes['order'];
+                            $ordObj['unit'] = $idx + 1;
+                            $recoveredItems[] = $ordObj;
+                        }
+                    }
+                    if (!empty($recoveredItems)) {
+                        $snAkun = TelegramBotApiService::formatDeliveredItems($recoveredItems, $qty);
+                    }
+                } else {
+                    $recovered = self::recoverTelegramApiOrderFromHistory($order, $tgService, $tgProductKey, $tgVariantKey);
+                    if (!empty($recovered['api_trx_id'])) {
+                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['api_trx_id' => $recovered['api_trx_id']]);
+                        $order->refresh();
+                    }
+                    if (!empty($recovered['sn'])) {
+                        $snAkun = $recovered['sn'];
+                    } elseif (empty($recovered['api_trx_id']) && ($forceRetryIfUnclaimed || $isStaleUnclaimed)) {
+                        Order::whereKey($order->id)->whereNull('api_trx_id')->update(['fulfillment_started_at' => null]);
+                        return self::fulfillOrder($order->fresh());
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning("[TELEGRAM-API-SYNC-ERROR] " . $e->getMessage());
             }
         }
 
@@ -892,6 +1096,80 @@ class OrderFulfillmentService
         }
 
         return count($credentials) === $quantity ? implode("\n\n---\n\n", $credentials) : null;
+    }
+
+    /**
+     * Pemulihan aman untuk Telegram Bot API (QuantumVault) menggunakan GET /orders dan GET /orders/:orderId
+     * sesuai aturan dokumentasi: jangan langsung re-buy jika purchase timeout.
+     */
+    private static function recoverTelegramApiOrderFromHistory(Order $order, TelegramBotApiService $tgService, string $productKey, ?string $variantKey = null): array
+    {
+        $ordersRes = $tgService->getOrders(25);
+        if (empty($ordersRes['ok']) || empty($ordersRes['orders']) || !is_array($ordersRes['orders'])) {
+            return ['api_trx_id' => null, 'sn' => null];
+        }
+
+        $qty = max(1, (int) ($order->quantity ?: 1));
+        $minTimestamp = ($order->fulfillment_started_at ?: $order->created_at ?: now())->copy()->subMinutes(2)->timestamp;
+
+        // Ambil daftar api_trx_id yang sudah dipakai oleh order lain di DB agar tidak tertukar
+        $usedTrxIds = Order::where('id', '!=', $order->id)
+            ->whereNotNull('api_trx_id')
+            ->where('api_trx_id', '!=', '')
+            ->where('created_at', '>=', now()->subHours(2))
+            ->pluck('api_trx_id')
+            ->flatMap(fn ($v) => array_map('trim', explode(',', (string) $v)))
+            ->filter()
+            ->flip()
+            ->all();
+
+        $matchedOrderIds = [];
+        foreach ($ordersRes['orders'] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rowOid = trim((string) ($row['orderId'] ?? $row['purchaseId'] ?? ''));
+            if ($rowOid === '' || isset($usedTrxIds[$rowOid])) {
+                continue;
+            }
+            $rowKey = trim((string) ($row['productKey'] ?? ''));
+            $rowVar = isset($row['variantKey']) && $row['variantKey'] !== null ? trim((string) $row['variantKey']) : null;
+            if ($rowKey !== $productKey) {
+                continue;
+            }
+            if ($variantKey !== null && $variantKey !== '' && $rowVar !== $variantKey) {
+                continue;
+            }
+            if (!empty($row['createdAt'])) {
+                $rowTs = strtotime((string) $row['createdAt']);
+                if ($rowTs !== false && $rowTs < $minTimestamp) {
+                    continue;
+                }
+            }
+            $matchedOrderIds[] = $rowOid;
+            if (count($matchedOrderIds) >= $qty) {
+                break;
+            }
+        }
+
+        if (empty($matchedOrderIds)) {
+            return ['api_trx_id' => null, 'sn' => null];
+        }
+
+        $recoveredItems = [];
+        foreach ($matchedOrderIds as $idx => $oid) {
+            $detail = $tgService->getOrderDetail($oid);
+            if (!empty($detail['ok']) && !empty($detail['order']) && is_array($detail['order'])) {
+                $ordObj = $detail['order'];
+                $ordObj['unit'] = $idx + 1;
+                $recoveredItems[] = $ordObj;
+            }
+        }
+
+        return [
+            'api_trx_id' => implode(',', $matchedOrderIds),
+            'sn' => TelegramBotApiService::formatDeliveredItems($recoveredItems, $qty),
+        ];
     }
 
     /**
@@ -1725,5 +2003,43 @@ class OrderFulfillmentService
         // Kirim langsung ke nomor Admin 6282317458496 sesuai instruksi
         $targetAdminWa = '6282317458496';
         return WebhookController::sendWaMessage($targetAdminWa, $msg);
+    }
+
+    /**
+     * Kirim peringatan WhatsApp ke Admin jika pesanan Preflix tertahan karena saldo Preflix tidak mencukupi.
+     */
+    public static function notifyPreflixInsufficientBalance(Order $order, string $failMsg = ''): void
+    {
+        try {
+            if (app()->runningUnitTests()) {
+                return;
+            }
+            $cacheKey = 'preflix_low_balance_order_alert_' . $order->invoice_number;
+            if (Cache::has($cacheKey)) {
+                return;
+            }
+
+            $adminWa = Setting::where('key', 'admin_whatsapp')->value('value') ?: '082317458496';
+            $targetWa = preg_replace('/[^0-9]/', '', (string) $adminWa);
+            if (str_starts_with($targetWa, '0')) {
+                $targetWa = '62' . substr($targetWa, 1);
+            }
+
+            $productName = $order->product_name ?: ($order->product->name ?? 'Produk Preflix');
+            $ordersUrl = url('/admin/orders?search=' . urlencode($order->invoice_number));
+
+            $msg = "🚨 *PERINGATAN SALDO PREFLIX TIDAK CUKUP*\n\n"
+                 . "Halo Admin *PremiumKita*,\n"
+                 . "Pesanan otomatis dari provider *Preflix* tertahan karena saldo deposit akun Preflix Anda tidak mencukupi:\n\n"
+                 . "• Invoice: *#{$order->invoice_number}*\n"
+                 . "• Produk: *{$productName}*\n"
+                 . "• Respon Provider: _{$failMsg}_\n\n"
+                 . "Segera isi saldo akun Preflix Anda lalu klik tombol *Kirim API* pada halaman Pesanan Admin:\n"
+                 . "👉 {$ordersUrl}";
+
+            if (WebhookController::sendWaMessage($targetWa, $msg)) {
+                Cache::put($cacheKey, true, now()->addHours(2));
+            }
+        } catch (\Throwable $e) {}
     }
 }

@@ -221,6 +221,10 @@
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
                                         Premku API
                                     </span>
+                                @elseif($prov === 'Telegram API')
+                                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border border-sky-200 dark:border-sky-800/40">
+                                        Telegram API
+                                    </span>
                                 @elseif($prov === 'Manual Admin')
                                     <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
                                         ✋ Manual Admin
@@ -301,10 +305,11 @@
                             <!-- Kolom 6: Detail Akun -->
                             @php
                                 $rawSnForModal = $order->sn_or_account ?? $order->account_details ?? '';
-                                $editableSn = \App\Services\OrderFulfillmentService::isWaitingText($rawSnForModal) ? '' : $rawSnForModal;
+                                $isSnWaiting = \App\Services\OrderFulfillmentService::isWaitingText($rawSnForModal);
+                                $editableSn = $isSnWaiting ? '' : $rawSnForModal;
                             @endphp
                             <td>
-                                @if($order->sn_or_account || $order->account_details)
+                                @if(($order->sn_or_account || $order->account_details) && !$isSnWaiting)
                                     <button 
                                         type="button"
                                         @click="viewAccountContent = '{{ addslashes($rawSnForModal) }}'; viewAccountModal = true;"
@@ -312,6 +317,10 @@
                                     >
                                         🔑 Lihat Akun
                                     </button>
+                                @elseif($isSnWaiting && ($order->sn_or_account || $order->account_details))
+                                    <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 px-2.5 py-1 rounded-lg inline-block">
+                                        ⏳ Menunggu API
+                                    </span>
                                 @else
                                     <span class="text-[10px] text-gray-400 italic">Belum diisi</span>
                                 @endif
@@ -322,6 +331,7 @@
                                 $isDone = in_array($st, ['completed', 'selesai', 'success']);
                                 $isClosed = in_array($st, ['expired', 'canceled', 'cancelled', 'failed', 'refunded']);
                                 $isManualProduct = ($order->product_type === 'local' && (($order->product->process_type ?? 'auto') === 'manual' || $prov === 'Manual Admin'));
+                                $isApiOrPpobRow = in_array($order->product_type, ['api', 'ppob'], true) || in_array(strtolower((string) $prov), ['preflix', 'premku', 'telegram api', 'api'], true);
                             @endphp
                             <td class="text-right">
                                 <div class="inline-flex items-center gap-1.5">
@@ -341,13 +351,13 @@
                                     @elseif($isClosed)
                                         <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500 mr-2">Ditutup</span>
                                     @else
-                                        @if(in_array($order->product_type, ['api', 'ppob']) && empty($order->sn_or_account))
+                                        @if($isApiOrPpobRow && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account))
                                             <form action="{{ route('admin.orders.retry_api', $order->id) }}" method="POST" class="inline">
                                                 @csrf
                                                 <button 
                                                     type="submit"
                                                     class="px-2 py-1 rounded-lg {{ $order->product_type === 'ppob' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-indigo-600 hover:bg-indigo-700' }} text-white font-bold text-[11px] transition cursor-pointer shadow-sm flex items-center gap-1"
-                                                    title="{{ $order->product_type === 'ppob' ? 'Cek Status Ulang ke /Services/Check-Status Kiosbank' : 'Kirim / Cek Ulang ke Provider API (Premku/Preflix)' }}"
+                                                    title="{{ $order->product_type === 'ppob' ? 'Cek Status Ulang ke /Services/Check-Status Kiosbank' : 'Kirim / Cek Ulang ke Provider API (Premku/Preflix/Telegram)' }}"
                                                 >
                                                     {{ $order->product_type === 'ppob' ? 'Cek Status' : 'Kirim API' }}
                                                 </button>
@@ -386,7 +396,7 @@
         </div>
 
         <!-- Mobile Cards List -->
-        <div class="block md:hidden divide-y divide-gray-100 dark:divide-white/5">
+        <div class="block md:hidden p-3.5 sm:p-4 space-y-4 bg-gray-50/80 dark:bg-[#080d17]/80">
             @forelse($orders as $order)
                 @php
                     $prov = $order->provider;
@@ -395,9 +405,9 @@
                     $isClosed = in_array($st, ['expired', 'canceled', 'cancelled', 'failed', 'refunded']);
                     $isManualProduct = ($order->product_type === 'local' && (($order->product->process_type ?? 'auto') === 'manual' || $prov === 'Manual Admin'));
                 @endphp
-                <div class="p-4 space-y-3">
+                <div class="rounded-2xl bg-white dark:bg-[#131c31] border border-gray-200/90 dark:border-white/10 p-4 space-y-3.5 shadow-md shadow-black/5 dark:shadow-black/35">
                     <!-- Top Row: Invoice + Date + Status -->
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-gray-100 dark:border-white/5">
                         <div class="flex items-center gap-1.5 min-w-0">
                             <span class="font-mono text-xs font-black text-gray-900 dark:text-white truncate">#{{ $order->invoice_number }}</span>
                             <a href="{{ url('/order/invoice/' . $order->invoice_number) }}" target="_blank" class="text-orange-500 hover:text-orange-600 text-xs shrink-0" title="Cetak / Lihat Invoice">
@@ -451,6 +461,10 @@
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
                                     Premku API
                                 </span>
+                            @elseif($prov === 'Telegram API')
+                                <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border border-sky-200 dark:border-sky-800/40">
+                                    Telegram API
+                                </span>
                             @elseif($prov === 'Manual Admin')
                                 <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
                                     ✋ Manual Admin
@@ -476,7 +490,7 @@
                     </div>
 
                     <!-- Customer & WA Info -->
-                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-100 dark:border-white/5 text-xs">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-black/25 border border-gray-100 dark:border-white/5 text-xs">
                         <div class="min-w-0 pr-2">
                             <p class="font-bold text-gray-900 dark:text-white truncate">
                                 👤 {{ $order->user ? $order->user->name : ($order->buyer_name ?: 'Tamu') }}
@@ -495,13 +509,14 @@
                     <!-- Detail Akun & Notes -->
                     @php
                         $mobRawSn = $order->sn_or_account ?? $order->account_details ?? '';
-                        $mobEditableSn = \App\Services\OrderFulfillmentService::isWaitingText($mobRawSn) ? '' : $mobRawSn;
+                        $mobIsWaiting = \App\Services\OrderFulfillmentService::isWaitingText($mobRawSn);
+                        $mobEditableSn = $mobIsWaiting ? '' : $mobRawSn;
                         $mobCleanNote = trim(preg_replace('/\s*\|\s*\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]/i', '', (string) $order->notes));
                         $mobCleanNote = trim(preg_replace('/^\[INTERNAL\]\[(?:WA-SENT|ADMIN-WA-SENT)\]\s*/i', '', $mobCleanNote));
                     @endphp
                     @if($order->sn_or_account || $order->account_details || !empty($mobCleanNote))
                         <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                            @if($order->sn_or_account || $order->account_details)
+                            @if(($order->sn_or_account || $order->account_details) && !$mobIsWaiting)
                                 <button 
                                     type="button"
                                     @click="viewAccountContent = '{{ addslashes($mobRawSn) }}'; viewAccountModal = true;"
@@ -509,6 +524,10 @@
                                 >
                                     🔑 <span>Lihat Akun Pembeli</span>
                                 </button>
+                            @elseif($mobIsWaiting && ($order->sn_or_account || $order->account_details))
+                                <span class="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                                    ⏳ <span>Menunggu Akun API</span>
+                                </span>
                             @endif
                             @if(!empty($mobCleanNote))
                                 <span class="text-[10px] text-amber-600 dark:text-amber-400 font-medium truncate max-w-full">
@@ -519,7 +538,7 @@
                     @endif
 
                     <!-- Action Buttons on Mobile -->
-                    <div class="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-white/5">
+                    <div class="flex items-center justify-between pt-2.5 border-t border-gray-100 dark:border-white/10">
                         <span class="text-[10px] text-gray-400">
                             {{ $order->created_at ? $order->created_at->timezone('Asia/Jakarta')->format('d M Y, H:i') . ' WIB' : '-' }}
                         </span>
@@ -538,14 +557,17 @@
                             @elseif($isClosed)
                                 <span class="text-[10px] font-bold text-gray-400 dark:text-gray-500">Ditutup</span>
                             @else
-                                @if($order->product_type === 'api' && empty($order->sn_or_account))
+                                @php
+                                    $mobIsApiOrPpob = in_array($order->product_type, ['api', 'ppob'], true) || in_array(strtolower((string) $prov), ['preflix', 'premku', 'telegram api', 'api'], true);
+                                @endphp
+                                @if($mobIsApiOrPpob && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account))
                                     <form action="{{ route('admin.orders.retry_api', $order->id) }}" method="POST" class="inline">
                                         @csrf
                                         <button 
                                             type="submit"
-                                            class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-1"
+                                            class="px-2.5 py-1.5 rounded-xl {{ $order->product_type === 'ppob' ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-indigo-600 hover:bg-indigo-700' }} text-white font-bold text-xs transition cursor-pointer shadow-sm flex items-center gap-1"
                                         >
-                                            Kirim API
+                                            {{ $order->product_type === 'ppob' ? 'Cek Status' : 'Kirim API' }}
                                         </button>
                                     </form>
                                 @endif

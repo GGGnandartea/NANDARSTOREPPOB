@@ -19,14 +19,19 @@ use Illuminate\Database\Schema\Blueprint;
 
 use App\Services\PremkuApiService;
 use App\Services\PreflixApiService;
+use App\Services\TelegramBotApiService;
 
 class FrontController extends Controller
 {
     public function index(Request $request, PremkuApiService $premkuService, PreflixApiService $preflixService) {
+        // Panggil getApiStockData terlebih dahulu agar produk baru dari API otomatis tersimpan dengan margin standar sebelum query etalase dijalankan
+        $apiData = $this->getApiStockData();
+
         $query = Product::withAvailableAccountStock()->where('status', 'available')->orderBy('name', 'asc');
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         if ($disabledPreflix) {
             $query->where(function($q) {
@@ -36,6 +41,11 @@ class FrontController extends Controller
         if ($disabledPremku) {
             $query->where(function($q) {
                 $q->where('type', '!=', 'api')->orWhere('api_product_id', 'NOT LIKE', 'PREMKU-%');
+            });
+        }
+        if ($disabledTelegram) {
+            $query->where(function($q) {
+                $q->where('type', '!=', 'api')->orWhere('api_product_id', 'NOT LIKE', 'TG-%');
             });
         }
 
@@ -94,8 +104,6 @@ class FrontController extends Controller
         }
 
         $products = $query->get();
-
-        $apiData = $this->getApiStockData();
 
         $products->transform(function($product) use ($apiData) {
             $this->resolveProductStock($product, $apiData);
@@ -191,7 +199,7 @@ class FrontController extends Controller
         $firstLastKnown = !empty($data) ? reset($data) : null;
         $hasFullLastKnown = is_array($firstLastKnown) && array_key_exists('price', $firstLastKnown) && array_key_exists('description', $firstLastKnown);
 
-        // Jika diakses oleh pengunjung web (bukan cron/CLI/unit test) dan data cadangan lengkap (stok + harga + deskripsi) sudah tersedia,
+        // Jika diakses oleh pengunjung web (bukan cron/CLI/unit test) dan data cadangan lengkap (stok + harga + deskripsi + nama) sudah tersedia,
         // langsung sajikan data cadangan secara instan (<5ms) lalu segarkan di background setelah response dikirim.
         if (!$forceRefresh && !empty($data) && $hasFullLastKnown && !app()->runningInConsole() && !app()->runningUnitTests()) {
             Cache::put('api_full_data', $data, 45);
@@ -206,8 +214,9 @@ class FrontController extends Controller
             return $data;
         }
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         try {
             if (!$disabledPremku) {
@@ -220,9 +229,12 @@ class FrontController extends Controller
                                 ? $p['description']
                                 : (isset($p['catatan']) && is_string($p['catatan']) ? $p['catatan'] : null);
                             $data['PREMKU-' . $p['id']] = [
+                                'name'        => trim((string) ($p['name'] ?? '')),
+                                'provider'    => 'Premku',
                                 'stock'       => max(0, (int) ($p['stock'] ?? 0)),
                                 'price'       => max(0, (int) ($p['price'] ?? 0)),
                                 'description' => $rawDesc ? Product::cleanText($rawDesc) : null,
+                                'image'       => $p['image'] ?? $p['icon'] ?? null,
                             ];
                         }
                     }
@@ -329,13 +341,36 @@ class FrontController extends Controller
                                 $rawDesc = isset($p['deskripsi']) && is_string($p['deskripsi']) && trim($p['deskripsi']) !== ''
                                     ? $p['deskripsi']
                                     : ($extraCache[$apiId]['deskripsi'] ?? null);
+                                $rawName = trim((string) ($p['nama_produk'] ?? $p['name'] ?? ''));
                                 $data[$apiId] = [
+                                    'name'        => $rawName !== '' ? (Product::cleanText($rawName) ?? $rawName) : '',
+                                    'provider'    => 'Preflix',
                                     'stock'       => max(0, (int) ($p['stok'] ?? 0)),
                                     'price'       => max(0, (int) ($p['harga'] ?? 0)),
                                     'description' => $rawDesc ? Product::cleanText($rawDesc) : null,
+                                    'image'       => $extraCache[$apiId]['icon'] ?? ($p['icon'] ?? null),
                                 ];
                             }
                         }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            if (!$disabledTelegram) {
+                $tgService = new TelegramBotApiService();
+                if ($tgService->hasApiKey()) {
+                    $tgCatalog = $tgService->getNormalizedCatalog(4);
+                    foreach ($tgCatalog as $apiId => $tgItem) {
+                        $data[$apiId] = [
+                            'name'        => $tgItem['name'] ?? '',
+                            'provider'    => 'Telegram API',
+                            'stock'       => max(0, (int) ($tgItem['stock'] ?? 0)),
+                            'price'       => max(0, (int) ($tgItem['price'] ?? 0)),
+                            'description' => $tgItem['description'] ?? null,
+                            'image'       => $tgItem['image'] ?? null,
+                        ];
                     }
                 }
             }
@@ -481,8 +516,9 @@ class FrontController extends Controller
         }
 
         // Cek setting provider yang dinonaktifkan
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         $query = Product::withAvailableAccountStock()->where('status', 'available');
         if ($disabledPreflix) {
@@ -493,6 +529,11 @@ class FrontController extends Controller
         if ($disabledPremku) {
             $query->where(function($q) {
                 $q->where('type', '!=', 'api')->orWhere('api_product_id', 'NOT LIKE', 'PREMKU-%');
+            });
+        }
+        if ($disabledTelegram) {
+            $query->where(function($q) {
+                $q->where('type', '!=', 'api')->orWhere('api_product_id', 'NOT LIKE', 'TG-%');
             });
         }
 
@@ -606,12 +647,14 @@ class FrontController extends Controller
             abort(404);
         }
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         if ($product->status !== 'available' 
             || ($disabledPreflix && str_starts_with($product->api_product_id ?? '', 'PREFLIX-'))
-            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))) {
+            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))
+            || ($disabledTelegram && str_starts_with($product->api_product_id ?? '', 'TG-'))) {
             return redirect()->route('home')->with('error', 'Produk ini sedang dinonaktifkan.');
         }
         
@@ -645,12 +688,14 @@ class FrontController extends Controller
             abort(404);
         }
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         if ($product->status !== 'available' 
             || ($disabledPreflix && str_starts_with($product->api_product_id ?? '', 'PREFLIX-'))
-            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))) {
+            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))
+            || ($disabledTelegram && str_starts_with($product->api_product_id ?? '', 'TG-'))) {
             return redirect()->route('home')->with('error', 'Produk ini sedang dinonaktifkan.');
         }
 
@@ -724,12 +769,14 @@ class FrontController extends Controller
             }
         }
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         if ($product->status !== 'available' 
             || ($disabledPreflix && str_starts_with($product->api_product_id ?? '', 'PREFLIX-'))
-            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))) {
+            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))
+            || ($disabledTelegram && str_starts_with($product->api_product_id ?? '', 'TG-'))) {
             return response()->json(['status' => 'error', 'message' => 'Produk ini sedang dinonaktifkan untuk sementara waktu.'], 400);
         }
         
@@ -740,13 +787,14 @@ class FrontController extends Controller
 
         $nominal = $subtotal;
         $discount = 0;
+        $validVoucher = null;
         if ($request->voucher_code) {
-            $voucher = Voucher::where('code', $request->voucher_code)->where('is_active', true)->first();
-            if ($voucher) {
+            $voucher = Voucher::where('code', strtoupper(trim((string) $request->voucher_code)))->where('is_active', true)->first();
+            if ($voucher && (!$voucher->expired_at || \Carbon\Carbon::now()->lte($voucher->expired_at)) && ($voucher->max_uses === null || $voucher->used_count < $voucher->max_uses)) {
                 $discount = ($voucher->type == 'nominal') ? $voucher->value : ($subtotal * $voucher->value) / 100;
                 if ($discount >= $subtotal) $discount = $subtotal - 1;
                 $nominal = $subtotal - $discount;
-                $voucher->increment('used_count'); // Tambah data pemakaian voucher
+                $validVoucher = $voucher;
             }
         }
 
@@ -782,6 +830,10 @@ class FrontController extends Controller
             return response()->json(['status' => 'error', 'message' => $data['message'] ?? 'Gagal membuat tagihan QRIS.']);
         }
 
+        if ($validVoucher) {
+            $validVoucher->increment('used_count');
+        }
+
         try {
             // MIGRATION OTOMATIS: Tambahkan kolom email, whatsapp, dan SN jika belum ada
             if (!Schema::hasColumn('orders', 'email')) {
@@ -808,6 +860,8 @@ class FrontController extends Controller
                     $provider = 'Preflix';
                 } elseif (str_starts_with($product->api_product_id ?? '', 'PREMKU-')) {
                     $provider = 'Premku';
+                } elseif (str_starts_with($product->api_product_id ?? '', 'TG-')) {
+                    $provider = 'Telegram API';
                 } else {
                     $provider = 'API';
                 }
@@ -895,8 +949,12 @@ class FrontController extends Controller
         }
 
         // Jika pesanan API sudah dibayar dan akun masih belum selesai / masih menunggu, sinkronkan langsung dengan provider
+        $isApiProduct = ($order->product_type === 'api') || ($order->product && $order->product->type === 'api');
+        if ($isApiProduct && $order->product_type !== 'api') {
+            $order->update(['product_type' => 'api']);
+        }
         if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
-            && $order->product_type === 'api'
+            && $isApiProduct
             && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order, $isManualRequest);
             $order->refresh();
@@ -977,8 +1035,12 @@ class FrontController extends Controller
         }
 
         // Otomatis sinkronisasi akun API saat invoice dibuka jika masih menunggu
+        $isApiInvoice = ($order->product_type === 'api') || ($order->product && $order->product->type === 'api');
+        if ($isApiInvoice && $order->product_type !== 'api') {
+            $order->update(['product_type' => 'api']);
+        }
         if (in_array(strtolower((string) $order->payment_status), ['paid', 'success', 'settlement', 'lunas'], true)
-            && $order->product_type === 'api'
+            && $isApiInvoice
             && \App\Services\OrderFulfillmentService::isWaitingText($order->sn_or_account)) {
             \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($order);
             $order->refresh();
@@ -1147,6 +1209,24 @@ class FrontController extends Controller
         if ($reconciledCancelCount > 0) {
             $user->refresh();
         }
+
+        // Otomatis sinkronisasi pesanan API milik user yang masih berstatus processing/pending saat membuka profil
+        try {
+            $pendingUserApiOrders = Order::where('user_id', $user->id)
+                ->where('product_type', 'api')
+                ->whereRaw("LOWER(payment_status) IN ('paid', 'success', 'settlement', 'lunas')")
+                ->whereRaw("LOWER(order_status) IN ('processing', 'pending')")
+                ->where('created_at', '>=', now()->subHours(24))
+                ->orderBy('id', 'desc')
+                ->limit(5)
+                ->get();
+
+            foreach ($pendingUserApiOrders as $pApiOrd) {
+                if (\App\Services\OrderFulfillmentService::isWaitingText($pApiOrd->sn_or_account)) {
+                    \App\Services\OrderFulfillmentService::checkAndSyncApiOrder($pApiOrd, true);
+                }
+            }
+        } catch (\Throwable $e) {}
 
         $orders = Order::where('user_id', $user->id)
             ->with('product')
@@ -1339,12 +1419,14 @@ class FrontController extends Controller
 
         $product = Product::withAvailableAccountStock()->findOrFail($request->product_id);
 
-        $disabledPreflix = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
-        $disabledPremku  = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+        $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+        $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
 
         if ($product->status !== 'available' 
             || ($disabledPreflix && str_starts_with($product->api_product_id ?? '', 'PREFLIX-'))
-            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))) {
+            || ($disabledPremku && str_starts_with($product->api_product_id ?? '', 'PREMKU-'))
+            || ($disabledTelegram && str_starts_with($product->api_product_id ?? '', 'TG-'))) {
             return response()->json(['status' => 'error', 'message' => 'Produk ini sedang dinonaktifkan untuk sementara waktu.']);
         }
 
@@ -1367,30 +1449,16 @@ class FrontController extends Controller
 
         $nominal = $subtotal;
         $discount = 0;
+        $validVoucher = null;
         if ($request->voucher_code) {
-            $voucher = \App\Models\Voucher::where('code', $request->voucher_code)->where('is_active', true)->first();
-            if ($voucher) {
+            $voucher = \App\Models\Voucher::where('code', strtoupper(trim((string) $request->voucher_code)))->where('is_active', true)->first();
+            if ($voucher && (!$voucher->expired_at || \Carbon\Carbon::now()->lte($voucher->expired_at)) && ($voucher->max_uses === null || $voucher->used_count < $voucher->max_uses)) {
                 $discount = ($voucher->type == 'nominal') ? $voucher->value : ($subtotal * $voucher->value) / 100;
                 if ($discount >= $subtotal) $discount = $subtotal - 1;
                 $nominal = $subtotal - $discount;
-                $voucher->increment('used_count');
+                $validVoucher = $voucher;
             }
         }
-
-        if ($user->balance < $nominal) {
-            return response()->json(['status' => 'error', 'message' => 'Saldo tidak mencukupi. Silakan top up terlebih dahulu.']);
-        }
-
-        // Kurangi saldo
-        $user->decrement('balance', $nominal);
-
-        // Catat transaksi
-        \App\Models\TransactionLog::create([
-            'user_id'     => $user->id,
-            'type'        => 'debit',
-            'amount'      => $nominal,
-            'description' => 'Pembelian (' . $qty . ' pcs): ' . $product->name,
-        ]);
 
         // Buat invoice
         $invoiceNumber = 'BAL-' . strtoupper(Str::random(8)) . '-' . time();
@@ -1417,6 +1485,8 @@ class FrontController extends Controller
                 $provider = 'Preflix';
             } elseif (str_starts_with($product->api_product_id ?? '', 'PREMKU-')) {
                 $provider = 'Premku';
+            } elseif (str_starts_with($product->api_product_id ?? '', 'TG-')) {
+                $provider = 'Telegram API';
             } else {
                 $provider = 'API';
             }
@@ -1424,26 +1494,69 @@ class FrontController extends Controller
             $provider = ($product->process_type === 'manual') ? 'Manual Admin' : 'Otomatis';
         }
 
-        $order = Order::create([
-            'user_id'        => $user->id,
-            'buyer_name'     => $buyerName,
-            'invoice_number' => $invoiceNumber,
-            'product_id'     => $product->id,
-            'product_name'   => $product->name,
-            'quantity'       => $qty,
-            'product_type'   => $product->type ?? 'local',
-            'provider'       => $provider,
-            'price'          => $unitPrice,
-            'discount'       => $discount,
-            'total_amount'   => $nominal,
-            'payment_status' => 'paid',
-            'order_status'   => 'processing',
-            'email'          => $request->email,
-            'whatsapp'       => $targetWhatsapp,
-            'voucher_code'   => $request->voucher_code,
-            'discount_amount'=> round($discount),
-            'notes'          => $request->notes,
-        ]);
+        $insufficientBalance = false;
+        $order = null;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use (
+            $user,
+            $nominal,
+            $qty,
+            $product,
+            $buyerName,
+            $invoiceNumber,
+            $provider,
+            $unitPrice,
+            $discount,
+            $request,
+            $targetWhatsapp,
+            $validVoucher,
+            &$insufficientBalance,
+            &$order
+        ) {
+            $lockedUser = \App\Models\User::whereKey($user->id)->lockForUpdate()->first();
+            if (!$lockedUser || (int) $lockedUser->balance < $nominal) {
+                $insufficientBalance = true;
+                return;
+            }
+
+            if ($validVoucher) {
+                $validVoucher->increment('used_count');
+            }
+
+            $lockedUser->decrement('balance', $nominal);
+
+            \App\Models\TransactionLog::create([
+                'user_id'     => $lockedUser->id,
+                'type'        => 'debit',
+                'amount'      => $nominal,
+                'description' => 'Pembelian (' . $qty . ' pcs): ' . $product->name,
+            ]);
+
+            $order = Order::create([
+                'user_id'         => $lockedUser->id,
+                'buyer_name'      => $buyerName,
+                'invoice_number'  => $invoiceNumber,
+                'product_id'      => $product->id,
+                'product_name'    => $product->name,
+                'quantity'        => $qty,
+                'product_type'    => $product->type ?? 'local',
+                'provider'        => $provider,
+                'price'           => $unitPrice,
+                'discount'        => $discount,
+                'total_amount'    => $nominal,
+                'payment_status'  => 'paid',
+                'order_status'    => 'processing',
+                'email'           => $request->email,
+                'whatsapp'        => $targetWhatsapp,
+                'voucher_code'    => $validVoucher ? $validVoucher->code : null,
+                'discount_amount' => round($discount),
+                'notes'           => $request->notes,
+            ]);
+        });
+
+        if ($insufficientBalance || !$order) {
+            return response()->json(['status' => 'error', 'message' => 'Saldo tidak mencukupi. Silakan top up terlebih dahulu.']);
+        }
 
         // FULFILL DENGAN OrderFulfillmentService (Menunggu provider API atau alokasi lokal)
         $fulfillResult = \App\Services\OrderFulfillmentService::fulfillOrder($order);

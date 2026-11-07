@@ -68,13 +68,13 @@ export default function Navbar({
             <nav className={`glass-nav sticky ${auth?.user?.role === 'admin' ? 'top-8' : 'top-0'} z-40 transition-all duration-300 ${isScrolled ? 'border-b border-gray-200/90 dark:border-gray-800 shadow-md' : 'border-b border-transparent dark:border-transparent'}`}>
                 <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-3">
 
-                    <div className="flex-1 min-w-0 h-full relative overflow-hidden flex items-center">
+                    <div className="flex-1 min-w-0 h-full flex items-center gap-3 md:gap-5">
                         <Link
                             href="/"
-                            className={`absolute left-0 flex items-center gap-2 cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                            className={`shrink-0 flex items-center gap-2.5 cursor-pointer transition-all duration-300 ${
                                 isScrolled
-                                    ? '-translate-y-16 opacity-0 sm:translate-y-0 sm:opacity-100 sm:relative sm:mr-5'
-                                    : 'translate-y-0 opacity-100 relative sm:mr-5'
+                                    ? 'hidden sm:flex'
+                                    : 'flex'
                             }`}
                         >
                             {store?.logo ? (
@@ -84,15 +84,15 @@ export default function Navbar({
                             ) : (
                                 <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg text-white flex items-center justify-center font-bold shadow-md shrink-0 text-sm">PK</div>
                             )}
-                            <span className="text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0">{store?.name || 'PremiumKita'}</span>
+                            <span className="text-lg lg:text-xl font-extrabold text-black dark:text-white tracking-tight hidden md:block shrink-0 whitespace-nowrap">{store?.name || 'PremiumKita'}</span>
                         </Link>
 
                         {/* Sticky Search Bar in Top Navbar */}
                         <div
-                            className={`absolute left-0 w-full max-w-xl transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                            className={`flex-1 min-w-0 max-w-xl transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                                 isScrolled
-                                    ? 'translate-y-0 opacity-100 pointer-events-auto sm:relative'
-                                    : 'translate-y-16 opacity-0 pointer-events-none sm:-translate-y-4 sm:absolute'
+                                    ? 'block opacity-100 translate-y-0 pointer-events-auto'
+                                    : 'hidden sm:block sm:opacity-0 sm:-translate-y-3 sm:pointer-events-none'
                             }`}
                         >
                             <form onSubmit={handleSearch} className="relative w-full flex items-center">

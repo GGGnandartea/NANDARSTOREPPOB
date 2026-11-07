@@ -210,7 +210,9 @@ class Product extends Model {
     }
 
     /**
-     * Sinkronkan seluruh produk API di database dengan peta data live (stok & harga modal) dari provider.
+     * Sinkronkan seluruh produk API di database dengan peta data live (stok, harga modal & deskripsi) dari provider.
+     * Sekaligus otomatis menambahkan produk baru dari provider aktif dengan margin standar (Untung Member & Reseller)
+     * tanpa pernah mereset nama produk kustom atau mengaktifkan kembali produk yang dinonaktifkan manual oleh Admin.
      */
     public static function syncAllApiProductsFromLiveMap(array $liveMap, ?array $marginSettings = null): int
     {
@@ -220,12 +222,30 @@ class Product extends Model {
 
         self::ensurePricingColumns();
         $settings = $marginSettings ?? self::getAutoMarginSettings();
+        $defaultMemberMargin = max(0, (int) ($settings['member_margin'] ?? $settings['member'] ?? 10000));
+        $defaultResellerMargin = max(0, (int) ($settings['reseller_margin'] ?? $settings['reseller'] ?? 5000));
         $adjustedCount = 0;
 
         try {
+            $providerSettings = Setting::whereIn('key', [
+                'provider_premku_disabled',
+                'provider_preflix_disabled',
+                'provider_telegram_disabled',
+            ])->pluck('value', 'key');
+
+            $disabledPremku = ($providerSettings['provider_premku_disabled'] ?? '0') == '1';
+            $disabledPreflix = ($providerSettings['provider_preflix_disabled'] ?? '0') == '1';
+            // Provider Telegram Bot API default OFF ('1') sebelum diaktifkan Admin
+            $disabledTelegram = ($providerSettings['provider_telegram_disabled'] ?? '1') == '1';
+
             $apiProducts = self::where('type', 'api')->get();
+            $existingApiIds = [];
+
             foreach ($apiProducts as $product) {
                 $apiId = (string) ($product->api_product_id ?? '');
+                if ($apiId !== '') {
+                    $existingApiIds[$apiId] = true;
+                }
                 if ($apiId === '' || !isset($liveMap[$apiId]) || !is_array($liveMap[$apiId])) {
                     continue;
                 }
@@ -242,9 +262,71 @@ class Product extends Model {
                 $rawLiveDesc = $item['description'] ?? ($item['deskripsi'] ?? null);
                 $liveDesc = (is_string($rawLiveDesc) && trim($rawLiveDesc) !== '') ? trim($rawLiveDesc) : null;
 
+                // syncLiveApiProduct tidak pernah menyentuh kolom `name` ataupun `status` (tetap menghormati setting Admin)
                 if (self::syncLiveApiProduct($product, $liveStock, $liveApiPrice, true, $settings, $liveDesc)) {
                     $adjustedCount++;
                 }
+            }
+
+            // Otomatis tambahkan produk baru yang muncul di API provider ke etalase toko dengan margin standar
+            foreach ($liveMap as $apiId => $item) {
+                $apiId = (string) $apiId;
+                if ($apiId === '' || isset($existingApiIds[$apiId]) || !is_array($item) || !empty($item['is_fallback'])) {
+                    continue;
+                }
+
+                $rawName = trim((string) ($item['name'] ?? ''));
+                $rawLivePrice = $item['price'] ?? ($item['original_price'] ?? null);
+                $liveApiPrice = ($rawLivePrice !== null && (int) $rawLivePrice > 0) ? (int) $rawLivePrice : 0;
+
+                if ($rawName === '' || $liveApiPrice <= 0) {
+                    continue;
+                }
+
+                $isProviderDisabled = false;
+                if (str_starts_with($apiId, 'PREMKU-')) {
+                    $isProviderDisabled = $disabledPremku;
+                } elseif (str_starts_with($apiId, 'PREFLIX-')) {
+                    $isProviderDisabled = $disabledPreflix;
+                } elseif (str_starts_with($apiId, 'TG-')) {
+                    $isProviderDisabled = $disabledTelegram;
+                }
+
+                $sellingPrice = $liveApiPrice + $defaultMemberMargin;
+                $resellerPrice = $defaultResellerMargin > 0 ? ($liveApiPrice + $defaultResellerMargin) : null;
+                if ($resellerPrice !== null && $resellerPrice > $sellingPrice) {
+                    $sellingPrice = $resellerPrice;
+                }
+
+                $liveStock = isset($item['stock']) ? max(0, (int) $item['stock']) : 0;
+                $rawLiveDesc = $item['description'] ?? ($item['deskripsi'] ?? null);
+                $cleanDesc = (is_string($rawLiveDesc) && trim($rawLiveDesc) !== '')
+                    ? self::cleanText($rawLiveDesc)
+                    : null;
+
+                try {
+                    $newProduct = new self();
+                    $newProduct->api_product_id = $apiId;
+                    $newProduct->type = 'api';
+                    $newProduct->name = $rawName;
+                    $newProduct->api_price = $liveApiPrice;
+                    $newProduct->api_margin = $defaultMemberMargin;
+                    $newProduct->price = $sellingPrice;
+                    $newProduct->api_reseller_margin = $defaultResellerMargin;
+                    $newProduct->reseller_price = $resellerPrice;
+                    $newProduct->stock = $liveStock;
+                    $newProduct->category = !empty($item['category']) ? trim((string) $item['category']) : 'Aplikasi Premium';
+                    $newProduct->description = $cleanDesc;
+                    if (!empty($item['image'])) {
+                        $newProduct->image = $item['image'];
+                    }
+                    $newProduct->is_promo = 1;
+                    $newProduct->status = $isProviderDisabled ? 'unavailable' : 'available';
+                    $newProduct->save();
+
+                    $existingApiIds[$apiId] = true;
+                    $adjustedCount++;
+                } catch (\Throwable $eNew) {}
             }
         } catch (\Throwable $e) {}
 

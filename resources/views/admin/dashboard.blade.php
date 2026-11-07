@@ -257,9 +257,9 @@
                 </div>
 
                 <!-- Mobile Cards List -->
-                <div class="block md:hidden divide-y divide-gray-100 dark:divide-white/5">
+                <div class="block md:hidden space-y-3">
                     @foreach($recentOrders as $order)
-                        <div class="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                        <div class="p-3.5 rounded-2xl bg-gray-50/90 dark:bg-[#131c31] border border-gray-200/80 dark:border-white/10 shadow-sm flex items-center justify-between gap-3">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 mb-0.5">
                                     <span class="font-mono text-[11px] font-black text-gray-900 dark:text-white">#{{ $order->invoice_number }}</span>

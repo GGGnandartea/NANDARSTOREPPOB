@@ -23,6 +23,12 @@
             <div>{{ session('success') }}</div>
         </div>
     @endif
+    @if(session('error'))
+        <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 font-bold text-sm flex items-center gap-3 shadow-sm">
+            <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black shrink-0">!</div>
+            <div>{{ session('error') }}</div>
+        </div>
+    @endif
 
     @if($activeSection === 'whatsapp')
         <!-- ======================================================== -->
@@ -934,6 +940,73 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </form>
+
+        <!-- KARTU PENGATURAN NOTIFIKASI WHATSAPP SALDO RENDAH PREMKU -->
+        <form action="{{ route('admin.settings.premku.low_balance_alert') }}" method="POST" class="admin-card p-6 sm:p-8 space-y-5">
+            @csrf
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100 dark:border-white/5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-md shadow-purple-500/20">
+                        WA
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-black text-base text-gray-900 dark:text-white">Notifikasi WhatsApp Saldo Rendah Premku</h3>
+                            @if(!empty($premkuLowBalanceSettings['enabled']))
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/40">
+                                    🟢 MONITORING AKTIF
+                                </span>
+                            @else
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                                    ⚪ NONAKTIF
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] font-semibold text-gray-400 mt-0.5">
+                            Kirim peringatan otomatis ke WhatsApp Admin saat saldo deposit Premku menyentuh atau kurang dari batas minimum (plus peringatan otomatis jika pesanan Preflix gagal akibat saldo habis).
+                        </p>
+                    </div>
+                </div>
+
+                @if(!empty($premkuLowBalanceSettings['last_alert_at']))
+                    <span class="text-[11px] font-mono font-bold text-gray-500 dark:text-gray-400">
+                        Alert Terakhir: {{ $premkuLowBalanceSettings['last_alert_at'] }}
+                    </span>
+                @endif
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Batas Minimum Saldo Premku (Rp)</label>
+                    <input type="number" name="threshold" min="5000" step="5000" value="{{ $premkuLowBalanceSettings['threshold'] ?? 50000 }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-purple-500">
+                    <p class="text-[11px] text-gray-400 mt-1">Contoh: <strong>50000</strong> (WA terkirim saat saldo ≤ Rp 50.000).</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider mb-1.5">Nomor WhatsApp Admin Penerima</label>
+                    <input type="text" name="admin_whatsapp" value="{{ $premkuLowBalanceSettings['admin_whatsapp'] ?? ($adminWhatsapp ?? '082317458496') }}" class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-mono font-bold dark:text-white outline-none focus:ring-2 focus:ring-purple-500" placeholder="082317458496">
+                    <p class="text-[11px] text-gray-400 mt-1">Dilengkapi jeda anti-spam otomatis (4 jam sekali).</p>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/20 border border-purple-200/70 dark:border-purple-800/30">
+                    <label class="flex items-center gap-2.5 cursor-pointer text-xs font-black text-gray-800 dark:text-gray-200">
+                        <input type="checkbox" name="enabled" value="1" @checked($premkuLowBalanceSettings['enabled'] ?? true) class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+                        <span>Aktifkan Alert WA Saldo Rendah Premku</span>
+                    </label>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Dicek otomatis setiap ada transaksi Premku atau cek saldo.</p>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-gray-100 dark:border-white/5 flex flex-wrap items-center justify-end gap-3">
+                <button type="submit" name="action" value="test" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/20 transition flex items-center gap-2 cursor-pointer">
+                    <span>Cek Saldo &amp; Tes Kirim WA Sekarang</span>
+                </button>
+                <button type="submit" name="action" value="save" class="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-600/20 transition flex items-center gap-2 cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                    <span>Simpan Pengaturan Alert Premku</span>
+                </button>
             </div>
         </form>
     @endif
