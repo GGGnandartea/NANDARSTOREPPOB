@@ -740,16 +740,29 @@ class AdminController extends Controller
 
         $activeProductCount = 0;
         try {
-            $activeProductCount = Product::where('status', 'available')
-                ->where(function ($q) {
-                    $q->whereNull('type')->orWhere('type', '!=', 'ppob');
-                })
-                ->count();
+            $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+            $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+            $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
+
+            $q = Product::where('status', 'available')
+                ->where(function ($sub) {
+                    $sub->whereNull('type')->orWhere('type', '!=', 'ppob');
+                });
+            if ($disabledPreflix) {
+                $q->where(fn ($sub) => $sub->whereNull('api_product_id')->orWhere('api_product_id', 'NOT LIKE', 'PREFLIX-%'));
+            }
+            if ($disabledPremku) {
+                $q->where(fn ($sub) => $sub->whereNull('api_product_id')->orWhere('api_product_id', 'NOT LIKE', 'PREMKU-%'));
+            }
+            if ($disabledTelegram) {
+                $q->where(fn ($sub) => $sub->whereNull('api_product_id')->orWhere('api_product_id', 'NOT LIKE', 'TG-%'));
+            }
+            $activeProductCount = $q->count();
         } catch (\Throwable $e) {
             $activeProductCount = 0;
         }
 
-        $totalSitemapUrls = 6 + (($seoCfg['seo_sitemap_include_products'] ?? '1') === '1' ? $activeProductCount : 0);
+        $totalSitemapUrls = 4 + (($seoCfg['seo_sitemap_include_products'] ?? '1') === '1' ? $activeProductCount : 0);
 
         return view('admin.seo_settings', compact('seoCfg', 'audit', 'activeProductCount', 'totalSitemapUrls'));
     }

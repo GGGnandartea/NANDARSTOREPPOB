@@ -1,20 +1,26 @@
+# Robots.txt for PremiumKita - Optimized for Google Search Console
 User-agent: *
 Allow: /
+Allow: /build/
+Allow: /storage/
 Allow: /ppob
 Allow: /product/
-Allow: /terms
+Allow: /faq
+Allow: /syarat-ketentuan
+Disallow: /terms
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
 Disallow: /admin
 Disallow: /admin/
-Disallow: /api/
-Disallow: /checkout/
-Disallow: /invoice/
 Disallow: /profile
-Disallow: /cart
+Disallow: /reseller/
+Disallow: /checkout/
+Disallow: /order/invoice/
+Disallow: /invoice/
+Disallow: /api/
+Disallow: /*?search=
+Disallow: /*?category=
+Disallow: /*?tipe=
 
-User-agent: Googlebot
-Allow: /
-Allow: /ppob
-Allow: /product/
-
-User-agent: Googlebot-Image
-Allow: /
+Sitemap: https://premiumkita.com/sitemap.xml

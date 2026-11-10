@@ -16,6 +16,9 @@
         $ogDescription = $seoData['description'];
         $ogImage = $seoData['og_image'];
         $currentUrl = $seoData['canonical_url'];
+        $seoBaseUrl = $seoData['base_url'] ?? rtrim(url('/'), '/');
+        $uaString = (string) request()->userAgent();
+        $isSearchBot = (bool) preg_match('/Googlebot|Google-InspectionTool|Storebot-Google|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Lighthouse|Chrome-Lighthouse|HeadlessChrome/i', $uaString);
     @endphp
     <title inertia>{{ $ogTitle }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -170,7 +173,7 @@
     <meta http-equiv="content-language" content="id-ID">
     <link rel="canonical" href="{{ $currentUrl }}">
     @if(($seoCfg['seo_sitemap_enabled'] ?? '1') === '1')
-    <link rel="sitemap" type="application/xml" title="Sitemap" href="{{ url('/sitemap.xml') }}">
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="{{ $seoBaseUrl }}/sitemap.xml">
     @endif
 
     <!-- Webmaster Verification Tags (Google Search Console, Bing, Yandex) -->
@@ -264,7 +267,8 @@
     @inertiaHead
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-sans antialiased">
-    <!-- POPULAR INITIAL WEBSITE PRELOADER -->
+    @if(!$isSearchBot)
+    <!-- POPULAR INITIAL WEBSITE PRELOADER (Hanya untuk pengunjung manusia agar Googlebot merender konten utama 0ms tanpa penghalang) -->
     <div id="ns-initial-preloader">
         <div class="ns-preloader-glow"></div>
         <div class="ns-logo-box">
@@ -286,6 +290,7 @@
         </div>
         <div class="ns-status-ticker" id="ns-preloader-status">Memuat Sistem...</div>
     </div>
+    @endif
 
     @if(!empty($seoCfg['seo_gtm_id']))
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ urlencode($seoCfg['seo_gtm_id']) }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -301,11 +306,10 @@
             <p>{{ $ogDescription }}</p>
             <nav aria-label="Navigasi Utama {{ $appStoreName }}">
                 <ul>
-                    <li><a href="{{ url('/') }}">Katalog Akun Premium - {{ $appStoreName }}</a></li>
-                    <li><a href="{{ url('/ppob') }}">Layanan PPOB, Pulsa, Paket Data, Token PLN &amp; Top Up Game</a></li>
-                    <li><a href="{{ url('/register') }}">Daftar Member &amp; Reseller VIP {{ $appStoreName }}</a></li>
-                    <li><a href="{{ url('/faq') }}">Pusat Bantuan &amp; FAQ {{ $appStoreName }}</a></li>
-                    <li><a href="{{ url('/syarat-ketentuan') }}">Syarat &amp; Ketentuan Garansi {{ $appStoreName }}</a></li>
+                    <li><a href="{{ $seoBaseUrl }}/">Katalog Akun Premium - {{ $appStoreName }}</a></li>
+                    <li><a href="{{ $seoBaseUrl }}/ppob">Layanan PPOB, Pulsa, Paket Data, Token PLN &amp; Top Up Game</a></li>
+                    <li><a href="{{ $seoBaseUrl }}/faq">Pusat Bantuan &amp; FAQ {{ $appStoreName }}</a></li>
+                    <li><a href="{{ $seoBaseUrl }}/syarat-ketentuan">Syarat &amp; Ketentuan Garansi {{ $appStoreName }}</a></li>
                 </ul>
             </nav>
         </section>
@@ -313,6 +317,7 @@
 
     @inertia
 
+    @if(!$isSearchBot)
     <script>
         (function() {
             var preloader = document.getElementById('ns-initial-preloader');
@@ -338,8 +343,8 @@
                         if (preloader && preloader.parentNode) {
                             preloader.parentNode.removeChild(preloader);
                         }
-                    }, 600);
-                }, 400);
+                    }, 450);
+                }, 120);
             }
 
             // Listen to Inertia first page mount or Window load
@@ -348,16 +353,17 @@
             }, { once: true });
 
             if (document.readyState === 'complete') {
-                setTimeout(dismissPreloader, 600);
+                setTimeout(dismissPreloader, 150);
             } else {
                 window.addEventListener('load', function() {
-                    setTimeout(dismissPreloader, 500);
+                    setTimeout(dismissPreloader, 150);
                 });
             }
 
-            // Safety timeout: never block longer than 1.4s under any circumstance
-            setTimeout(dismissPreloader, 1400);
+            // Safety timeout: never block longer than 900ms under any circumstance
+            setTimeout(dismissPreloader, 900);
         })();
     </script>
+    @endif
 </body>
 </html>

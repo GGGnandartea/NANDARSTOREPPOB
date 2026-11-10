@@ -184,6 +184,43 @@ class SeoService
     }
 
     /**
+     * Normalisasi domain kanonis utama (paksa https:// & non-www pada domain publik produksi)
+     * agar tidak pernah muncul error "Duplikat, tanpa ada versi kanonis" atau "Google memilih versi kanonis berbeda".
+     */
+    public static function resolveCanonicalBaseUrl(?string $rawRequestHost = null, ?array $cfg = null): string
+    {
+        $cfg = $cfg ?: self::getConfig();
+        $configured = trim((string) ($cfg['seo_canonical_domain'] ?? ''));
+
+        $candidate = $configured !== ''
+            ? $configured
+            : trim((string) ($rawRequestHost ?: config('app.url', 'https://premiumkita.com')));
+
+        if (!preg_match('#^https?://#i', $candidate)) {
+            $candidate = 'https://' . ltrim($candidate, '/');
+        }
+
+        $parsed = parse_url($candidate);
+        $scheme = strtolower((string) ($parsed['scheme'] ?? 'https'));
+        $host   = strtolower((string) ($parsed['host'] ?? 'premiumkita.com'));
+        $port   = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+
+        $isLocal = in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+            || str_ends_with($host, '.test')
+            || str_ends_with($host, '.local');
+
+        if (!$isLocal) {
+            $scheme = 'https';
+            if ($configured === '' && str_starts_with($host, 'www.')) {
+                $host = substr($host, 4);
+            }
+            $port = '';
+        }
+
+        return $scheme . '://' . $host . $port;
+    }
+
+    /**
      * Resolusi metadata lengkap, Open Graph, dan JSON-LD Structured Data untuk request saat ini.
      */
     public static function resolveForRequest(Request $request): array
@@ -193,18 +230,23 @@ class SeoService
         $tagline   = $cfg['store_tagline'];
         $sep       = $cfg['seo_title_separator'];
 
-        $baseUrl = !empty($cfg['seo_canonical_domain'])
-            ? rtrim($cfg['seo_canonical_domain'], '/')
-            : rtrim($request->getSchemeAndHttpHost(), '/');
+        $baseUrl = self::resolveCanonicalBaseUrl($request->getSchemeAndHttpHost(), $cfg);
 
-        $path = ltrim($request->path(), '/');
-        $canonicalUrl = $path === '' ? $baseUrl : ($baseUrl . '/' . $path);
+        $path = trim($request->path(), '/');
+        // Pastikan URL kanonis beranda ($baseUrl . '/') identik 100% dengan <loc> di sitemap.xml
+        $canonicalUrl = $path === '' ? ($baseUrl . '/') : ($baseUrl . '/' . $path);
 
         $title = self::resolveHomeTitle($cfg);
         $description = self::replaceVariables($cfg['store_description'], $cfg);
         $keywords = $cfg['seo_meta_keywords'];
         $ogType = 'website';
         $robots = $cfg['seo_robots_index'] ?: 'index, follow';
+
+        // Jika beranda diakses dengan query parameter filter (?search=, ?category=, ?tipe=),
+        // arahkan canonical tetap ke beranda utama & pasang noindex, follow agar Google tidak menandai halaman duplikat!
+        if ($path === '' && ($request->filled('search') || $request->filled('category') || $request->filled('tipe') || $request->filled('page'))) {
+            $robots = 'noindex, follow';
+        }
 
         // Resolusi OG Image
         $ogImage = !empty($cfg['seo_og_image'])
@@ -216,7 +258,7 @@ class SeoService
 
         $productModel = null;
         $breadcrumbs = [
-            ['name' => 'Beranda', 'url' => $baseUrl],
+            ['name' => 'Beranda', 'url' => $baseUrl . '/'],
         ];
 
         // 1. Halaman Detail Produk (/product/{id})
@@ -246,30 +288,56 @@ class SeoService
                         ? $productModel->image
                         : ($baseUrl . '/' . ltrim($productModel->image, '/'));
                 }
-                $breadcrumbs[] = ['name' => $categoryName, 'url' => $baseUrl . '/?category=' . urlencode($categoryName)];
+                if ($productModel->status !== 'available') {
+                    $robots = 'noindex, follow';
+                }
                 $breadcrumbs[] = ['name' => $productModel->name, 'url' => $canonicalUrl];
+            } else {
+                $robots = 'noindex, nofollow';
             }
         }
         // 2. Halaman Layanan PPOB (/ppob)
         elseif ($request->is('ppob*')) {
+            $canonicalUrl = $baseUrl . '/ppob';
             $title = self::replaceVariables($cfg['seo_ppob_title'], $cfg) . ' ' . $sep . ' ' . $storeName;
             $description = self::replaceVariables($cfg['seo_ppob_description'], $cfg);
             $breadcrumbs[] = ['name' => 'Layanan PPOB & Pulsa', 'url' => $canonicalUrl];
         }
         // 3. Halaman FAQ (/faq)
         elseif ($request->is('faq*')) {
+            $canonicalUrl = $baseUrl . '/faq';
             $title = self::replaceVariables($cfg['seo_faq_title'], $cfg) . ' ' . $sep . ' ' . $storeName;
             $description = self::replaceVariables($cfg['seo_faq_description'], $cfg);
             $breadcrumbs[] = ['name' => 'Pusat Bantuan (FAQ)', 'url' => $canonicalUrl];
         }
         // 4. Halaman Syarat & Ketentuan (/syarat-ketentuan, /terms)
         elseif ($request->is('terms*') || $request->is('syarat-ketentuan*')) {
+            $canonicalUrl = $baseUrl . '/syarat-ketentuan';
             $title = self::replaceVariables($cfg['seo_terms_title'], $cfg) . ' ' . $sep . ' ' . $storeName;
             $description = self::replaceVariables($cfg['seo_terms_description'], $cfg);
             $breadcrumbs[] = ['name' => 'Syarat & Ketentuan', 'url' => $canonicalUrl];
         }
-        // 5. Halaman Private / Transaksional (Jangan di-index oleh Google)
-        elseif ($request->is('admin*') || $request->is('profile*') || $request->is('checkout*') || $request->is('order/invoice*') || $request->is('invoice*')) {
+        // 5. Halaman Autentikasi (/login, /register, /forgot-password) -> judul unik & noindex agar tidak menjadi thin/duplicate page di GSC
+        elseif ($request->is('login*')) {
+            $canonicalUrl = $baseUrl . '/login';
+            $title = 'Masuk Akun Member & Reseller ' . $sep . ' ' . $storeName;
+            $description = 'Masuk ke dashboard member dan Reseller VIP ' . $storeName . ' untuk transaksi akun aplikasi premium & PPOB otomatis 24 jam.';
+            $robots = 'noindex, follow';
+        }
+        elseif ($request->is('register*')) {
+            $canonicalUrl = $baseUrl . '/register';
+            $title = 'Daftar Akun & Mitra Reseller VIP ' . $sep . ' ' . $storeName;
+            $description = 'Daftar akun member atau Reseller VIP ' . $storeName . ' gratis dan nikmati harga modal termurah semua aplikasi premium & PPOB.';
+            $robots = 'noindex, follow';
+        }
+        elseif ($request->is('forgot-password*')) {
+            $canonicalUrl = $baseUrl . '/forgot-password';
+            $title = 'Reset Kata Sandi via OTP WhatsApp ' . $sep . ' ' . $storeName;
+            $description = 'Pulihkan akses kata sandi akun ' . $storeName . ' Anda secara instan melalui kode OTP WhatsApp resmi.';
+            $robots = 'noindex, nofollow';
+        }
+        // 6. Halaman Private / Transaksional (Jangan di-index oleh Google)
+        elseif ($request->is('admin*') || $request->is('profile*') || $request->is('reseller*') || $request->is('checkout*') || $request->is('order/invoice*') || $request->is('invoice*')) {
             $robots = 'noindex, nofollow';
         }
 
@@ -540,13 +608,12 @@ class SeoService
 
     /**
      * Generate isi XML Sitemap lengkap untuk Google Search Console (/sitemap.xml).
+     * Hanya menyertakan halaman konten publik utama & produk aktif (tanpa halaman form login/register/redirect).
      */
     public static function generateSitemapXml(?string $requestHost = null): string
     {
         $cfg = self::getConfig();
-        $baseUrl = !empty($cfg['seo_canonical_domain'])
-            ? rtrim($cfg['seo_canonical_domain'], '/')
-            : rtrim($requestHost ?: config('app.url', 'https://premiumkita.com'), '/');
+        $baseUrl = self::resolveCanonicalBaseUrl($requestHost, $cfg);
 
         $includeProducts = ($cfg['seo_sitemap_include_products'] ?? '1') === '1';
         $includeImages   = ($cfg['seo_sitemap_include_images'] ?? '1') === '1';
@@ -581,32 +648,29 @@ class SeoService
                 'priority'   => '0.6',
                 'image'      => null,
             ],
-            [
-                'loc'        => $baseUrl . '/register',
-                'lastmod'    => $today,
-                'changefreq' => 'weekly',
-                'priority'   => '0.7',
-                'image'      => null,
-            ],
-            [
-                'loc'        => $baseUrl . '/login',
-                'lastmod'    => $today,
-                'changefreq' => 'monthly',
-                'priority'   => '0.5',
-                'image'      => null,
-            ],
         ];
 
         if ($includeProducts) {
             try {
+                $disabledPreflix  = Setting::where('key', 'provider_preflix_disabled')->value('value') == '1';
+                $disabledPremku   = Setting::where('key', 'provider_premku_disabled')->value('value') == '1';
+                $disabledTelegram = !TelegramBotApiService::isEnabledForUsers();
+
                 $products = Product::where('status', 'available')
                     ->where(function ($q) {
                         $q->whereNull('type')->orWhere('type', '!=', 'ppob');
                     })
                     ->orderBy('id', 'desc')
-                    ->get(['id', 'name', 'category', 'image', 'updated_at']);
+                    ->get(['id', 'name', 'category', 'image', 'api_product_id', 'updated_at']);
 
                 foreach ($products as $prod) {
+                    $apiId = (string) ($prod->api_product_id ?? '');
+                    if (($disabledPreflix && str_starts_with($apiId, 'PREFLIX-'))
+                        || ($disabledPremku && str_starts_with($apiId, 'PREMKU-'))
+                        || ($disabledTelegram && str_starts_with($apiId, 'TG-'))) {
+                        continue;
+                    }
+
                     $imgUrl = null;
                     if ($includeImages && !empty($prod->image) && !str_starts_with($prod->image, 'data:')) {
                         $imgUrl = str_starts_with($prod->image, 'http')
@@ -659,9 +723,7 @@ class SeoService
     public static function generateRobotsTxt(?string $requestHost = null): string
     {
         $cfg = self::getConfig();
-        $baseUrl = !empty($cfg['seo_canonical_domain'])
-            ? rtrim($cfg['seo_canonical_domain'], '/')
-            : rtrim($requestHost ?: config('app.url', 'https://premiumkita.com'), '/');
+        $baseUrl = self::resolveCanonicalBaseUrl($requestHost, $cfg);
 
         $isNoIndex = str_contains(strtolower($cfg['seo_robots_index'] ?? ''), 'noindex');
 
@@ -674,16 +736,27 @@ class SeoService
             $lines[] = 'Disallow: /';
         } else {
             $lines[] = 'Allow: /';
+            $lines[] = 'Allow: /build/';
+            $lines[] = 'Allow: /storage/';
             $lines[] = 'Allow: /ppob';
             $lines[] = 'Allow: /product/';
             $lines[] = 'Allow: /faq';
             $lines[] = 'Allow: /syarat-ketentuan';
+            $lines[] = 'Disallow: /terms';
+            $lines[] = 'Disallow: /login';
+            $lines[] = 'Disallow: /register';
+            $lines[] = 'Disallow: /forgot-password';
+            $lines[] = 'Disallow: /admin';
             $lines[] = 'Disallow: /admin/';
             $lines[] = 'Disallow: /profile';
+            $lines[] = 'Disallow: /reseller/';
             $lines[] = 'Disallow: /checkout/';
             $lines[] = 'Disallow: /order/invoice/';
             $lines[] = 'Disallow: /invoice/';
             $lines[] = 'Disallow: /api/';
+            $lines[] = 'Disallow: /*?search=';
+            $lines[] = 'Disallow: /*?category=';
+            $lines[] = 'Disallow: /*?tipe=';
         }
 
         if (!empty($cfg['seo_robots_custom'])) {

@@ -6,7 +6,12 @@
     <title inertia>PremiumKita</title>
     @php
         $siteFavicon = \App\Models\Setting::where('key', 'store_favicon')->value('value') ?: (\App\Models\Setting::where('key', 'store_logo')->value('value') ?: null);
+        $fallbackCanonicalBase = \App\Services\SeoService::resolveCanonicalBaseUrl(request()->getSchemeAndHttpHost());
+        $fallbackPath = trim(request()->path(), '/');
+        $fallbackCanonical = $fallbackPath === '' ? ($fallbackCanonicalBase . '/') : ($fallbackCanonicalBase . '/' . $fallbackPath);
     @endphp
+    <meta name="robots" content="noindex, follow">
+    <link rel="canonical" href="{{ $fallbackCanonical }}">
     @if($siteFavicon)
         <link rel="icon" href="{{ $siteFavicon }}">
     @endif

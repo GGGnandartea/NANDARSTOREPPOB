@@ -32,7 +32,7 @@ Route::post('/ppob/check-status/{orderId}', [PpobController::class, 'recheckStat
 // --- PUSAT BANTUAN & SYARAT KETENTUAN (HALAMAN DEDIKASI) ---
 Route::get('/faq', [FrontController::class, 'faq'])->name('faq');
 Route::get('/syarat-ketentuan', [FrontController::class, 'terms'])->name('terms');
-Route::get('/terms', [FrontController::class, 'terms'])->name('terms.alias');
+Route::permanentRedirect('/terms', '/syarat-ketentuan')->name('terms.alias');
 // -----------------------------------------------------------
 
 Route::get('/auth/session', [AuthController::class, 'session']);

@@ -196,11 +196,23 @@ class RealtimeApiPricingAndSeoTest extends TestCase
         $this->assertSame('googleabcdef987654321.html', $cfg['seo_google_html_file']);
         $this->assertSame('G-TEST12345onclickevil', $cfg['seo_ga4_id']);
 
-        // Sitemap XML memuat halaman utama dan produk aktif
+        // Sitemap XML memuat halaman utama dan produk aktif (tanpa halaman form login/register)
         $sitemapResponse = $this->get('/sitemap.xml');
         $sitemapResponse->assertOk();
         $this->assertStringContainsString('<loc>', $sitemapResponse->getContent());
         $this->assertStringContainsString('/product/' . $product->id, $sitemapResponse->getContent());
+        $this->assertStringNotContainsString('/login</loc>', $sitemapResponse->getContent());
+        $this->assertStringNotContainsString('/register</loc>', $sitemapResponse->getContent());
+
+        // Alias /terms melakukan redirect permanen 301 ke /syarat-ketentuan agar tidak duplikat di Google Search Console
+        $this->get('/terms')->assertRedirect('/syarat-ketentuan')->assertStatus(301);
+
+        // Googlebot tidak terhalang layar preloader saat merender halaman
+        $botHomeHtml = $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'])
+            ->get('/')
+            ->assertOk()
+            ->getContent();
+        $this->assertStringNotContainsString('id="ns-initial-preloader"', $botHomeHtml);
 
         // Robots.txt menunjuk ke Sitemap
         $robotsResponse = $this->get('/robots.txt');
