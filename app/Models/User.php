@@ -46,4 +46,9 @@ class User extends Authenticatable
     public function orders() {
         return $this->hasMany(Order::class)->orderBy('id', 'desc');
     }
+
+    // Relasi Konfigurasi Open API Khusus Reseller VIP
+    public function apiClient() {
+        return $this->hasOne(ResellerApiClient::class);
+    }
 }

@@ -50,7 +50,12 @@ export default function PpobInputSection({
   setTagihanPeriod,
   tagihanPdamSearch,
   setTagihanPdamSearch,
+  targetCheckResult = null,
+  isCheckingTarget = false,
+  onCheckTarget,
+  cutoff = null,
 }) {
+  const isCutoff = Boolean(cutoff?.is_cutoff);
   const activeBillService = BILL_SERVICES.find((s) => s.id === tagihanType) || BILL_SERVICES[0];
   const isBillTab = ['pdam', 'pln_postpaid', 'bpjs'].includes(activeTab);
   const selectedPdam = PDAM_PRODUCTS.find((product) => product.id === tagihanPdamRegion);
@@ -209,6 +214,50 @@ export default function PpobInputSection({
                 Pascabayar
               </button>.
             </p>
+
+            {onCheckTarget && (
+              <div className="mt-3 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => onCheckTarget()}
+                  disabled={isCutoff || isCheckingTarget || !plnCustomerId || plnCustomerId.length < 8}
+                  className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCheckingTarget ? (
+                    <>
+                      <span className="w-3.5 h-3.5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin"></span>
+                      <span>Mengecek Nama Pelanggan PLN...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Search className="w-4 h-4" />
+                      <span>Cek Nama Pelanggan PLN</span>
+                    </>
+                  )}
+                </button>
+
+                {targetCheckResult?.status === 'success' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 font-semibold">Nama Pelanggan:</span>
+                      <span className="font-black text-emerald-700 dark:text-emerald-300 text-right">{targetCheckResult.customer_name}</span>
+                    </div>
+                    {targetCheckResult.tarif_daya && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-gray-500 dark:text-gray-400 font-semibold">Tarif / Daya:</span>
+                        <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{targetCheckResult.tarif_daya}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {targetCheckResult?.status === 'error' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-xs font-bold text-rose-600 dark:text-rose-300">
+                    {targetCheckResult.message}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -312,6 +361,53 @@ export default function PpobInputSection({
                 )}
               </div>
             )}
+
+            {onCheckTarget && (
+              <div className="pt-1 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => onCheckTarget()}
+                  disabled={
+                    isCutoff ||
+                    isCheckingTarget ||
+                    !gameUserId ||
+                    gameUserId.length < 3 ||
+                    (selectedGame.needZone && !selectedGame.zoneOptional && !gameZoneId)
+                  }
+                  className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCheckingTarget ? (
+                    <>
+                      <span className="w-3.5 h-3.5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin"></span>
+                      <span>Memverifikasi ID {selectedGame.name}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Search className="w-4 h-4" />
+                      <span>Cek / Verifikasi ID {selectedGame.name}</span>
+                    </>
+                  )}
+                </button>
+
+                {targetCheckResult?.status === 'success' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 font-semibold">Keterangan Akun:</span>
+                      <span className="font-black text-emerald-700 dark:text-emerald-300 text-right">{targetCheckResult.customer_name}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                      ID Tujuan telah tervalidasi pada server resmi PremiumKita ({selectedGame.name}).
+                    </p>
+                  </div>
+                )}
+
+                {targetCheckResult?.status === 'error' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-xs font-bold text-rose-600 dark:text-rose-300">
+                    {targetCheckResult.message}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -374,6 +470,44 @@ export default function PpobInputSection({
               placeholder="Contoh: 081234567890"
               className="w-full px-4 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl text-sm font-black font-mono dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-inner"
             />
+
+            {onCheckTarget && (
+              <div className="mt-3 space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => onCheckTarget()}
+                  disabled={isCutoff || isCheckingTarget || !ewalletPhone || ewalletPhone.length < 9}
+                  className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCheckingTarget ? (
+                    <>
+                      <span className="w-3.5 h-3.5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin"></span>
+                      <span>Mengecek Akun {selectedEwallet.name}...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Search className="w-4 h-4" />
+                      <span>Cek Nomor Tujuan {selectedEwallet.name}</span>
+                    </>
+                  )}
+                </button>
+
+                {targetCheckResult?.status === 'success' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 font-semibold">Keterangan Akun:</span>
+                      <span className="font-black text-emerald-700 dark:text-emerald-300 text-right">{targetCheckResult.customer_name}</span>
+                    </div>
+                  </div>
+                )}
+
+                {targetCheckResult?.status === 'error' && (
+                  <div className="ppob-fade-in p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-xs font-bold text-rose-600 dark:text-rose-300">
+                    {targetCheckResult.message}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -647,14 +781,17 @@ export default function PpobInputSection({
               type="button"
               onClick={handleTagihanInquiry}
               disabled={
+                isCutoff ||
                 isTagihanInquiring ||
                 (tagihanType === 'pdam' && !selectedPdam) ||
                 !tagihanCustomerId ||
                 tagihanCustomerId.length < (activeBillService.minLength || 4)
               }
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
-              {isTagihanInquiring ? (
+              {isCutoff ? (
+                <span>Layanan Sedang Tutup / Gangguan</span>
+              ) : isTagihanInquiring ? (
                 <>
                   <svg className="w-5 h-5 animate-spin text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>

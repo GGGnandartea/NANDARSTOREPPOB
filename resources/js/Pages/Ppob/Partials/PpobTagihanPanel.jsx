@@ -6,7 +6,8 @@ import { extractBillRows } from './PpobBillUtils';
  * Panel kolom kanan untuk tab Tagihan & PDAM.
  * Menampilkan rincian hasil inquiry dan tombol lanjut bayar.
  */
-export default function PpobTagihanPanel({ inquiryResult, isInquiring, onOpenCheckout, serviceLabel }) {
+export default function PpobTagihanPanel({ inquiryResult, isInquiring, onOpenCheckout, serviceLabel, cutoff = null }) {
+  const isCutoff = Boolean(cutoff?.is_cutoff);
   const summary = inquiryResult?.summary;
   const rows = extractBillRows(inquiryResult?.data);
   const hasBill = summary && summary.grandTotal > 0;
@@ -170,19 +171,21 @@ export default function PpobTagihanPanel({ inquiryResult, isInquiring, onOpenChe
 
       <button
         type="button"
-        onClick={() =>
+        disabled={isCutoff}
+        onClick={() => {
+          if (isCutoff) return;
           onOpenCheckout({
             code: inquiryResult?.product_id || 'TAGIHAN',
             name: `${serviceLabel} - ${summary.customerName}`,
             price: summary.grandTotal,
             inquiryKey: inquiryResult?.inquiry_key,
-          })
-        }
-        className="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/95 dark:hover:bg-emerald-500 font-black text-sm shadow-lg shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-between cursor-pointer"
+          });
+        }}
+        className="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/95 dark:hover:bg-emerald-500 font-black text-sm shadow-lg shadow-emerald-950/30 border border-emerald-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-between cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
       >
         <span className="flex items-center gap-2.5">
           <Icons.Lightning className="w-5 h-5" />
-          <span>Bayar Tagihan Sekarang</span>
+          <span>{isCutoff ? 'Layanan Sedang Tutup / Gangguan' : 'Bayar Tagihan Sekarang'}</span>
         </span>
         <span className="px-3 py-1.5 rounded-xl bg-black/20 font-mono font-black text-sm">
           {fmt.rp(summary.grandTotal)}

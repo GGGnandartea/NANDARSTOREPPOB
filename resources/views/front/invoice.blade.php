@@ -638,19 +638,42 @@
             </div>
         </div>
 
-        @if(!in_array($invStatusLower, ['refunded', 'failed', 'canceled', 'cancelled'], true) && !$invIsPpob && ($isWaitingTop || in_array($invPayStatusLower, ['pending', 'unpaid'], true)))
-        <!-- TOMBOL CEK STATUS PEMBAYARAN & AMBIL AKUN DI BAGIAN ATAS AGAR LANGSUNG TERLIHAT DI HP -->
-        <div id="invoice-top-check-bar" class="no-print" style="background: linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%); border: 2px solid #f59e0b; border-radius: 16px; padding: 14px 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.25);">
+        @php
+            $pendingQrisUrl = in_array($invPayStatusLower, ['pending', 'unpaid'], true)
+                ? \App\Services\OrderFulfillmentService::resolveOrderQrisUrl($order)
+                : null;
+            $remainingQrisSeconds = in_array($invPayStatusLower, ['pending', 'unpaid'], true)
+                ? \App\Services\OrderFulfillmentService::remainingQrisSeconds($order)
+                : 0;
+        @endphp
+
+        @if(!in_array($invStatusLower, ['refunded', 'failed', 'canceled', 'cancelled'], true) && (in_array($invPayStatusLower, ['pending', 'unpaid'], true) || (!$invIsPpob && $isWaitingTop)))
+        <!-- TOMBOL CEK STATUS PEMBAYARAN & QRIS AKTIF DI BAGIAN ATAS AGAR LANGSUNG TERLIHAT DI HP -->
+        <div id="invoice-top-check-bar" class="no-print" style="background: linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%); border: 2px solid #f59e0b; border-radius: 16px; padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.25);">
+            @if(in_array($invPayStatusLower, ['pending', 'unpaid'], true) && !empty($pendingQrisUrl) && $remainingQrisSeconds > 0)
+            <div style="text-align: center; background: #ffffff; border: 1px solid #fde68a; border-radius: 14px; padding: 16px;">
+                <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;">
+                    Scan QRIS untuk Menyelesaikan Pembayaran
+                </div>
+                <img src="{{ $pendingQrisUrl }}" alt="QRIS {{ $order->invoice_number }}" style="width: 210px; height: 210px; object-fit: contain; margin: 0 auto 8px auto; display: block; border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px; background: #ffffff;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 900; color: #059669;">
+                    {{ $paidNominalFmt }}
+                </div>
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; margin-top: 4px;">
+                    Halaman ini otomatis mengecek status pembayaran di latar belakang setiap 3 detik.
+                </div>
+            </div>
+            @endif
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                 <div style="font-size: 12px; font-weight: 800; color: #92400e; line-height: 1.4;">
                     @if(in_array($invPayStatusLower, ['pending', 'unpaid'], true))
-                        ⏳ Sudah membayar QRIS? Klik tombol di bawah untuk sinkronisasi pembayaran &amp; ambil akun otomatis:
+                        ⏳ Sudah membayar QRIS? Klik tombol di bawah untuk sinkronisasi pembayaran &amp; memproses pesanan otomatis:
                     @else
                         ✅ Pembayaran sudah LUNAS! Klik tombol di bawah jika akun belum muncul otomatis:
                     @endif
                 </div>
                 <button type="button" id="btn-top-check-order" onclick="checkInvoiceOrderStatus()" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border-radius: 12px; background: linear-gradient(135deg, #f97316, #ea580c); color: #ffffff; border: none; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);">
-                    <span id="btn-top-check-label">🔄 Sudah Bayar? Cek Pembayaran &amp; Ambil Akun Sekarang</span>
+                    <span id="btn-top-check-label">🔄 Sudah Bayar? Cek Pembayaran Sekarang</span>
                 </button>
             </div>
             <div id="invoice-top-check-feedback" style="display: none; padding: 9px 12px; border-radius: 10px; background: #ffffff; border: 1px solid #fcd34d; color: #92400e; font-size: 12px; font-weight: 700; text-align: center;"></div>
@@ -703,6 +726,26 @@
                     @endphp
                     <span class="info-value" style="color: {{ $statusLayananColor }};">{{ $statusLayananLabel }}</span>
                 </div>
+                @if($invIsPpob)
+                    @php
+                        $invCustomerName = null;
+                        if (!empty($order->notes) && preg_match('/Atas Nama:\s*([^|]+)/i', $order->notes, $mName)) {
+                            $invCustomerName = trim($mName[1]);
+                        }
+                    @endphp
+                    @if(!empty($repTarget))
+                    <div class="info-row">
+                        <span class="info-label">No. / ID Tujuan</span>
+                        <span class="info-value" style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">{{ $repTarget }}</span>
+                    </div>
+                    @endif
+                    @if(!empty($invCustomerName))
+                    <div class="info-row">
+                        <span class="info-label">Keterangan Akun</span>
+                        <span class="info-value" style="color: #059669; font-weight: 800;">{{ $invCustomerName }}</span>
+                    </div>
+                    @endif
+                @endif
             </div>
             <div class="info-card">
                 <div class="info-card-title">Data Pembeli</div>
@@ -1194,7 +1237,7 @@
 
             btn.disabled = true;
             btn.style.opacity = '0.7';
-            if (label) label.innerText = '⏳ Mengecek ke Server Kiosbank...';
+            if (label) label.innerText = '⏳ Mengecek ke Server PremiumKita...';
 
             var recheckUrl = @json(route('ppob.recheck_status', array_filter(['orderId' => $order->invoice_number, 'token' => $order->user_id ? null : $order->guest_access_token])));
 

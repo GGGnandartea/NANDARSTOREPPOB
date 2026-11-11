@@ -238,4 +238,49 @@ class PulsaDataCatalogTest extends TestCase
         $resFailed = $service->singlePayment('500521', '081280982287', 5000);
         $this->assertSame('failed', $resFailed['status']);
     }
+
+    public function test_official_voucher_game_catalog_includes_free_fire_5_diamond_and_disables_purchase_on_maintenance_or_cutoff(): void
+    {
+        Setting::where('key', 'kiosbank_mode')->update(['value' => 'development']);
+        $this->provider('6701BK,6707BE,6701BM,6010BD', '6702BK');
+
+        $ff = collect($this->getJson('/ppob/products?category=game&prefix=AAO.AAAF')->assertOk()->json('data'))->keyBy('code');
+        $this->assertTrue($ff->has('6701BK'));
+        $this->assertSame('Free Fire 5 Diamond', $ff['6701BK']['name']);
+        $this->assertTrue($ff['6701BK']['can_purchase']);
+        $this->assertSame('active', $ff['6701BK']['status']);
+
+        // Product reported in maintenance by API get-Active-Product cannot be purchased
+        $this->assertTrue($ff->has('6702BK'));
+        $this->assertFalse($ff['6702BK']['can_purchase']);
+        $this->assertSame('maintenance', $ff['6702BK']['status']);
+
+        // Obsolete placeholder FF50 must not exist
+        $this->assertFalse($ff->has('FF50'));
+
+        // Checkout of maintenance game product is rejected before creating order
+        $user = User::factory()->create(['balance' => 100000]);
+        $this->actingAs($user)->postJson('/ppob/checkout', [
+            'product_code'   => '6702BK',
+            'product_name'   => 'Free Fire 12 Diamond',
+            'customer_id'    => '082216303791',
+            'amount'         => 2500,
+            'payment_method' => 'balance',
+        ])->assertUnprocessable()->assertJsonPath('message', 'Produk sedang gangguan.');
+        $this->assertDatabaseCount('orders', 0);
+
+        // When global PPOB status is maintenance / gangguan / offline, all products have can_purchase = false
+        Setting::updateOrCreate(['key' => 'ppob_status_mode'], ['value' => 'maintenance']);
+        $ffCutoff = collect($this->getJson('/ppob/products?category=game&prefix=AAO.AAAF')->assertOk()->json('data'))->keyBy('code');
+        $this->assertFalse($ffCutoff['6701BK']['can_purchase']);
+        $this->assertSame('maintenance', $ffCutoff['6701BK']['status']);
+
+        $this->actingAs($user)->postJson('/ppob/checkout', [
+            'product_code'   => '6701BK',
+            'product_name'   => 'Free Fire 5 Diamond',
+            'customer_id'    => '082216303791',
+            'amount'         => 1500,
+            'payment_method' => 'balance',
+        ])->assertStatus(503);
+    }
 }

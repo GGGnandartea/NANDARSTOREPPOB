@@ -26,8 +26,12 @@ class PpobProviderAmountTest extends TestCase
         config(['kiosbank.profiles.production' => ['username' => 'test-user', 'password' => 'test-secret']]);
         Setting::create(['key' => 'kiosbank_mode', 'value' => 'production']);
         Http::fake([
-            '127.0.0.1:4061/*' => Http::response([
-                'data' => ['orderId' => 'PPOB-PRIVATE', 'total_nominal' => 7123, 'url_qris' => 'https://example.test/qr.png'],
+            '127.0.0.1:4061/*' => fn ($request) => Http::response([
+                'data' => [
+                    'orderId' => Order::where('invoice_number', 'PPOB-PRIVATE')->exists() ? 'PPOB-PRIVATE-2' : 'PPOB-PRIVATE',
+                    'total_nominal' => 7123,
+                    'url_qris' => 'https://example.test/qr.png',
+                ],
             ]),
             '*/auth/Sign-On' => Http::response(['SessionID' => 'test-session']),
             '*/Services/SinglePayment' => function ($request) {
@@ -50,6 +54,74 @@ class PpobProviderAmountTest extends TestCase
                 return Http::response(['rc' => '00', 'data' => ['status' => 'BERHASIL', 'sn' => 'test-token']]);
             },
             '*/Services/Payment' => Http::response(['rc' => '00', 'data' => ['status' => 'BERHASIL', 'sn' => 'bill-token']]),
+            '*/Services/Inquiry' => function ($request) {
+                $pid = (string) ($request['productID'] ?? '');
+                $cid = (string) ($request['customerID'] ?? '');
+                $aid = (string) ($request['additionalID'] ?? '');
+                if ($pid === '6707BE') {
+                    return Http::response([
+                        'rc' => '00',
+                        'description' => 'SUCCESS',
+                        'customerID' => $cid,
+                        'additionalID' => $aid,
+                        'productID' => $pid,
+                        'data' => [
+                            'noHandphone' => $cid,
+                            'produk' => 'MOBILE LEGEND 170 DIAMONDS',
+                            'harga' => '45950',
+                        ],
+                    ]);
+                }
+                if ($pid === '752110') {
+                    return Http::response([
+                        'rc' => '00',
+                        'description' => 'Sukses',
+                        'customerID' => $cid,
+                        'productID' => $pid,
+                        'data' => [
+                            'adminBank' => '1500',
+                            'harga' => '20000',
+                            'nama' => 'TopUp DANA 20.000 ',
+                            'noReferensi' => '261110123456',
+                            'noHandphone' => $cid,
+                            'total' => '21500',
+                        ],
+                    ]);
+                }
+                if ($pid === '754161') {
+                    return Http::response([
+                        'rc' => '00',
+                        'description' => 'Sukses',
+                        'customerID' => $cid,
+                        'productID' => $pid,
+                        'data' => [
+                            'adminBank' => '0',
+                            'harga' => '50000',
+                            'nama' => 'PELANGGAN DANA / OVO',
+                            'noReferensi' => '261110123456',
+                            'noHandphone' => $cid,
+                            'total' => '50000',
+                        ],
+                    ]);
+                }
+                if ($pid === '100302') {
+                    return Http::response([
+                        'rc' => '00',
+                        'description' => 'Sukses',
+                        'customerID' => $cid,
+                        'productID' => $pid,
+                        'data' => [
+                            'NM' => 'PELANGGAN PLN PRABAYAR',
+                            'TF' => 'R1',
+                            'DY' => '000001300',
+                            'ID' => $cid,
+                            'AB' => '000000002750',
+                        ],
+                    ]);
+                }
+
+                return Http::response(['rc' => '14', 'description' => 'ID Pelanggan tidak ditemukan']);
+            },
             '*/Services/get-Active-Product' => Http::response(['rc' => '00', 'active' => 'TEST-PULSA', 'maintenance' => '']),
             '*/Services/Check-Status' => function ($request) {
                 if (($request['customerID'] ?? '') === '081280982297') {
@@ -374,5 +446,116 @@ class PpobProviderAmountTest extends TestCase
             ->assertSee('Panduan Klaim Refund Pembeli Publik (QRIS)')
             ->assertSee('Bawa Bukti Pembelian')
             ->assertSee('Beli Lagi');
+    }
+
+    public function test_pre_purchase_target_inquiry_and_refresh_proof_qris_checkout_recovery(): void
+    {
+        // 1. Pre-purchase inquiry for MLBB Game (6707BE with zone_id)
+        $gameInquiry = $this->postJson('/ppob/inquiry', [
+            'customer_id' => '48122786',
+            'zone_id' => '2114',
+            'product_code' => '6707BE',
+        ])->assertOk()->json();
+
+        $this->assertSame('success', $gameInquiry['status']);
+        $this->assertStringContainsString('48122786', (string) ($gameInquiry['customer_name'] ?? ''));
+        $this->assertStringContainsString('2114', (string) ($gameInquiry['customer_name'] ?? ''));
+
+        // 2. Pre-purchase inquiry for E-Wallet Fixed Denom (752110) and Open Denom (754161)
+        $ewalletInquiry = $this->postJson('/ppob/inquiry', [
+            'customer_id' => '081111111111',
+            'product_code' => '752110',
+        ])->assertOk()->json();
+
+        $this->assertSame('success', $ewalletInquiry['status']);
+        $this->assertNotEmpty($ewalletInquiry['customer_name'] ?? '');
+
+        $ewalletOpenInquiry = $this->postJson('/ppob/inquiry', [
+            'customer_id' => '081111111111',
+            'product_code' => '754161',
+        ])->assertOk()->json();
+
+        $this->assertSame('success', $ewalletOpenInquiry['status']);
+        $this->assertSame('PELANGGAN DANA / OVO', $ewalletOpenInquiry['customer_name']);
+
+        // 3. Pre-purchase inquiry for PLN Token Prabayar (100302)
+        $plnInquiry = $this->postJson('/ppob/inquiry', [
+            'customer_id' => '01112582460',
+            'product_code' => '100302',
+        ])->assertOk()->json();
+
+        $this->assertSame('success', $plnInquiry['status']);
+        $this->assertSame('PELANGGAN PLN PRABAYAR', $plnInquiry['customer_name']);
+        $this->assertSame('R1 / 1300 VA', $plnInquiry['tarif_daya']);
+
+        // 4. Refresh-proof QRIS checkout recovery & dedicated invoice URL
+        $this->product();
+
+        $checkoutRes = $this->postJson('/ppob/checkout', $this->checkoutPayload([
+            'customer_id' => '081280982299',
+            'payment_method' => 'qris',
+            'customer_name' => 'BUDI SANTOSO',
+        ]))->assertOk()->json();
+
+        $this->assertSame('success', $checkoutRes['status']);
+        $this->assertNotEmpty($checkoutRes['order_id']);
+        $this->assertSame('https://example.test/qr.png', $checkoutRes['url_qris']);
+        $this->assertSame('BUDI SANTOSO', $checkoutRes['customer_name']);
+        $this->assertGreaterThan(1000, (int) $checkoutRes['remaining_seconds']);
+
+        $orderId = $checkoutRes['order_id'];
+
+        // Simulate browser refresh calling /ppob/status/{orderId}
+        $statusRes = $this->getJson('/ppob/status/'.$orderId)
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('pending', $statusRes['payment_status']);
+        $this->assertSame('https://example.test/qr.png', $statusRes['url_qris']);
+        $this->assertSame('BUDI SANTOSO', $statusRes['customer_name']);
+        $this->assertGreaterThan(1000, (int) $statusRes['remaining_seconds']);
+        $this->assertSame((int) $checkoutRes['total_nominal'], (int) $statusRes['total_nominal']);
+
+        // Dedicated transaction invoice page shows active QRIS & auto-polling when unpaid
+        $this->get($checkoutRes['invoice_url'])
+            ->assertOk()
+            ->assertSee('Scan QRIS untuk Menyelesaikan Pembayaran')
+            ->assertSee('https://example.test/qr.png')
+            ->assertSee('BUDI SANTOSO');
+
+        // 5. Regular store product checkout (/checkout/process & /checkout/status/{orderId}) also persists QRIS for refresh recovery
+        $storeProduct = \App\Models\Product::create([
+            'name' => 'Netflix Premium 1 Bulan',
+            'type' => 'local',
+            'process_type' => 'manual',
+            'price' => 35000,
+        ]);
+
+        $regularCheckout = $this->postJson('/checkout/process', [
+            'product_id' => $storeProduct->id,
+        ])->assertOk()->json();
+
+        $this->assertSame('success', $regularCheckout['status']);
+        $this->assertSame('https://example.test/qr.png', $regularCheckout['url_qris']);
+        $this->assertGreaterThan(1000, (int) $regularCheckout['remaining_seconds']);
+
+        $regularStatus = $this->getJson('/checkout/status/'.$regularCheckout['order_id'])
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('https://example.test/qr.png', $regularStatus['url_qris']);
+        $this->assertSame((int) $regularCheckout['total_nominal'], (int) $regularStatus['total_nominal']);
+        $this->assertGreaterThan(1000, (int) $regularStatus['remaining_seconds']);
+
+        // 6. Verify KiosbankDevelopmentNopel::simulateInquiry for Game & E-Wallet in development mode
+        $kiosbank = new \App\Services\KiosbankService;
+        $devGameSim = \App\Services\KiosbankDevelopmentNopel::simulateInquiry('6707BE', '48122786', '261110123456', ['additional_id' => '2114'], $kiosbank, 2000, 54500);
+        $this->assertSame('success', $devGameSim['status']);
+        $this->assertStringContainsString('48122786', $devGameSim['customer_name']);
+        $this->assertStringContainsString('2114', $devGameSim['customer_name']);
+
+        $devEwalletSim = \App\Services\KiosbankDevelopmentNopel::simulateInquiry('752110', '081111111111', '261110123457', [], $kiosbank, 2000, 54500);
+        $this->assertSame('success', $devEwalletSim['status']);
+        $this->assertNotEmpty($devEwalletSim['customer_name']);
     }
 }

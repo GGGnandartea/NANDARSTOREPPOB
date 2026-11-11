@@ -10,15 +10,18 @@ class Order extends Model
         'invoice_number', 'user_id', 'buyer_name', 'product_id', 'product_name', 'quantity', 'product_type', 'provider',
         'price', 'discount', 'total_amount', 'bill_amount', 'bill_admin_fee', 'bill_penalty', 'bill_total', 'bill_reference', 'payment_status', 'order_status', 'account_details',
         'email', 'whatsapp', 'voucher_code', 'discount_amount', 'sn_or_account',
-        'api_trx_id', 'notes', 'kiosbank_mode', 'provider_amount', 'provider_product_code', 'provider_customer_id'
+        'api_trx_id', 'notes', 'kiosbank_mode', 'provider_amount', 'provider_product_code', 'provider_customer_id',
+        'is_open_api', 'api_client_ref_id', 'open_api_callback_url', 'open_api_webhook_sent_at', 'open_api_webhook_event'
     ];
 
-    protected $hidden = ['guest_access_token'];
+    protected $hidden = ['guest_access_token', 'open_api_callback_url'];
 
     protected $casts = [
-        'guest_access_token' => 'encrypted',
-        'fulfillment_started_at' => 'datetime',
-        'provider_amount' => 'integer',
+        'guest_access_token'       => 'encrypted',
+        'fulfillment_started_at'   => 'datetime',
+        'provider_amount'          => 'integer',
+        'is_open_api'              => 'boolean',
+        'open_api_webhook_sent_at' => 'datetime',
     ];
 
     protected static function booted(): void

@@ -43,6 +43,12 @@ export default function PpobQrisModal({
           </span>
           <h3 className="text-base font-black text-gray-900 dark:text-white mt-2">Scan QRIS untuk Membayar</h3>
           <p className="text-xs text-gray-400">Selesaikan sesuai nominal unik sebelum waktu berakhir</p>
+          {(qrisData.invoice_number || qrisData.order_id) && (
+            <div className="mt-2 inline-flex flex-wrap items-center justify-center gap-1.5 px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[11px] font-mono font-bold text-gray-700 dark:text-gray-300">
+              <span>ID Transaksi: #{qrisData.invoice_number || qrisData.order_id}</span>
+              {qrisData.customer_id && <span>• Tujuan: {qrisData.customer_id}</span>}
+            </div>
+          )}
         </div>
 
         {qrisData.url_qris && (
@@ -83,6 +89,9 @@ export default function PpobQrisModal({
             <span>
               Waktu tersisa (20 Menit): {Math.floor(qrisTimer / 60)}:{(qrisTimer % 60).toString().padStart(2, '0')}
             </span>
+          </p>
+          <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-2.5 py-1.5">
+            Aman direfresh: Jika halaman ter-refresh, transaksi ini tetap tersimpan &amp; dicek otomatis di latar belakang tanpa perlu order ulang.
           </p>
         </div>
 

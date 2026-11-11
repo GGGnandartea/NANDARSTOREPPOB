@@ -3,7 +3,7 @@
 return [
     'profiles' => [
         'development' => [
-            'verify_tls' => env('KIOSBANK_DEVELOPMENT_VERIFY_TLS', true),
+            'verify_tls' => env('KIOSBANK_DEVELOPMENT_VERIFY_TLS', false),
             'ca_bundle' => env('KIOSBANK_DEVELOPMENT_CA_BUNDLE'),
             'username' => env('KIOSBANK_DEVELOPMENT_USERNAME', ''),
             'password' => env('KIOSBANK_DEVELOPMENT_PASSWORD', ''),

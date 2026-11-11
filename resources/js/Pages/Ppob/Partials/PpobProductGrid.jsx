@@ -7,6 +7,7 @@ export default function PpobProductGrid({
   selectedProduct,
   onOpenCheckout,
   title = 'Pilih Nominal & Produk',
+  cutoff = null,
 }) {
   return (
     <div className="lg:col-span-7 space-y-4 ppob-fade-in">
@@ -44,32 +45,41 @@ export default function PpobProductGrid({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {products.map((item) => {
             const isSelected = selectedProduct?.code === item.code;
-            const isMaintenance = item.status === 'maintenance';
+            const isGlobalCutoff = Boolean(cutoff?.is_cutoff);
+            const isMaintenance = item.status === 'maintenance' || (isGlobalCutoff && (cutoff?.mode === 'maintenance' || cutoff?.mode === 'gangguan'));
+            const isCutoff = !isMaintenance && (isGlobalCutoff || item.status === 'cutoff');
             const isInactive = item.status === 'inactive';
-            const canBuy = item.can_purchase !== false && item.status === 'active' && Number(item.price) > 0;
+            const canBuy = !isGlobalCutoff && !isMaintenance && !isCutoff && !isInactive && item.can_purchase !== false && item.status === 'active' && Number(item.price) > 0;
 
             return (
               <div
                 key={item.code}
+                aria-disabled={!canBuy}
                 onClick={() => { if (canBuy) onOpenCheckout(item); }}
-                className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer flex flex-col justify-between group relative overflow-hidden ${
+                className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col justify-between group relative overflow-hidden ${
                   isMaintenance
-                    ? 'bg-amber-500/5 border-amber-500/30 opacity-75'
+                    ? 'bg-amber-500/5 border-amber-500/30 opacity-75 cursor-not-allowed select-none'
+                    : isCutoff
+                    ? 'bg-amber-500/5 border-amber-500/25 opacity-75 cursor-not-allowed select-none'
                     : !canBuy
-                    ? 'bg-gray-100 dark:bg-white/5 opacity-50 cursor-not-allowed'
+                    ? 'bg-gray-100 dark:bg-white/5 opacity-55 cursor-not-allowed select-none'
                     : isSelected
-                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/20 -translate-y-0.5'
-                    : 'bg-white dark:bg-[#131b2e] border-gray-200/80 dark:border-white/5 hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5'
+                    ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/20 -translate-y-0.5 cursor-pointer'
+                    : 'bg-white dark:bg-[#131b2e] border-gray-200/80 dark:border-white/5 hover:border-emerald-500/50 hover:shadow-md hover:-translate-y-0.5 cursor-pointer'
                 }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-black text-xs sm:text-sm text-gray-900 dark:text-white group-hover:text-emerald-500 transition">
+                    <h4 className={`font-black text-xs sm:text-sm text-gray-900 dark:text-white transition ${canBuy ? 'group-hover:text-emerald-500' : ''}`}>
                       {item.name}
                     </h4>
                     {isMaintenance ? (
                       <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40 shrink-0">
                         GANGGUAN
+                      </span>
+                    ) : isCutoff ? (
+                      <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800/40 shrink-0">
+                        TUTUP
                       </span>
                     ) : isInactive ? (
                       <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 shrink-0">
@@ -85,7 +95,11 @@ export default function PpobProductGrid({
                   </div>
                 </div>
 
-                {!canBuy && <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">{item.availability_message || 'Produk ini belum dapat dibeli.'}</p>}
+                {!canBuy && (
+                  <p className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                    {item.availability_message || cutoff?.title || 'Produk ini sedang tidak dapat dibeli.'}
+                  </p>
+                )}
 
                 <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-gray-100 dark:border-white/5 mt-2 gap-2">
                   <div>
@@ -99,17 +113,21 @@ export default function PpobProductGrid({
                     disabled={!canBuy}
                     onClick={(event) => { event.stopPropagation(); if (canBuy) onOpenCheckout(item); }}
                     className={`px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black shadow-md transition-all flex items-center gap-1.5 shrink-0 ${
-                      isMaintenance
-                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-not-allowed'
+                      isMaintenance || isCutoff
+                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 cursor-not-allowed pointer-events-none opacity-80'
                         : !canBuy
-                        ? 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed'
+                        ? 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed pointer-events-none opacity-80'
                         : 'bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/90 dark:hover:bg-emerald-500 dark:text-white border border-emerald-500/40 shadow-sm shadow-emerald-950/30 group-hover:scale-105 active:scale-95 cursor-pointer'
                     }`}
                   >
                     {isMaintenance ? (
-                      <span>Gangguan</span>
+                      <span>Sedang Gangguan</span>
+                    ) : isCutoff ? (
+                      <span>Sedang Tutup</span>
+                    ) : isInactive ? (
+                      <span>Nonaktif</span>
                     ) : !canBuy ? (
-                      <span>Tidak tersedia</span>
+                      <span>Tidak Tersedia</span>
                     ) : (
                       <>
                         <span className="sm:hidden">Beli</span>

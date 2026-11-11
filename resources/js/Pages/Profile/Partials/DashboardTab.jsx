@@ -141,6 +141,33 @@ export default function DashboardTab({
         </div>
       </div>
 
+      {/* Shortcut Eksklusif Open API untuk VIP Reseller */}
+      {isReseller && (
+        <div className="bg-gradient-to-r from-[#111827] via-[#1e293b] to-[#0f172a] border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white shadow-sm">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+              <Icon.Code className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-black text-white">Integrasi Open API PremiumKita (H2H)</h3>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-gray-950">Eksklusif VIP</span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Hubungkan website Anda langsung ke layanan resmi PremiumKita untuk menjual Aplikasi Premium otomatis menggunakan Saldo Akun.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleMenuClick('open_api')}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:brightness-110 text-gray-950 font-black text-xs shadow transition cursor-pointer shrink-0"
+          >
+            Konfigurasi &amp; Dokumentasi API →
+          </button>
+        </div>
+      )}
+
       {/* Transaksi Singkat: 2 Kolom (Pesanan Terakhir & Aktivitas Saldo Terakhir) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Kolom 1: Pesanan Terakhir */}

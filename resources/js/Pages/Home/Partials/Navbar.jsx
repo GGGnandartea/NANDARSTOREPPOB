@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link, router } from '@inertiajs/react';
 import TopAnnouncementBar from '../../../Components/TopAnnouncementBar';
 
@@ -19,6 +19,7 @@ export default function Navbar({
     setShowTrackModal,
     onOpenPpob,
 }) {
+    const triggerButtonRef = useRef(null);
     const hasCategoryFilter = Boolean(filters?.category || filters?.tipe);
     const ppobStatus = store?.ppob_status;
     const isPpobOff = Boolean(ppobStatus?.is_cutoff);
@@ -169,25 +170,49 @@ export default function Navbar({
                         </button>
 
                         {auth?.user ? (
-                            <div className="relative" ref={profileMenuRef}>
+                            <div
+                                className="relative"
+                                ref={profileMenuRef}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Escape' && showProfileMenu) {
+                                        e.stopPropagation();
+                                        setShowProfileMenu(false);
+                                        triggerButtonRef.current?.focus();
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    if (showProfileMenu && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) {
+                                        setShowProfileMenu(false);
+                                    }
+                                }}
+                            >
                                 {auth.user.role === 'admin' ? (
                                     <button
+                                        ref={triggerButtonRef}
+                                        type="button"
+                                        aria-expanded={Boolean(showProfileMenu)}
+                                        aria-controls="navbar-admin-popup"
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                        className="!min-h-0 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 hover:border-orange-500 transition-colors focus:outline-none cursor-pointer shadow-sm"
+                                        className="!min-h-0 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-800 border border-slate-700 hover:border-orange-500 aria-expanded:border-orange-500 aria-expanded:ring-2 aria-expanded:ring-orange-500/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer shadow-sm"
                                         title="Mode Pantau Admin"
                                     >
-                                        <span className="text-xs">👑</span>
+                                        <span className="text-xs" aria-hidden="true">👑</span>
                                         <span className="text-xs font-black hidden sm:inline text-orange-400">Admin</span>
-                                        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg aria-hidden="true" className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
                                         </svg>
                                     </button>
                                 ) : (
                                     <button
+                                        ref={triggerButtonRef}
+                                        type="button"
+                                        aria-label="Menu Akun"
+                                        aria-expanded={Boolean(showProfileMenu)}
+                                        aria-controls="navbar-user-popup"
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                        className="!min-h-0 flex items-center justify-center p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none cursor-pointer"
+                                        className="!min-h-0 flex items-center justify-center p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 aria-expanded:bg-orange-50 aria-expanded:text-orange-600 dark:aria-expanded:bg-gray-800 dark:aria-expanded:text-orange-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer"
                                     >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg aria-hidden="true" className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
                                         </svg>
                                     </button>
@@ -196,11 +221,11 @@ export default function Navbar({
                                 {/* DROPDOWN MENU */}
                                 {showProfileMenu && (
                                     auth.user.role === 'admin' ? (
-                                        <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in-up">
+                                        <div id="navbar-admin-popup" className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in-up">
                                             {/* Info Admin */}
                                             <div className="px-5 py-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-b border-slate-700">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center font-bold text-lg shrink-0">
+                                                    <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center font-bold text-lg shrink-0" aria-hidden="true">
                                                         👑
                                                     </div>
                                                     <div className="flex-1 overflow-hidden">
@@ -222,7 +247,7 @@ export default function Navbar({
                                                     onClick={() => setShowProfileMenu(false)}
                                                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-orange-600 dark:text-orange-400 bg-orange-50/70 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                                                     </div>
                                                     <div className="flex-1">
@@ -231,13 +256,28 @@ export default function Navbar({
                                                     </div>
                                                 </a>
 
-                                                <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
+                                                <a
+                                                    href="/admin/open-api"
+                                                    onClick={() => setShowProfileMenu(false)}
+                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer group"
+                                                >
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="font-black text-sm">Open API Reseller</p>
+                                                        <p className="text-[11px] text-gray-500 dark:text-gray-300">Kelola konfigurasi Open API</p>
+                                                    </div>
+                                                </a>
+
+                                                <hr className="border-0 border-t border-gray-100 dark:border-gray-700 my-1 mx-2" />
 
                                                 <button
+                                                    type="button"
                                                     onClick={() => { setShowProfileMenu(false); router.post('/logout'); }}
                                                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                                     </div>
                                                     Keluar
@@ -245,11 +285,11 @@ export default function Navbar({
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in-up">
+                                        <div id="navbar-user-popup" className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in-up">
                                             {/* Info User */}
                                             <div className="px-5 py-4 bg-gradient-to-br from-orange-500 to-orange-600">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center font-bold text-lg shadow-inner backdrop-blur-sm border border-white/30 shrink-0">
+                                                    <div className="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center font-bold text-lg shadow-inner backdrop-blur-sm border border-white/30 shrink-0" aria-hidden="true">
                                                         {auth.user.name.charAt(0).toUpperCase()}
                                                     </div>
                                                     <div className="flex-1 overflow-hidden">
@@ -262,7 +302,7 @@ export default function Navbar({
                                             {/* Saldo Info */}
                                             <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-md bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
+                                                    <div className="w-6 h-6 rounded-md bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center" aria-hidden="true">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                                     </div>
                                                     <span className="text-xs font-bold text-gray-600 dark:text-gray-300">Saldo</span>
@@ -277,7 +317,7 @@ export default function Navbar({
                                                     onClick={() => setShowProfileMenu(false)}
                                                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                                     </div>
                                                     Profil Saya
@@ -288,7 +328,7 @@ export default function Navbar({
                                                     onClick={() => setShowProfileMenu(false)}
                                                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                                                     </div>
                                                     Riwayat Pembelian
@@ -299,19 +339,36 @@ export default function Navbar({
                                                     onClick={() => setShowProfileMenu(false)}
                                                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                                     </div>
                                                     Top Up &amp; Mutasi
                                                 </Link>
 
-                                                <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
+                                                <Link
+                                                    href="/profile?tab=open_api"
+                                                    onClick={() => setShowProfileMenu(false)}
+                                                    className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer group"
+                                                >
+                                                    <span className="flex items-center gap-3 min-w-0">
+                                                        <span className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                                                        </span>
+                                                        <span className="truncate">Open API</span>
+                                                    </span>
+                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700 shrink-0">
+                                                        {auth.user.role === 'reseller' ? 'H2H' : 'VIP'}
+                                                    </span>
+                                                </Link>
+
+                                                <hr className="border-0 border-t border-gray-100 dark:border-gray-700 my-1 mx-2" />
 
                                                 <button
+                                                    type="button"
                                                     onClick={() => { setShowProfileMenu(false); router.post('/logout'); }}
                                                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer group"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
+                                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors flex items-center justify-center shrink-0" aria-hidden="true">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                                                     </div>
                                                     Keluar

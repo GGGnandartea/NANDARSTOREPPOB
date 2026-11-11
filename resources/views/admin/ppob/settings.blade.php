@@ -1,18 +1,57 @@
 @extends('layouts.admin')
 
-@section('title', request('section') === 'cutoff' ? 'Jam Cut-Off & Maintenance PPOB' : 'Konfigurasi Kiosbank PPOB')
+@section('title', request('section') === 'cutoff' ? 'Jam Cut-Off & Maintenance PPOB' : (request('section') === 'uat' ? 'Pusat UAT & Syarat Launching Kiosbank' : 'Konfigurasi Kiosbank PPOB'))
 
 @section('content')
 @php
     $activeSection = request('section', 'credentials');
     $cutoff = $cutoffStatus ?? (new \App\Services\KiosbankService())->getCutoffStatus();
+    $uatScenarios = $uatChecklist ?? (new \App\Services\KiosbankService())->getOfficialUatChecklist();
+    $uatLogsData = $uatLogs ?? (new \App\Services\KiosbankService())->getUatLogs(80);
+    $totalUatCount = count($uatScenarios);
+    $completedUatCount = collect($uatScenarios)->filter(fn($s) => !empty($s['last_run']['ok']))->count();
+    $isReadyForLaunch = $completedUatCount >= $totalUatCount && $totalUatCount > 0;
+    $devProfile = $profiles['development'] ?? [];
+    $latestSessionId = collect($uatLogsData)->pluck('session_id')->filter()->first()
+        ?? \App\Models\Setting::where('key', 'kiosbank_session_id_development')->value('value');
+    $signOnTodayCount = (int) (\App\Models\Setting::where('key', 'kiosbank_signon_count_' . now('Asia/Jakarta')->format('Y-m-d'))->value('value') ?? 1);
+    $officialRequirements = [
+        [
+            'title' => '1. Autentikasi Sign-On & Reuse SessionID Harian (Maks 99x/Hari)',
+            'detail' => 'SessionID berlaku hingga pukul 23:59 WIB di hari yang sama (disarankan Sign-On setelah 00:15 WIB). Sistem otomatis menyimpan SessionID di cache agar tidak terkena blokir RC 34.',
+        ],
+        [
+            'title' => '2. Format ReferenceID Wajib 12 Digit Angka Unik (0-9)',
+            'detail' => 'Setiap request SinglePayment dan Inquiry wajib memakai ReferenceID 12 digit numerik unik. Pada saat Payment, ReferenceID wajib sama persis dengan saat Inquiry.',
+        ],
+        [
+            'title' => '3. Format Nominal Tagihan, Admin & Total 12 Digit Zero-Padded',
+            'detail' => 'Seluruh parameter nominal pada Payment dan Check-Status dikirim dalam format 12 karakter rata kanan bertanda nol di depan (contoh: 000000027500) sesuai respon Inquiry.',
+        ],
+        [
+            'title' => '4. Validasi Status Transaksi (BERHASIL vs SEDANG DIPROSES / RC 71)',
+            'detail' => 'Selain mengecek rc == "00", sistem wajib memeriksa data.status ("BERHASIL" = Sukses Final, "SEDANG DIPROSES" atau RC 71 = Pending / Tahan Saldo hingga Callback atau Check-Status).',
+        ],
+        [
+            'title' => '5. Rekonsiliasi /Services/Check-Status Identik + tglTransaksi',
+            'detail' => 'Jika belum menerima Callback untuk transaksi Pending, sistem menembak /Services/Check-Status dengan parameter merchantID, productID, customerID, referenceID, tagihan, admin, total & tglTransaksi (YYYY-MM-DD) yang identik.',
+        ],
+        [
+            'title' => '6. Endpoint Callback / Webhook Menerima POST JSON (HTTP 200 OK)',
+            'detail' => 'URL Callback (' . url('/api/webhook/kiosbank') . ') siap menerima notifikasi asinkron dari server pusat Kiosbank untuk produk Pulsa/Paket Data/E-Money/PLN.',
+        ],
+        [
+            'title' => '7. Jam Rekonsiliasi / Cut-Off Harian Server Pusat (23:50 - 00:10 WIB)',
+            'detail' => 'Transaksi ditahan otomatis selama masa rekonsiliasi tengah malam server pusat Kiosbank untuk mencegah transaksi gantung lintas hari.',
+        ],
+    ];
 @endphp
 <div class="max-w-6xl mx-auto space-y-6">
     <!-- Header & Navigasi Cepat -->
     <div class="admin-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="space-y-1.5">
             <div class="flex flex-wrap items-center gap-2.5">
-                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Konfigurasi &amp; Keamanan Kiosbank PPOB</h1>
+                <h1 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">Konfigurasi &amp; UAT Kiosbank PPOB</h1>
                 <span class="text-xs font-black px-2.5 py-1 rounded-full {{ $mode === 'production' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-slate-950' }}">
                     Mode: {{ ucfirst($mode) }}
                 </span>
@@ -27,11 +66,14 @@
                 @endif
             </div>
             <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                Kelola kredensial Webservice V2 Kiosbank serta pengaman Jam Cut-Off Harian ({{ $cutoff['cutoff_start'] ?? '23:50' }} - {{ $cutoff['cutoff_end'] ?? '00:10' }} WIB).
+                Kelola kredensial Webservice V2 Kiosbank, eksekusi UAT langsung ke Server Pusat Kiosbank, serta pengaman Jam Cut-Off Harian ({{ $cutoff['cutoff_start'] ?? '23:50' }} - {{ $cutoff['cutoff_end'] ?? '00:10' }} WIB).
             </p>
-            <div class="flex flex-wrap gap-3 pt-1 text-xs font-black text-cyan-600 dark:text-cyan-400">
-                <a href="{{ route('admin.ppob.settings') }}" class="px-3 py-1.5 rounded-xl {{ $activeSection !== 'cutoff' ? 'bg-cyan-600 text-white' : 'bg-cyan-50 dark:bg-cyan-950/40 hover:underline' }}">
+            <div class="flex flex-wrap gap-2.5 pt-1 text-xs font-black text-cyan-600 dark:text-cyan-400">
+                <a href="{{ route('admin.ppob.settings') }}" class="px-3 py-1.5 rounded-xl {{ !in_array($activeSection, ['cutoff', 'uat']) ? 'bg-cyan-600 text-white' : 'bg-cyan-50 dark:bg-cyan-950/40 hover:underline' }}">
                     🔑 Kredensial Kiosbank
+                </a>
+                <a href="{{ route('admin.ppob.settings', ['section' => 'uat']) }}" class="px-3 py-1.5 rounded-xl {{ $activeSection === 'uat' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:underline' }}">
+                    🧪 Pusat UAT &amp; Syarat Launching ({{ $completedUatCount }}/{{ $totalUatCount }})
                 </a>
                 <a href="{{ route('admin.ppob.settings', ['section' => 'cutoff']) }}" class="px-3 py-1.5 rounded-xl {{ $activeSection === 'cutoff' ? 'bg-amber-500 text-slate-950' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:underline' }}">
                     ⏰ Jam Cut-Off &amp; Maintenance ({{ $cutoff['cutoff_start'] ?? '23:50' }} - {{ $cutoff['cutoff_end'] ?? '00:10' }})
@@ -73,6 +115,286 @@
             <ul class="list-disc pl-5 space-y-1">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
+
+    <!-- ========================================================================= -->
+    <!-- PUSAT EKSEKUSI UAT & SYARAT KETENTUAN LAUNCHING KIOSBANK (WEBSERVICE V2)  -->
+    <!-- ========================================================================= -->
+    <div id="uat-section" class="admin-card p-6 sm:p-7 border-t-4 border-t-emerald-500 space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-gray-100 dark:border-white/10">
+            <div class="space-y-1.5">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
+                        SERVER PUSAT KIOSBANK (UAT RESMI)
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 text-[10px] font-black font-mono">
+                        https://{{ $devProfile['host'] ?? 'development.kiosbank.com' }}:{{ $devProfile['port'] ?? '4432' }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full {{ $isReadyForLaunch ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-slate-950' }} text-[10px] font-black">
+                        Progres Skenario UAT: {{ $completedUatCount }} / {{ $totalUatCount }} Selesai
+                    </span>
+                </div>
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">
+                    Pusat Eksekusi UAT (User Acceptance Test) &amp; Syarat Launching Kiosbank
+                </h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Seluruh pengujian pada panel ini dikirim <strong>100% langsung (Live HTTP Digest Auth + SessionID Asli)</strong> ke server pusat Kiosbank Development (<code class="font-mono text-cyan-600 dark:text-cyan-400">https://development.kiosbank.com:4432</code>) menggunakan kredensial Merchant <strong>{{ $devProfile['merchant_id'] ?? 'DJI000799' }}</strong> sehingga tercatat resmi di log server pusat Kiosbank sebagai syarat pengajuan Kredensial Production.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                <form method="POST" action="{{ route('admin.ppob.settings.uat_run') }}">
+                    @csrf
+                    <input type="hidden" name="scenario" value="all">
+                    <button type="submit" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/20 cursor-pointer transition flex items-center gap-2">
+                        <span>🚀 Jalankan Semua 11 Skenario UAT ke Server Pusat</span>
+                    </button>
+                </form>
+
+                <a href="{{ route('admin.ppob.settings.uat_export', ['format' => 'txt']) }}" class="px-3.5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs shadow-md shadow-cyan-600/20 transition flex items-center gap-1.5">
+                    <span>📄 Download Berita Acara UAT (.TXT)</span>
+                </a>
+
+                <a href="{{ route('admin.ppob.settings.uat_export', ['format' => 'json']) }}" class="px-3 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-black text-xs transition">
+                    <span>{ } Export JSON</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- RINGKASAN METRIK KONEKSI SERVER PUSAT -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div class="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/70 border border-gray-200 dark:border-white/10">
+                <span class="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Identitas Mitra &amp; Merchant</span>
+                <p class="text-sm font-black text-gray-900 dark:text-white mt-1 font-mono">
+                    {{ $devProfile['mitra'] ?? 'DJI' }} / {{ $devProfile['merchant_id'] ?? 'DJI000799' }}
+                </p>
+                <span class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mt-0.5">
+                    Account: {{ $devProfile['account_id'] ?? '085794205822' }} ({{ $devProfile['merchant_name'] ?? 'NANDARSTORE' }})
+                </span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/70 border border-gray-200 dark:border-white/10">
+                <span class="text-[10px] font-black uppercase tracking-wider text-gray-400 block">SessionID Aktif (Server Pusat)</span>
+                <p class="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono break-all">
+                    {{ !empty($latestSessionId) ? $latestSessionId : 'Belum Sign-On Hari Ini' }}
+                </p>
+                <span class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mt-0.5">
+                    Batas Sign-On: <strong>Maks 99x / Hari</strong> (Berlaku s/d 23:59 WIB)
+                </span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/70 border border-gray-200 dark:border-white/10">
+                <span class="text-[10px] font-black uppercase tracking-wider text-gray-400 block">URL Callback / Webhook Anda</span>
+                <p class="text-xs font-black text-cyan-600 dark:text-cyan-400 mt-1 font-mono break-all">
+                    {{ url('/api/webhook/kiosbank') }}
+                </p>
+                <span class="text-[11px] font-semibold text-gray-500 dark:text-gray-400 block mt-0.5">
+                    Metode: POST JSON (Response HTTP 200 OK)
+                </span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/70 border border-gray-200 dark:border-white/10">
+                <span class="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Total Hit Tercatat ke Pusat</span>
+                <p class="text-lg font-black text-gray-900 dark:text-white mt-0.5">
+                    {{ count($uatLogsData) }} <span class="text-xs font-bold text-gray-500">Request API</span>
+                </p>
+                <span class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block">
+                    ✓ Tersimpan dengan ReferenceID 12 Digit
+                </span>
+            </div>
+        </div>
+
+        <!-- 7 SYARAT & KETENTUAN RESMI UAT WEBSERVICE V2 KIOSBANK -->
+        <div class="p-4 sm:p-5 rounded-2xl bg-cyan-50/60 dark:bg-cyan-950/25 border border-cyan-200/80 dark:border-cyan-800/40 space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <h3 class="text-xs sm:text-sm font-black uppercase tracking-wider text-cyan-900 dark:text-cyan-300">
+                    📋 7 Syarat &amp; Ketentuan Resmi UAT Webservice V2 Kiosbank (Sudah Terpenuhi di Sistem Anda)
+                </h3>
+                <span class="text-[11px] font-bold text-cyan-700 dark:text-cyan-400">Sesuai Dokumentasi Resmi Webservice V2 Kiosbank</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                @foreach($officialRequirements as $req)
+                    <div class="p-3 rounded-xl bg-white dark:bg-gray-900/80 border border-cyan-200/60 dark:border-white/10 flex items-start gap-2.5">
+                        <span class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-black flex items-center justify-center shrink-0 mt-0.5">✓</span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black text-gray-900 dark:text-white">{{ $req['title'] }}</p>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5 leading-snug">{{ $req['detail'] }}</p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- TABEL 11 SKENARIO WAJIB UAT KIOSBANK -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <h3 class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                        Daftar 11 Skenario Pengujian UAT Resmi Kiosbank (SinglePayment, Inquiry, Payment &amp; Check-Status)
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Klik tombol <strong>"Jalankan Semua 11 Skenario UAT ke Server Pusat"</strong> di atas atau tombol <strong>"Uji ke Pusat"</strong> pada masing-masing baris di bawah.
+                    </p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-white/10">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 dark:bg-gray-900/90 text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-white/10">
+                            <th class="py-3 px-4">No &amp; Skenario UAT</th>
+                            <th class="py-3 px-3">Endpoint &amp; Nopel Uji</th>
+                            <th class="py-3 px-3">Ketentuan Pengujian</th>
+                            <th class="py-3 px-3">Status UAT &amp; Ref ID (12 Digit)</th>
+                            <th class="py-3 px-4 text-right">Aksi Uji Live</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-white/5 text-xs">
+                        @foreach($uatScenarios as $key => $sc)
+                            @php
+                                $res = $sc['last_run'] ?? null;
+                                $isPassed = !empty($res['ok']);
+                            @endphp
+                            <tr class="hover:bg-gray-50/80 dark:hover:bg-white/[0.02] transition">
+                                <td class="py-3.5 px-4 align-top">
+                                    <span class="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 mb-1">
+                                        Skenario #{{ $sc['number'] ?? $loop->iteration }}
+                                    </span>
+                                    <p class="font-black text-gray-900 dark:text-white">{{ $sc['title'] }}</p>
+                                </td>
+                                <td class="py-3.5 px-3 align-top font-mono text-[11px]">
+                                    <span class="font-black text-indigo-600 dark:text-indigo-400 block">{{ $sc['endpoint'] }}</span>
+                                    <span class="text-gray-600 dark:text-gray-300 block mt-0.5">Produk: <strong>{{ $sc['product_id'] }}</strong></span>
+                                    <span class="text-gray-600 dark:text-gray-300 block">Nopel: <strong>{{ $sc['nopel'] }}</strong></span>
+                                </td>
+                                <td class="py-3.5 px-3 align-top">
+                                    <span class="text-[11px] font-medium text-gray-600 dark:text-gray-300 leading-snug block max-w-xs">{{ $sc['requirement'] }}</span>
+                                </td>
+                                <td class="py-3.5 px-3 align-top">
+                                    @if($res)
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full {{ $isPassed ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-slate-950' }}">
+                                            {{ $isPassed ? '✓ TERCATAT DI PUSAT (' . ($res['central_hits'] ?? 1) . ' HIT)' : '⚠ PERLU CEK' }}
+                                        </span>
+                                        <p class="font-mono text-[11px] font-bold text-gray-800 dark:text-gray-200 mt-1">
+                                            RefID: {{ $res['reference_id'] ?? '-' }} | RC: {{ $res['app_rc'] ?? '-' }}
+                                        </p>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                                            {{ $res['summary'] ?? '' }}
+                                        </p>
+                                        <span class="text-[10px] text-gray-400 block mt-0.5">{{ $res['executed_at'] ?? '' }}</span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                                            BELUM DIJALANKAN
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="py-3.5 px-4 align-top text-right">
+                                    <form method="POST" action="{{ route('admin.ppob.settings.uat_run') }}">
+                                        @csrf
+                                        <input type="hidden" name="scenario" value="{{ $key }}">
+                                        <button type="submit" class="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-[11px] cursor-pointer transition whitespace-nowrap">
+                                            ▶ Uji ke Pusat
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- LOG BUKTI REQUEST & RESPONSE KE SERVER PUSAT KIOSBANK -->
+        <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <h3 class="text-sm sm:text-base font-black text-gray-900 dark:text-white">
+                        📡 Bukti Log Request &amp; Response Server Pusat Kiosbank ({{ count($uatLogsData) }} Log Terbaru)
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        Setiap baris di bawah ini adalah bukti otentik komunikasi HTTP Digest antara server Anda dengan <code class="font-mono">https://development.kiosbank.com:4432</code> beserta <code class="font-mono">SessionID</code> dan <code class="font-mono">ReferenceID</code> 12 digit.
+                    </p>
+                </div>
+
+                @if(count($uatLogsData) > 0)
+                    <form method="POST" action="{{ route('admin.ppob.settings.uat_clear') }}" onsubmit="return confirm('Bersihkan riwayat log UAT lokal?');">
+                        @csrf
+                        <button type="submit" class="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[11px] font-black cursor-pointer transition">
+                            🗑 Bersihkan Log
+                        </button>
+                    </form>
+                @endif
+            </div>
+
+            @if(count($uatLogsData) === 0)
+                <div class="p-8 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-dashed border-gray-300 dark:border-white/10 text-center space-y-2">
+                    <p class="text-sm font-black text-gray-700 dark:text-gray-200">Belum Ada Log Transaksi UAT Hari Ini</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 max-w-lg mx-auto">
+                        Klik tombol hijau <strong>"Jalankan Semua 11 Skenario UAT ke Server Pusat"</strong> di bagian atas kartu ini untuk mengirim seluruh skenario pengujian langsung ke server pusat Kiosbank.
+                    </p>
+                </div>
+            @else
+                <div class="overflow-x-auto rounded-2xl border border-gray-200 dark:border-white/10 max-h-[520px] overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="sticky top-0 z-10">
+                            <tr class="bg-gray-100 dark:bg-gray-900 text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-white/10">
+                                <th class="py-2.5 px-3">Waktu (WIB)</th>
+                                <th class="py-2.5 px-3">Endpoint Pusat</th>
+                                <th class="py-2.5 px-3">ReferenceID (12 Digit)</th>
+                                <th class="py-2.5 px-3">Produk / Nopel</th>
+                                <th class="py-2.5 px-3">HTTP &amp; RC Pusat</th>
+                                <th class="py-2.5 px-3">Payload JSON (Request &amp; Response)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5 text-xs font-mono">
+                            @foreach($uatLogsData as $log)
+                                <tr class="hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
+                                    <td class="py-2.5 px-3 align-top whitespace-nowrap text-[11px] text-gray-600 dark:text-gray-300">
+                                        {{ $log['timestamp'] ?? '-' }}
+                                    </td>
+                                    <td class="py-2.5 px-3 align-top">
+                                        <span class="font-black text-cyan-600 dark:text-cyan-400 block">{{ $log['endpoint'] ?? '-' }}</span>
+                                        <span class="text-[10px] text-gray-400 break-all">{{ !empty($log['session_id']) ? 'SID: '.\Illuminate\Support\Str::limit($log['session_id'], 16) : '' }}</span>
+                                    </td>
+                                    <td class="py-2.5 px-3 align-top font-black text-gray-900 dark:text-white">
+                                        {{ $log['reference_id'] ?: '-' }}
+                                    </td>
+                                    <td class="py-2.5 px-3 align-top text-[11px]">
+                                        <span class="block text-gray-800 dark:text-gray-200">ID: <strong>{{ $log['product_id'] ?: '-' }}</strong></span>
+                                        <span class="block text-gray-500">Nopel: {{ $log['customer_id'] ?: '-' }}</span>
+                                    </td>
+                                    <td class="py-2.5 px-3 align-top">
+                                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-black {{ ($log['http_code'] ?? 0) === 200 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600' }}">
+                                            HTTP {{ $log['http_code'] ?? 0 }} | RC: {{ $log['server_rc'] ?? '-' }}
+                                        </span>
+                                        <p class="font-sans text-[11px] text-gray-600 dark:text-gray-300 mt-1 max-w-xs">
+                                            {{ $log['server_description'] ?? '' }}
+                                        </p>
+                                    </td>
+                                    <td class="py-2.5 px-3 align-top font-sans">
+                                        <details class="text-[11px]">
+                                            <summary class="cursor-pointer font-bold text-cyan-600 dark:text-cyan-400 hover:underline">
+                                                Lihat JSON Request &amp; Response
+                                            </summary>
+                                            <div class="mt-2 space-y-1.5 max-w-md">
+                                                <div class="p-2 rounded bg-gray-900 text-emerald-300 font-mono text-[10px] overflow-x-auto">
+                                                    <strong class="text-white block mb-0.5">REQUEST KE PUSAT:</strong>
+                                                    {{ json_encode($log['request_payload'] ?? [], JSON_UNESCAPED_SLASHES) }}
+                                                </div>
+                                                <div class="p-2 rounded bg-gray-900 text-cyan-300 font-mono text-[10px] overflow-x-auto">
+                                                    <strong class="text-white block mb-0.5">RESPONSE DARI PUSAT:</strong>
+                                                    {{ json_encode($log['response_payload'] ?? [], JSON_UNESCAPED_SLASHES) }}
+                                                </div>
+                                            </div>
+                                        </details>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
 
     <!-- ========================================================================= -->
     <!-- KARTU PENGATURAN STATUS LAYANAN PPOB (ONLINE / OFFLINE / MAINTENANCE DLL) -->

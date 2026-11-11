@@ -58,7 +58,168 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   const [cooldown, setCooldown] = useState(0);
   const [isCheckingManual, setIsCheckingManual] = useState(false);
   const [qrisTimeLeft, setQrisTimeLeft] = useState(1200); // 20 menit (1200 detik)
+  const [orderToken, setOrderToken] = useState('');
   const [isDark, setIsDark] = useState(false);
+
+  const CHECKOUT_ACTIVE_ORDER_KEY = `checkout_active_order_${product.id}`;
+
+  const extractTokenFromUrl = (urlStr) => {
+    if (!urlStr || typeof window === 'undefined') return '';
+    try {
+      const u = new URL(urlStr, window.location.origin);
+      return u.searchParams.get('token') || '';
+    } catch {
+      return '';
+    }
+  };
+
+  const buildCheckoutStatusUrl = (oid, token = '', manual = false) => {
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (manual) params.set('manual', '1');
+    const qs = params.toString();
+    return `/checkout/status/${encodeURIComponent(oid)}${qs ? `?${qs}` : ''}`;
+  };
+
+  const syncCheckoutOrderUrlAndStorage = (orderPayload) => {
+    if (typeof window === 'undefined') return;
+    const oid = orderPayload?.order_id;
+    if (!oid) return;
+    const token = orderPayload?.token || extractTokenFromUrl(orderPayload?.invoice_url) || orderToken;
+    if (token) setOrderToken(token);
+    const stored = {
+      ...orderPayload,
+      order_id: oid,
+      product_id: product.id,
+      token,
+      saved_at: Date.now(),
+    };
+    try {
+      localStorage.setItem(CHECKOUT_ACTIVE_ORDER_KEY, JSON.stringify(stored));
+    } catch {}
+    if (window.history) {
+      const url = new URL(window.location);
+      url.searchParams.set('order', oid);
+      if (token) url.searchParams.set('token', token);
+      window.history.replaceState({}, '', url);
+    }
+  };
+
+  const clearCheckoutOrderUrlAndStorage = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(CHECKOUT_ACTIVE_ORDER_KEY);
+    } catch {}
+    if (window.history) {
+      const url = new URL(window.location);
+      url.searchParams.delete('order');
+      url.searchParams.delete('invoice');
+      url.searchParams.delete('token');
+      window.history.replaceState({}, '', url);
+    }
+  };
+
+  // Pulihkan sesi pembayaran / cek status di latar belakang jika halaman di-refresh (F5) atau dibuka via ?order=
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlOrderId = (params.get('order') || params.get('invoice') || '').trim();
+    const urlToken = (params.get('token') || '').trim();
+
+    let savedOrder = null;
+    try {
+      const raw = localStorage.getItem(CHECKOUT_ACTIVE_ORDER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - (Number(parsed?.saved_at) || 0);
+        if (parsed && parsed.order_id && ageMs < 25 * 60 * 1000) {
+          savedOrder = parsed;
+        } else {
+          localStorage.removeItem(CHECKOUT_ACTIVE_ORDER_KEY);
+        }
+      }
+    } catch {}
+
+    const targetOrderId = urlOrderId || savedOrder?.order_id || '';
+    if (!targetOrderId) return;
+
+    const targetToken =
+      urlToken ||
+      (savedOrder && savedOrder.order_id === targetOrderId
+        ? savedOrder.token || extractTokenFromUrl(savedOrder.invoice_url)
+        : '');
+    if (targetToken) setOrderToken(targetToken);
+
+    if (savedOrder && savedOrder.order_id === targetOrderId) {
+      setOrderId(targetOrderId);
+      if (savedOrder.total_nominal || savedOrder.total_amount) {
+        setTotalNominal(savedOrder.total_nominal || savedOrder.total_amount);
+      }
+      if (savedOrder.url_qris) setQrisUrl(savedOrder.url_qris);
+      if (savedOrder.invoice_url) setInvoiceUrl(savedOrder.invoice_url);
+      setTrackingData(savedOrder);
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(buildCheckoutStatusUrl(targetOrderId, targetToken));
+        if (!res.ok) {
+          if (res.status === 404) clearCheckoutOrderUrlAndStorage();
+          return;
+        }
+        const data = await res.json();
+        if (cancelled || data.status === 'NOT_FOUND') {
+          if (data.status === 'NOT_FOUND') clearCheckoutOrderUrlAndStorage();
+          return;
+        }
+
+        const resolvedToken = targetToken || extractTokenFromUrl(data.invoice_url);
+        if (resolvedToken) setOrderToken(resolvedToken);
+
+        const merged = {
+          ...(savedOrder || {}),
+          ...data,
+          order_id: data.order_id || targetOrderId,
+          url_qris: data.url_qris || savedOrder?.url_qris || null,
+          total_nominal: data.total_nominal || data.total_amount || savedOrder?.total_nominal || 0,
+          token: resolvedToken,
+        };
+
+        setTrackingData(merged);
+        setOrderId(merged.order_id);
+        setTotalNominal(merged.total_nominal);
+        if (merged.url_qris) setQrisUrl(merged.url_qris);
+        if (merged.invoice_url) setInvoiceUrl(merged.invoice_url);
+
+        const payLower = String(data.payment_status || '').toLowerCase();
+        const stUpper = String(data.status || '').toUpperCase();
+
+        if (
+          stUpper === 'SUCCESS' ||
+          stUpper === 'LUNAS' ||
+          stUpper === 'PAID' ||
+          stUpper === 'COMPLETED' ||
+          ['paid', 'success', 'settlement', 'lunas'].includes(payLower)
+        ) {
+          setOrderStatus('SUCCESS');
+          setCompletedOrder(merged);
+          syncCheckoutOrderUrlAndStorage(merged);
+        } else if (['pending', 'unpaid'].includes(payLower) && Number(data.remaining_seconds ?? 1200) > 0) {
+          setQrisTimeLeft(Number(data.remaining_seconds || 1200));
+          setOrderStatus('WAITING_PAYMENT');
+          syncCheckoutOrderUrlAndStorage(merged);
+        } else if (['expired', 'failed', 'canceled', 'cancelled'].includes(payLower) || stUpper === 'EXPIRED') {
+          setOrderId(null);
+          clearCheckoutOrderUrlAndStorage();
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const theme = localStorage.getItem('theme');
@@ -133,7 +294,6 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   // QRIS 20-minute countdown (1200 detik)
   useEffect(() => {
     if (!orderId || orderStatus !== 'WAITING_PAYMENT') return;
-    setQrisTimeLeft(1200);
     const timer = setInterval(() => {
       setQrisTimeLeft((prev) => {
         if (prev <= 1) {
@@ -159,9 +319,13 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
     setIsCheckingManual(true);
     if (!isSilent) setCooldown(100);
     try {
-      const res = await fetch(`/checkout/status/${activeOrderId}?manual=1`);
+      const tokenToUse = orderToken || extractTokenFromUrl(invoiceUrl);
+      const res = await fetch(buildCheckoutStatusUrl(activeOrderId, tokenToUse, true));
       const data = await res.json();
       if (res.ok && data.order_id) setTrackingData(data);
+      if (typeof data.remaining_seconds === 'number' && data.remaining_seconds >= 0 && ['pending', 'unpaid'].includes(String(data.payment_status || '').toLowerCase())) {
+        setQrisTimeLeft(data.remaining_seconds);
+      }
       if (
         data.status === 'SUCCESS' ||
         data.status === 'LUNAS' ||
@@ -170,7 +334,11 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         data.payment_status === 'paid'
       ) {
         setOrderStatus('SUCCESS');
-        setCompletedOrder((prev) => ({ ...(prev || {}), ...data }));
+        setCompletedOrder((prev) => {
+          const updated = { ...(prev || {}), ...data };
+          syncCheckoutOrderUrlAndStorage(updated);
+          return updated;
+        });
         if (balanceSuccess && data.sn_or_account) {
           setBalanceSuccess((prev) => ({ ...(prev || {}), sn_or_account: data.sn_or_account }));
         }
@@ -225,11 +393,15 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
   useEffect(() => {
     let interval;
     if (orderId && orderStatus === 'WAITING_PAYMENT') {
+      const tokenToUse = orderToken || extractTokenFromUrl(invoiceUrl);
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`/checkout/status/${orderId}`);
+          const res = await fetch(buildCheckoutStatusUrl(orderId, tokenToUse, false));
           const data = await res.json();
           if (res.ok && data.order_id) setTrackingData(data);
+          if (typeof data.remaining_seconds === 'number' && data.remaining_seconds >= 0 && ['pending', 'unpaid'].includes(String(data.payment_status || '').toLowerCase())) {
+            setQrisTimeLeft(data.remaining_seconds);
+          }
           if (
             data.status === 'SUCCESS' ||
             data.status === 'LUNAS' ||
@@ -239,13 +411,14 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
           ) {
             setOrderStatus('SUCCESS');
             setCompletedOrder(data);
+            syncCheckoutOrderUrlAndStorage(data);
             clearInterval(interval);
           }
         } catch {}
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [orderId, orderStatus]);
+  }, [orderId, orderStatus, orderToken, invoiceUrl]);
 
   // Polling lanjutan untuk API Orders jika akun belum selesai / masih generating
   useEffect(() => {
@@ -255,11 +428,11 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
 
     if (currentOrderId && (orderStatus === 'SUCCESS' || balanceSuccess) && isAccountPending(currentSn)) {
       let pollCount = 0;
+      const tokenToUse = orderToken || extractTokenFromUrl(invoiceUrl);
       apiInterval = setInterval(async () => {
         pollCount++;
         try {
-          const queryParam = pollCount >= 2 ? '?manual=1' : '';
-          const res = await fetch(`/checkout/status/${currentOrderId}${queryParam}`);
+          const res = await fetch(buildCheckoutStatusUrl(currentOrderId, tokenToUse, pollCount >= 2));
           const data = await res.json();
           if (res.ok && data.order_id) setTrackingData(data);
           if (data && data.sn_or_account && !isAccountPending(data.sn_or_account)) {
@@ -411,6 +584,9 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         setTotalNominal(data.total_nominal);
         setQrisUrl(data.url_qris);
         setInvoiceUrl(data.invoice_url);
+        setQrisTimeLeft(Number(data.remaining_seconds || 1200));
+        setOrderStatus('WAITING_PAYMENT');
+        syncCheckoutOrderUrlAndStorage({ ...data, product_name: product.name });
         if (!user) rememberGuestOrder({ ...data, product_name: product.name });
       } else {
         Swal.fire('Mohon Maaf', data.message || 'Gagal memproses pembayaran.', 'error');
@@ -484,6 +660,14 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
         });
         if (data.wa_sent) setWaSentSuccess(true);
         setOrderStatus('SUCCESS');
+        syncCheckoutOrderUrlAndStorage({
+          ...data,
+          order_id: data.order_id,
+          product_name: data.product_name || product.name,
+          total_amount: data.total_nominal || finalPrice,
+          payment_status: 'paid',
+          status: 'LUNAS',
+        });
       } else {
         Swal.fire('Gagal', data.message || 'Gagal memproses pembayaran dengan saldo.', 'error');
       }
@@ -506,7 +690,10 @@ export default function CheckoutIndex({ product, paymentChannels, initialQty = 1
       reverseButtons: true,
       customClass: { popup: 'rounded-[2rem]' },
     }).then((r) => {
-      if (r.isConfirmed) window.location.href = '/';
+      if (r.isConfirmed) {
+        clearCheckoutOrderUrlAndStorage();
+        window.location.href = '/';
+      }
     });
   };
 

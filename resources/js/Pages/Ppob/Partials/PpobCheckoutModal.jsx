@@ -6,13 +6,22 @@ export default function PpobCheckoutModal({
   onClose,
   selectedProduct,
   currentTargetNumber,
+  targetCheckResult = null,
+  isCheckingTarget = false,
   paymentMethod,
   setPaymentMethod,
   userBalance,
   isSubmitting,
   onConfirmPayment,
+  cutoff = null,
 }) {
   if (!isOpen || !selectedProduct) return null;
+  const isProductBlocked =
+    Boolean(cutoff?.is_cutoff) ||
+    selectedProduct.can_purchase === false ||
+    selectedProduct.status === 'maintenance' ||
+    selectedProduct.status === 'cutoff' ||
+    selectedProduct.status === 'inactive';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -50,6 +59,32 @@ export default function PpobCheckoutModal({
               {currentTargetNumber}
             </span>
           </div>
+          {(isCheckingTarget || targetCheckResult) && (
+            <div className="flex justify-between items-start gap-2 pt-1">
+              <span className="text-gray-400 shrink-0 font-medium">Keterangan Akun:</span>
+              {isCheckingTarget ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  <span className="w-3 h-3 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></span>
+                  Memverifikasi ID tujuan...
+                </span>
+              ) : targetCheckResult?.status === 'success' ? (
+                <div className="text-right">
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 block">
+                    {targetCheckResult.customer_name}
+                  </span>
+                  {targetCheckResult.tarif_daya && (
+                    <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400 block">
+                      Tarif/Daya: {targetCheckResult.tarif_daya}
+                    </span>
+                  )}
+                </div>
+              ) : targetCheckResult?.status === 'error' ? (
+                <span className="font-bold text-rose-500 text-right text-[11px]">
+                  {targetCheckResult.message}
+                </span>
+              ) : null}
+            </div>
+          )}
           <div className="flex justify-between items-center pt-2.5 border-t border-gray-200 dark:border-white/5">
             <span className="font-black text-gray-900 dark:text-white text-xs uppercase tracking-wider">Total Tagihan:</span>
             <span className="font-black font-mono text-lg text-emerald-600 dark:text-emerald-400">
@@ -157,9 +192,11 @@ export default function PpobCheckoutModal({
         <div className="pt-2 space-y-2.5">
           <button
             type="button"
-            onClick={onConfirmPayment}
-            disabled={isSubmitting || (paymentMethod === 'balance' && userBalance < selectedProduct.price)}
-            className="w-full py-4 px-5 rounded-2xl font-black text-sm sm:text-base bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/95 dark:hover:bg-emerald-500 border border-emerald-500/40 shadow-lg shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-between cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              if (!isProductBlocked) onConfirmPayment();
+            }}
+            disabled={isSubmitting || isProductBlocked || (paymentMethod === 'balance' && userBalance < selectedProduct.price)}
+            className="w-full py-4 px-5 rounded-2xl font-black text-sm sm:text-base bg-emerald-600 hover:bg-emerald-500 text-white dark:bg-emerald-600/95 dark:hover:bg-emerald-500 border border-emerald-500/40 shadow-lg shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-between cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
           >
             <div className="flex items-center gap-3">
               {isSubmitting ? (
@@ -175,6 +212,8 @@ export default function PpobCheckoutModal({
                 <p className="leading-tight text-xs sm:text-sm font-black tracking-tight">
                   {isSubmitting
                     ? 'Memproses Transaksi...'
+                    : isProductBlocked
+                    ? 'Layanan Sedang Gangguan / Tutup'
                     : paymentMethod === 'balance'
                     ? 'Bayar Sekarang via Saldo'
                     : 'Lanjut Pembayaran via QRIS'}

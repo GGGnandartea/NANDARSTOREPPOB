@@ -71,6 +71,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/wa-verify/request', [FrontController::class, 'requestWaVerification'])->name('profile.wa_verify.request')->middleware('throttle:profile_security');
     Route::post('/profile/wa-verify/confirm', [FrontController::class, 'confirmWaVerification'])->name('profile.wa_verify.confirm')->middleware('throttle:profile_security');
     Route::get('/profile/wa-verify/status', [FrontController::class, 'checkWaVerificationStatus'])->name('profile.wa_verify.status');
+
+    // Konfigurasi Open API Khusus VIP Reseller di Menu Profil User
+    Route::post('/profile/open-api/generate', [\App\Http\Controllers\ResellerApiSettingsController::class, 'generateCredentials'])->name('profile.open_api.generate')->middleware('throttle:profile_security');
+    Route::post('/profile/open-api/rotate', [\App\Http\Controllers\ResellerApiSettingsController::class, 'rotateCredentials'])->name('profile.open_api.rotate')->middleware('throttle:profile_security');
+    Route::post('/profile/open-api/config', [\App\Http\Controllers\ResellerApiSettingsController::class, 'saveUserConfig'])->name('profile.open_api.config')->middleware('throttle:profile_security');
+    Route::post('/profile/open-api/toggle', [\App\Http\Controllers\ResellerApiSettingsController::class, 'toggleUserApi'])->name('profile.open_api.toggle')->middleware('throttle:profile_security');
+    Route::post('/profile/open-api/test-webhook', [\App\Http\Controllers\ResellerApiSettingsController::class, 'testUserWebhook'])->name('profile.open_api.test_webhook')->middleware('throttle:profile_security');
 });
 
 // Area Admin Panel
@@ -120,6 +127,9 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::get('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'edit'])->name('ppob.settings');
     Route::post('/ppob/settings', [\App\Http\Controllers\KiosbankSettingsController::class, 'update'])->name('ppob.settings.update');
     Route::post('/ppob/settings/cutoff', [\App\Http\Controllers\KiosbankSettingsController::class, 'updateCutoff'])->name('ppob.settings.cutoff');
+    Route::post('/ppob/settings/uat-run', [\App\Http\Controllers\KiosbankSettingsController::class, 'runUat'])->name('ppob.settings.uat_run');
+    Route::post('/ppob/settings/uat-clear', [\App\Http\Controllers\KiosbankSettingsController::class, 'clearUatLogs'])->name('ppob.settings.uat_clear');
+    Route::get('/ppob/settings/uat-export', [\App\Http\Controllers\KiosbankSettingsController::class, 'exportUatReport'])->name('ppob.settings.uat_export');
     Route::get('/ppob/products', [AdminController::class, 'ppobProducts'])->name('ppob.products');
     Route::post('/ppob/products/bulk-margin', [AdminController::class, 'bulkUpdatePpobMargin'])->name('ppob.products.bulk_margin');
     Route::post('/ppob/products/{id}/update', [AdminController::class, 'updatePpobProduct'])->name('ppob.products.update');
@@ -188,6 +198,16 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureUserIsAdmin::class])->pref
     Route::post('/telegram-api/save', [AdminController::class, 'saveTelegramApiSettings'])->name('telegram.save');
     Route::post('/telegram-api/toggle', [AdminController::class, 'toggleTelegramApiStatus'])->name('telegram.toggle');
     Route::post('/telegram-api/test-endpoint', [AdminController::class, 'testTelegramApiEndpoint'])->name('telegram.test');
+
+    // --- RUTE KONFIGURASI OPEN API RESELLER (ADMIN) ---
+    Route::get('/open-api', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminIndex'])->name('open_api.index');
+    Route::post('/open-api/save', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminSaveConfig'])->name('open_api.save');
+    Route::post('/open-api/toggle', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminToggleMaster'])->name('open_api.toggle');
+    Route::post('/open-api/clients/{userId}/suspend', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminSuspendClient'])->whereNumber('userId')->name('open_api.clients.suspend');
+    Route::post('/open-api/clients/{userId}/rate-limit', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminUpdateClientRateLimit'])->whereNumber('userId')->name('open_api.clients.rate_limit');
+    Route::post('/open-api/clients/{userId}/clear-ip', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminClearClientIpWhitelist'])->whereNumber('userId')->name('open_api.clients.clear_ip');
+    Route::post('/open-api/clients/{userId}/revoke', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminRevokeClient'])->whereNumber('userId')->name('open_api.clients.revoke');
+    Route::post('/open-api/logs/clear', [\App\Http\Controllers\ResellerApiSettingsController::class, 'adminClearLogs'])->name('open_api.logs.clear');
 });
 
 // Route API untuk Frontend (Cek Voucher)

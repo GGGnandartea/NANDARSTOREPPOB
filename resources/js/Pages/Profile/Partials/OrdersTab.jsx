@@ -207,7 +207,7 @@ export default function OrdersTab({
           if (showToast) {
             const st = String(data.order_status || '').toLowerCase();
             const toastType = ['failed', 'refunded'].includes(st) ? 'error' : 'success';
-            showToast(toastType, data.message || 'Status transaksi telah diperiksa ke server Kiosbank.');
+            showToast(toastType, data.message || 'Status transaksi telah diperiksa ke server PremiumKita.');
           }
         },
       });
@@ -903,7 +903,7 @@ export default function OrdersTab({
                             onClick={() => handleRecheckSingleOrder(o.invoice_number || o.id)}
                             disabled={isOrderRechecking || recheckCooldown > 0}
                             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black shadow-sm transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            title="Cek status terbaru transaksi ini ke endpoint /Services/Check-Status Kiosbank"
+                            title="Cek status terbaru transaksi ini ke server pusat PremiumKita"
                           >
                             <svg
                               className={`w-3.5 h-3.5 ${isOrderRechecking ? 'animate-spin' : ''}`}

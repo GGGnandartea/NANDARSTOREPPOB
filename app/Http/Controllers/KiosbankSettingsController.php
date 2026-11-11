@@ -29,6 +29,61 @@ class KiosbankSettingsController extends Controller
             'mode'         => $configuration->mode(),
             'enabled'      => Setting::where('key', 'kiosbank_enabled')->value('value') !== '0',
             'cutoffStatus' => $kiosbankService->getCutoffStatus(),
+            'uatChecklist' => $kiosbankService->getOfficialUatChecklist(),
+            'uatLogs'      => $kiosbankService->getUatLogs(60),
+        ]);
+    }
+
+    public function runUat(Request $request)
+    {
+        $scenarioKey = trim((string) $request->input('scenario_key', 'all'));
+        $kiosbankService = new KiosbankService();
+        $result = $kiosbankService->executeUatScenario($scenarioKey);
+
+        if (!($result['ok'] ?? false)) {
+            return redirect()->route('admin.ppob.settings', ['section' => 'uat'])
+                ->with('error', $result['message'] ?? 'Gagal menjalankan skenario UAT.');
+        }
+
+        return redirect()->route('admin.ppob.settings', ['section' => 'uat'])
+            ->with('success', $result['message']);
+    }
+
+    public function clearUatLogs()
+    {
+        (new KiosbankService())->clearUatLogs();
+
+        return redirect()->route('admin.ppob.settings', ['section' => 'uat'])
+            ->with('success', 'Log Audit UAT & riwayat pengujian berhasil dibersihkan.');
+    }
+
+    public function exportUatReport(Request $request)
+    {
+        $format = strtolower((string) $request->query('format', 'txt'));
+        $kiosbankService = new KiosbankService();
+        $dateSuffix = now('Asia/Jakarta')->format('Ymd_His');
+
+        if ($format === 'json') {
+            $payload = [
+                'generated_at' => now('Asia/Jakarta')->format('Y-m-d H:i:s') . ' WIB',
+                'mode'         => $kiosbankService->getMode(),
+                'base_url'     => $kiosbankService->getBaseUrl(),
+                'callback_url' => url('/api/webhook/kiosbank'),
+                'scenarios'    => array_values($kiosbankService->getOfficialUatChecklist()),
+                'server_logs'  => $kiosbankService->getUatLogs(100),
+            ];
+
+            return response(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), 200, [
+                'Content-Type'        => 'application/json; charset=UTF-8',
+                'Content-Disposition' => "attachment; filename=\"Bukti_UAT_Kiosbank_{$dateSuffix}.json\"",
+            ]);
+        }
+
+        $text = $kiosbankService->exportUatReportText();
+
+        return response($text, 200, [
+            'Content-Type'        => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"Berita_Acara_UAT_Kiosbank_{$dateSuffix}.txt\"",
         ]);
     }
 

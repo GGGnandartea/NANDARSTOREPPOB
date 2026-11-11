@@ -143,9 +143,12 @@ export default function CheckoutQrisSection({
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-orange-500 font-bold text-xs animate-pulse bg-orange-50 dark:bg-orange-900/20 py-2.5 rounded-2xl mb-3">
+      <div className="flex items-center justify-center gap-2 text-orange-500 font-bold text-xs animate-pulse bg-orange-50 dark:bg-orange-900/20 py-2.5 rounded-2xl mb-2">
         <div className="w-2 h-2 rounded-full bg-orange-500"></div>Menunggu Pembayaran Anda...
       </div>
+      <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 mb-3">
+        Aman direfresh: Jika halaman ter-refresh, transaksi ini tetap tersimpan &amp; dicek otomatis di latar belakang tanpa perlu order ulang.
+      </p>
       <button
         type="button"
         onClick={handleCancel}

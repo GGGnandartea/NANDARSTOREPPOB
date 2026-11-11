@@ -101,13 +101,22 @@ export const OPERATORS = [
 ];
 
 export const GAMES = [
-  { id: 'AAO.AAAL', name: 'Mobile Legends', badge: 'MLBB', needZone: true, zoneLabel: 'Zone ID', placeholderId: 'Contoh: 12345678', placeholderZone: 'Contoh: 2149' },
-  { id: 'AAO.AAAF', name: 'Free Fire', badge: 'FF', needZone: false, placeholderId: 'Contoh: 87654321' },
+  { id: 'AAO.AAAL', name: 'Mobile Legends', badge: 'MLBB', needZone: true, zoneOptional: true, zoneLabel: 'Zone ID (Opsional jika sudah digabung)', placeholderId: 'User ID / Gabung (Contoh: 48122786)', placeholderZone: 'Contoh: 2149' },
+  { id: 'AAO.AAAF', name: 'Free Fire', badge: 'FF', needZone: false, placeholderId: 'Player ID / Nopel (Contoh: 082216303791 / 147818637)' },
   { id: 'AAO.AAAJ', name: 'Honor of Kings', badge: 'HOK', needZone: false, placeholderId: 'Contoh: 98765432' },
-  { id: 'AAO.AAAG', name: 'Genshin Impact', badge: 'GI', needZone: true, zoneLabel: 'Server', servers: ['Asia', 'America', 'Europe', 'TW_HK_MO'], placeholderId: 'UID Genshin' },
+  { id: 'AAO.AAAG', name: 'Genshin Impact', badge: 'GI', needZone: true, zoneOptional: true, zoneLabel: 'Server', servers: ['Asia', 'America', 'Europe', 'TW_HK_MO'], placeholderId: 'UID Genshin' },
   { id: 'AAO.AAAS', name: 'PUBG Mobile', badge: 'PUBG', needZone: false, placeholderId: 'Nomor ID Karakter PUBG' },
   { id: 'AAO.AAAX', name: 'Valorant', badge: 'VAL', needZone: false, placeholderId: 'Riot ID (Nama#Tag)' },
-  { id: 'AAO.AAAU', name: 'Roblox', badge: 'RBLX', needZone: false, placeholderId: 'Username Roblox' },
+  { id: 'AAO.AAAU', name: 'Roblox', badge: 'RBLX', needZone: false, placeholderId: 'Nomor HP / Username Roblox' },
+  { id: 'AAO.AAAH', name: 'Google Play', badge: 'GPLAY', needZone: false, placeholderId: 'Nomor HP Penerima Kode (Contoh: 081210838388)' },
+  { id: 'AAO.AAAD', name: 'Unipin Voucher', badge: 'UNIPIN', needZone: false, placeholderId: 'Nomor HP / ID Unipin (Contoh: 085227923332)' },
+  { id: 'AAO.AAAI', name: 'Honkai Star Rail', badge: 'HSR', needZone: false, placeholderId: 'UID Honkai Star Rail' },
+  { id: 'AAO.AAAE', name: 'Call of Duty Mobile', badge: 'CODM', needZone: false, placeholderId: 'OpenID Call of Duty Mobile' },
+  { id: 'AAO.AAAK', name: 'EA Sports FC Mobile', badge: 'FCM', needZone: false, placeholderId: 'UID EA Sports FC Mobile' },
+  { id: 'AAO.AAAQ', name: 'Point Blank', badge: 'PB', needZone: false, placeholderId: 'ID Akun Point Blank Zepetto' },
+  { id: 'AAO.AAAV', name: 'Steam Wallet', badge: 'STEAM', needZone: false, placeholderId: 'Nomor HP Penerima Voucher Steam' },
+  { id: 'AAO.AAAC', name: 'Garena Shell', badge: 'GARENA', needZone: false, placeholderId: 'Nomor HP / ID Garena' },
+  { id: 'AAO.AAAT', name: 'Razer Gold', badge: 'RAZER', needZone: false, placeholderId: 'Nomor HP Penerima PIN Razer Gold' },
 ];
 
 export const EWALLETS = [
@@ -115,6 +124,8 @@ export const EWALLETS = [
   { id: 'EWAL.GOPAY', name: 'GoPay', badge: 'GOPAY' },
   { id: 'EWAL.OVO', name: 'OVO', badge: 'OVO' },
   { id: 'EWAL.SHOPEE', name: 'ShopeePay', badge: 'SPAY' },
+  { id: 'EWAL.LINKAJA', name: 'LinkAja', badge: 'LINKAJA' },
+  { id: 'EWAL.EMONEY', name: 'Mandiri E-Money', badge: 'EMONEY' },
 ];
 
 export const STREAMING_SERVICES = [

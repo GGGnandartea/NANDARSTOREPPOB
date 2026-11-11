@@ -890,18 +890,23 @@ class FrontController extends Controller
                 'discount_amount' => round($discount),
             ]);
 
+            \App\Services\OrderFulfillmentService::storeOrderQrisUrl(
+                (string) $data['data']['orderId'],
+                $data['data']['url_qris'] ?? null
+            );
             \App\Services\OrderAccessService::grantGuestSession($request, $order);
 
             return response()->json([
-                'status'        => 'success',
-                'invoice_url'   => $order->invoiceUrl(),
-                'order_id'      => $data['data']['orderId'],
-                'order_status' => $order->order_status,
-                'payment_status' => $order->payment_status,
-                'placed_at' => $order->created_at?->toIso8601String(),
-                'updated_at' => $order->updated_at?->toIso8601String(),
-                'total_nominal' => $data['data']['total_nominal'], 
-                'url_qris'      => $data['data']['url_qris']
+                'status'            => 'success',
+                'invoice_url'       => $order->invoiceUrl(),
+                'order_id'          => $data['data']['orderId'],
+                'order_status'      => $order->order_status,
+                'payment_status'    => $order->payment_status,
+                'placed_at'         => $order->created_at?->toIso8601String(),
+                'updated_at'        => $order->updated_at?->toIso8601String(),
+                'total_nominal'     => $data['data']['total_nominal'], 
+                'url_qris'          => $data['data']['url_qris'],
+                'remaining_seconds' => 1200,
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Order creation error: ' . $e->getMessage());
@@ -1005,10 +1010,13 @@ class FrontController extends Controller
             'buyer_name'      => $order->buyer_name ?: ($buyerUser ? $buyerUser->name : 'Pembeli Publik'),
             'buyer_category'  => $buyerCategory,
             'admin_whatsapp'  => '6282317458496',
-            'price'           => (int) $order->price,
-            'discount'        => (int) ($order->discount_amount ?? $order->discount ?? 0),
-            'total_amount'    => (int) ($order->total_amount ?? $order->price),
-            'email'           => $order->email,
+            'price'             => (int) $order->price,
+            'discount'          => (int) ($order->discount_amount ?? $order->discount ?? 0),
+            'total_amount'      => (int) ($order->total_amount ?? $order->price),
+            'total_nominal'     => (int) ($order->total_amount ?? $order->price),
+            'url_qris'          => \App\Services\OrderFulfillmentService::resolveOrderQrisUrl($order),
+            'remaining_seconds' => \App\Services\OrderFulfillmentService::remainingQrisSeconds($order),
+            'email'             => $order->email,
             'whatsapp'        => $order->whatsapp,
             'payment_status'  => $order->payment_status,
             'sn_or_account'   => $isReady ? $snAkun : ($isManualOrder ? $snAkun : null),
@@ -1234,11 +1242,13 @@ class FrontController extends Controller
             ->get()
             ->map(function($order) {
                 $order->total_amount = $order->total_amount ?? $order->price ?? 0;
-                $order->provider = $order->provider;
+                $order->setAttribute('provider', 'PremiumKita');
+                $order->makeHidden(['api_trx_id', 'provider_amount', 'provider_product_code']);
+                $order->product?->makeHidden(['api_product_id', 'api_price', 'api_margin', 'api_reseller_margin']);
                 // Pastikan catatan teknis / server / API tidak pernah bocor ke tampilan user
                 if (!empty($order->notes)) {
                     $noteLower = strtolower($order->notes);
-                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_contains($noteLower, '[internal]') || str_contains($noteLower, '[wa-sent]') || str_contains($noteLower, '[admin-wa-sent]') || str_contains($noteLower, 'menunggu admin') || str_contains($noteLower, 'menunggu pembeli')) {
+                    if (str_contains($noteLower, 'premku') || str_contains($noteLower, 'preflix') || str_contains($noteLower, 'kiosbank') || str_contains($noteLower, 'provider') || str_contains($noteLower, 'api') || str_contains($noteLower, 'invalid') || str_contains($noteLower, '[internal]') || str_contains($noteLower, '[wa-sent]') || str_contains($noteLower, '[admin-wa-sent]') || str_contains($noteLower, 'menunggu admin') || str_contains($noteLower, 'menunggu pembeli')) {
                         $order->notes = null;
                     }
                 }
@@ -1364,6 +1374,7 @@ class FrontController extends Controller
                 'expense_count' => $expenseCount,
                 'refund_count'  => $refundCount,
             ],
+            'openApiData' => \App\Http\Controllers\ResellerApiSettingsController::buildProfileOpenApiPayload($user, request()),
         ]);
     }
 

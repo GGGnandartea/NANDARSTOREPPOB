@@ -12,12 +12,13 @@ import OrdersTab from './Partials/OrdersTab';
 import MutationsTab from './Partials/MutationsTab';
 import EditProfileTab from './Partials/EditProfileTab';
 import SecurityTab from './Partials/SecurityTab';
+import OpenApiTab from './Partials/OpenApiTab';
 import TopupModal from './Partials/TopupModal';
 import UpgradeResellerModal from './Partials/UpgradeResellerModal';
 import ChangeWaModal from './Partials/ChangeWaModal';
 import WaVerificationModal from './Partials/WaVerificationModal';
 
-export default function Profile({ favoriteProducts = [], orders = [], topups = [], mutations = [], stats = null, resellerSettings = null }) {
+export default function Profile({ favoriteProducts = [], orders = [], topups = [], mutations = [], stats = null, resellerSettings = null, openApiData = null }) {
   const { auth, flash } = usePage().props;
   const { url } = usePage();
   const user = auth?.user;
@@ -73,7 +74,8 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
         if (tabParam === 'orders' || tabParam === 'orders_app' || tabParam === 'history') return 'orders_app';
         if (tabParam === 'orders_all') return 'orders_all';
         if (tabParam === 'settings') return 'profile';
-        if (['dashboard', 'topup', 'security', 'profile', 'favorites'].includes(tabParam)) return tabParam;
+        if (tabParam === 'api' || tabParam === 'open_api' || tabParam === 'openapi') return 'open_api';
+        if (['dashboard', 'topup', 'security', 'profile', 'favorites', 'open_api'].includes(tabParam)) return tabParam;
       }
     }
     return 'dashboard';
@@ -207,7 +209,8 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
         else if (tab === 'ppob' || tab === 'orders_ppob') setActiveMenu('orders_ppob');
         else if (tab === 'orders_all') setActiveMenu('orders_all');
         else if (tab === 'settings') setActiveMenu('profile');
-        else if (['dashboard', 'profile', 'topup', 'security', 'favorites'].includes(tab)) {
+        else if (tab === 'api' || tab === 'open_api' || tab === 'openapi') setActiveMenu('open_api');
+        else if (['dashboard', 'profile', 'topup', 'security', 'favorites', 'open_api'].includes(tab)) {
           setActiveMenu(tab);
         }
       } else {
@@ -237,13 +240,14 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
   };
 
   const menus = [
-    { key: 'favorites', label: 'Produk Favorit', icon: Icon.Heart, count: favoriteProducts.length },
-    { key: 'dashboard',   label: 'Dashboard',             icon: Icon.Dashboard },
-    { key: 'orders_app',  label: 'Pesanan Aplikasi',      icon: Icon.App,     count: appOrders.length },
-    { key: 'orders_ppob', label: 'Pesanan PPOB',          icon: Icon.Ppob,    count: ppobOrders.length },
+    { key: 'favorites',   label: 'Produk Favorit',         icon: Icon.Heart,   count: favoriteProducts.length },
+    { key: 'dashboard',   label: 'Dashboard',              icon: Icon.Dashboard },
+    { key: 'orders_app',  label: 'Pesanan Aplikasi',       icon: Icon.App,     count: appOrders.length },
+    { key: 'orders_ppob', label: 'Pesanan PPOB',           icon: Icon.Ppob,    count: ppobOrders.length },
     { key: 'topup',       label: 'Riwayat Saldo & Top Up', icon: Icon.Wallet,  count: allMutations.length },
-    { key: 'profile',     label: 'Edit Profil',           icon: Icon.User },
-    { key: 'security',    label: 'Ubah Password',         icon: Icon.Lock },
+    { key: 'open_api',    label: 'Open API & Dokumentasi', icon: Icon.Code,    badge: isReseller ? 'H2H' : 'VIP' },
+    { key: 'profile',     label: 'Edit Profil',            icon: Icon.User },
+    { key: 'security',    label: 'Ubah Password',          icon: Icon.Lock },
   ];
 
   const handleMenuClick = (key) => {
@@ -417,6 +421,18 @@ export default function Profile({ favoriteProducts = [], orders = [], topups = [
                 user={user}
                 isReseller={isReseller}
                 setShowTopup={setShowTopup}
+              />
+            )}
+
+            {/* Open API Khusus VIP Reseller & Dokumentasi */}
+            {activeMenu === 'open_api' && (
+              <OpenApiTab
+                user={user}
+                isReseller={isReseller}
+                openApiData={openApiData}
+                onOpenTopup={() => setShowTopup(true)}
+                onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+                showToast={showToast}
               />
             )}
 

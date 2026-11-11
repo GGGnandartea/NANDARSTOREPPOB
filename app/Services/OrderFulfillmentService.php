@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\TransactionLog;
 use App\Services\KiosbankService;
 use App\Http\Controllers\WebhookController;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -160,7 +161,7 @@ class OrderFulfillmentService
                         'status'        => 'success',
                         'is_ready'      => true,
                         'sn_or_account' => $order->sn_or_account,
-                        'message'       => 'Tagihan berhasil dibayarkan melalui Kiosbank!',
+                        'message'       => 'Tagihan berhasil dibayarkan melalui PremiumKita!',
                     ];
                 }
 
@@ -226,7 +227,7 @@ class OrderFulfillmentService
                     'status'        => 'success',
                     'is_ready'      => true,
                     'sn_or_account' => $order->sn_or_account,
-                    'message'       => 'Layanan PPOB berhasil diproses oleh Kiosbank!',
+                    'message'       => 'Layanan PPOB berhasil diproses oleh PremiumKita!',
                 ];
             }
 
@@ -781,6 +782,89 @@ class OrderFulfillmentService
             'http://127.0.0.1:' . $port . $cleanPath,
             'http://localhost:' . $port . $cleanPath,
         ])));
+    }
+
+    /**
+     * Simpan URL QRIS tagihan ke Cache dan Setting agar tahan terhadap refresh halaman (F5)
+     * maupun ketika dibuka melalui URL transaksi khusus (/ppob?order=..., /checkout/..., /order/invoice/...).
+     */
+    public static function storeOrderQrisUrl(string $invoiceNumber, ?string $urlQris): void
+    {
+        $invoiceNumber = trim($invoiceNumber);
+        $urlQris = trim((string) $urlQris);
+        if ($invoiceNumber === '' || $urlQris === '') {
+            return;
+        }
+
+        try {
+            Cache::put('order_qris_url:' . $invoiceNumber, $urlQris, now()->addMinutes(30));
+        } catch (\Throwable $e) {}
+
+        try {
+            Setting::updateOrCreate(
+                ['key' => 'qris_url_' . substr($invoiceNumber, 0, 48)],
+                ['value' => $urlQris]
+            );
+        } catch (\Throwable $e) {}
+    }
+
+    /**
+     * Ambil kembali URL QRIS untuk pesanan yang masih berstatus pending/unpaid.
+     */
+    public static function resolveOrderQrisUrl(Order $order): ?string
+    {
+        $invoiceNumber = trim((string) $order->invoice_number);
+        if ($invoiceNumber === '' || str_starts_with($invoiceNumber, 'BAL-')) {
+            return null;
+        }
+
+        try {
+            $cached = Cache::get('order_qris_url:' . $invoiceNumber);
+            if (is_string($cached) && trim($cached) !== '') {
+                return trim($cached);
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $fromSetting = Setting::where('key', 'qris_url_' . substr($invoiceNumber, 0, 48))->value('value');
+            if (is_string($fromSetting) && trim($fromSetting) !== '') {
+                return trim($fromSetting);
+            }
+        } catch (\Throwable $e) {}
+
+        if (!app()->runningUnitTests() && in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true)) {
+            foreach (self::qrisGatewayEndpoints('/api/order/status/' . $invoiceNumber) as $endpoint) {
+                try {
+                    $pgRes = Http::connectTimeout(2)->timeout(3)->get($endpoint);
+                    if ($pgRes->successful()) {
+                        $pgData = $pgRes->json();
+                        $resolved = trim((string) ($pgData['data']['url_qris'] ?? $pgData['url_qris'] ?? ''));
+                        if ($resolved !== '') {
+                            self::storeOrderQrisUrl($invoiceNumber, $resolved);
+                            return $resolved;
+                        }
+                        break;
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Hitung sisa waktu pembayaran QRIS dalam satuan detik (maksimal 20 menit = 1200 detik).
+     */
+    public static function remainingQrisSeconds(Order $order, int $maxSeconds = 1200): int
+    {
+        if (!in_array(strtolower((string) $order->payment_status), ['pending', 'unpaid'], true)) {
+            return 0;
+        }
+        if (!$order->created_at) {
+            return $maxSeconds;
+        }
+        $elapsed = max(0, (int) $order->created_at->diffInSeconds(now(), false));
+        return max(0, $maxSeconds - $elapsed);
     }
 
     /**
@@ -1341,7 +1425,7 @@ class OrderFulfillmentService
             return [
                 'status'   => 'processing',
                 'is_ready' => false,
-                'message'  => 'Nomor referensi transaksi Kiosbank belum tersedia.',
+                'message'  => 'Nomor referensi transaksi belum tersedia di server PremiumKita.',
             ];
         }
 
@@ -1400,12 +1484,12 @@ class OrderFulfillmentService
                 'is_ready'      => true,
                 'sn_or_account' => $order->sn_or_account,
                 'rc'            => $res['rc'] ?? '00',
-                'message'       => 'Status diperbarui dari Kiosbank (/Services/Check-Status): Transaksi BERHASIL!',
+                'message'       => 'Status diperbarui dari server PremiumKita: Transaksi BERHASIL!',
             ];
         }
 
         if (($res['status'] ?? '') === 'failed') {
-            $failReason = trim((string) ($res['message'] ?? 'Transaksi gagal berdasarkan pengecekan /Services/Check-Status'));
+            $failReason = trim((string) ($res['message'] ?? 'Transaksi gagal berdasarkan pengecekan server'));
             return self::handlePpobFailedAutoRefund($order, $failReason);
         }
 
@@ -1415,7 +1499,7 @@ class OrderFulfillmentService
             'status'   => 'processing',
             'is_ready' => false,
             'rc'       => $res['rc'] ?? '71',
-            'message'  => 'Hasil cek /Services/Check-Status Kiosbank: Transaksi masih berstatus Pending (Sedang Diproses Operator).',
+            'message'  => 'Hasil pengecekan server PremiumKita: Transaksi masih berstatus Pending (Sedang Diproses Operator).',
         ];
     }
 
@@ -1561,6 +1645,14 @@ class OrderFulfillmentService
             $order->save();
 
             Log::info("[AUTO-REFUND-SUCCESS] Order {$order->invoice_number}: Saldo Rp {$refundAmount} telah dikembalikan ke user {$buyer->email}.");
+
+            DB::afterCommit(function () use ($order) {
+                try {
+                    ResellerOpenApiService::dispatchOrderWebhookIfNeeded($order, 'order.refunded');
+                } catch (\Throwable $e) {
+                    Log::warning('[OPEN-API-REFUND-WH] ' . $e->getMessage());
+                }
+            });
 
             // Kirim notifikasi WhatsApp ke pembeli bahwa dana telah di-refund
             try {
@@ -1828,6 +1920,14 @@ class OrderFulfillmentService
                 self::sendUserCancelRefundWaNotification($result['order'], (int) $result['refund_amount']);
             } catch (\Throwable $e) {
                 Log::warning('[CANCEL-REFUND-WA-ERROR] ' . $e->getMessage());
+            }
+        }
+
+        if (!empty($result['order'])) {
+            try {
+                ResellerOpenApiService::dispatchOrderWebhookIfNeeded($result['order'], 'order.refunded');
+            } catch (\Throwable $e) {
+                Log::warning('[OPEN-API-CANCEL-WH-ERROR] ' . $e->getMessage());
             }
         }
 

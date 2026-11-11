@@ -230,7 +230,7 @@ export default function PpobSuccessModal({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              <span>{isRechecking ? 'Mengecek ke Server Kiosbank...' : 'Cek Status Ulang Sekarang'}</span>
+              <span>{isRechecking ? 'Mengecek ke Server PremiumKita...' : 'Cek Status Ulang Sekarang'}</span>
             </button>
             {recheckFeedback && (
               <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200 bg-amber-100/80 dark:bg-amber-900/40 px-3 py-2 rounded-lg">

@@ -117,6 +117,242 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
   const [successOrder, setSuccessOrder] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
   const [pendingRepeatCode, setPendingRepeatCode] = useState('');
+  const [targetCheckResult, setTargetCheckResult] = useState(null);
+  const [isCheckingTarget, setIsCheckingTarget] = useState(false);
+
+  const PPOB_ACTIVE_ORDER_STORAGE_KEY = 'ppob_active_order';
+
+  const extractTokenFromUrl = (urlStr) => {
+    if (!urlStr || typeof window === 'undefined') return '';
+    try {
+      const u = new URL(urlStr, window.location.origin);
+      return u.searchParams.get('token') || '';
+    } catch {
+      return '';
+    }
+  };
+
+  const buildPpobStatusUrl = (orderId, token = '', manual = false) => {
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    if (manual) params.set('manual', '1');
+    const qs = params.toString();
+    return `/ppob/status/${encodeURIComponent(orderId)}${qs ? `?${qs}` : ''}`;
+  };
+
+  const syncPpobOrderUrlAndStorage = (orderPayload) => {
+    if (typeof window === 'undefined') return;
+    const oid = orderPayload?.order_id || orderPayload?.invoice_number;
+    if (!oid) return;
+    const token = orderPayload?.token || extractTokenFromUrl(orderPayload?.invoice_url);
+    const stored = {
+      ...orderPayload,
+      order_id: oid,
+      invoice_number: orderPayload?.invoice_number || oid,
+      token,
+      saved_at: Date.now(),
+    };
+    try {
+      localStorage.setItem(PPOB_ACTIVE_ORDER_STORAGE_KEY, JSON.stringify(stored));
+    } catch {}
+    if (window.history) {
+      const url = new URL(window.location);
+      url.searchParams.set('order', oid);
+      if (token) url.searchParams.set('token', token);
+      window.history.replaceState({}, '', url);
+    }
+  };
+
+  const clearPpobOrderUrlAndStorage = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(PPOB_ACTIVE_ORDER_STORAGE_KEY);
+    } catch {}
+    if (window.history) {
+      const url = new URL(window.location);
+      url.searchParams.delete('order');
+      url.searchParams.delete('invoice');
+      url.searchParams.delete('token');
+      window.history.replaceState({}, '', url);
+    }
+  };
+
+  // Pulihkan sesi pembayaran / cek status di latar belakang jika halaman di-refresh (F5) atau dibuka via ?order=
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const urlOrderId = (params.get('order') || params.get('invoice') || '').trim();
+    const urlToken = (params.get('token') || '').trim();
+
+    let savedOrder = null;
+    try {
+      const raw = localStorage.getItem(PPOB_ACTIVE_ORDER_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const ageMs = Date.now() - (Number(parsed?.saved_at) || 0);
+        if (parsed && (parsed.order_id || parsed.invoice_number) && ageMs < 25 * 60 * 1000) {
+          savedOrder = parsed;
+        } else {
+          localStorage.removeItem(PPOB_ACTIVE_ORDER_STORAGE_KEY);
+        }
+      }
+    } catch {}
+
+    const targetOrderId = urlOrderId || savedOrder?.order_id || savedOrder?.invoice_number || '';
+    if (!targetOrderId) return;
+
+    const targetToken =
+      urlToken ||
+      (savedOrder && (savedOrder.order_id === targetOrderId || savedOrder.invoice_number === targetOrderId)
+        ? savedOrder.token || extractTokenFromUrl(savedOrder.invoice_url)
+        : '');
+
+    // Tampilkan modal QRIS dari cache instan jika masih berstatus pending agar tidak kembali ke form order
+    if (
+      savedOrder &&
+      (savedOrder.order_id === targetOrderId || savedOrder.invoice_number === targetOrderId) &&
+      savedOrder.url_qris &&
+      ['pending', 'unpaid', ''].includes(String(savedOrder.payment_status || 'pending').toLowerCase())
+    ) {
+      setQrisData(savedOrder);
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(buildPpobStatusUrl(targetOrderId, targetToken));
+        if (!res.ok) {
+          if (res.status === 404) clearPpobOrderUrlAndStorage();
+          return;
+        }
+        const data = await res.json();
+        if (cancelled || data.status === 'NOT_FOUND') {
+          if (data.status === 'NOT_FOUND') clearPpobOrderUrlAndStorage();
+          return;
+        }
+
+        const merged = {
+          ...(savedOrder || {}),
+          ...data,
+          order_id: data.order_id || data.invoice_number || targetOrderId,
+          invoice_number: data.invoice_number || data.order_id || targetOrderId,
+          token: targetToken || extractTokenFromUrl(data.invoice_url),
+        };
+
+        const payStatus = String(data.payment_status || '').toLowerCase();
+        const ordStatus = String(data.order_status || data.status || '').toLowerCase();
+
+        if (ordStatus === 'completed' || ['paid', 'success', 'settlement', 'lunas'].includes(payStatus)) {
+          setQrisData(null);
+          setSuccessOrder(merged);
+          syncPpobOrderUrlAndStorage(merged);
+        } else if (['pending', 'unpaid'].includes(payStatus) && (Number(data.remaining_seconds ?? 1200) > 0)) {
+          setQrisTimer(Number(data.remaining_seconds || 1200));
+          setQrisData(merged);
+          syncPpobOrderUrlAndStorage(merged);
+        } else if (['expired', 'failed', 'canceled', 'cancelled'].includes(payStatus) || ordStatus === 'expired') {
+          setQrisData(null);
+          clearPpobOrderUrlAndStorage();
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Reset hasil cek ID tujuan saat pengguna mengubah input tujuan atau berganti layanan
+  useEffect(() => {
+    setTargetCheckResult(null);
+  }, [activeTab, plnCustomerId, gameUserId, gameZoneId, selectedGame, ewalletPhone, selectedEwallet]);
+
+  // Cek / Validasi ID Pelanggan (Token PLN, Voucher Game, E-Wallet) sebelum membeli via /ppob/inquiry
+  const handleCheckTarget = async (productOverride = null, silent = false) => {
+    if (cutoff?.is_cutoff) {
+      if (!silent) setOfflineModalOpen(true);
+      return null;
+    }
+
+    let productId = productOverride?.code || products[0]?.code || '';
+    let customerId = '';
+    let zoneId = '';
+
+    if (activeTab === 'pln') {
+      productId = productId || '100302';
+      customerId = (plnCustomerId || '').trim();
+      if (customerId.length < 8) return null;
+    } else if (activeTab === 'game') {
+      productId = productId || (selectedGame.id === 'AAO.AAAU' ? '6707BE' : '6701BK');
+      customerId = (gameUserId || '').trim();
+      zoneId = (gameZoneId || '').trim();
+      if (customerId.length < 3) return null;
+    } else if (activeTab === 'ewallet') {
+      productId = productId || '752110';
+      customerId = (ewalletPhone || '').trim();
+      if (customerId.length < 9) return null;
+    } else {
+      return null;
+    }
+
+    setIsCheckingTarget(true);
+    try {
+      const payload = {
+        product_id: productId,
+        customer_id: customerId,
+      };
+      if (zoneId) payload.zone_id = zoneId;
+
+      const res = await fetch('/ppob/inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        const verified = {
+          status: 'success',
+          customer_name: data.customer_name || 'Tujuan Terverifikasi',
+          tarif_daya: data.tarif_daya || null,
+          product_name: data.product_name || '',
+          customer_id: data.customer_id || customerId,
+        };
+        setTargetCheckResult(verified);
+        return verified;
+      } else {
+        const errObj = {
+          status: 'error',
+          message: data.message || 'ID / Nomor tujuan tidak ditemukan.',
+        };
+        setTargetCheckResult(errObj);
+        if (!silent) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Verifikasi Tujuan Gagal',
+            text: errObj.message,
+            confirmButtonColor: '#10b981',
+          });
+        }
+        return null;
+      }
+    } catch {
+      if (!silent) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Gagal Mengecek Tujuan',
+          text: 'Koneksi sedang sibuk. Anda tetap dapat melanjutkan transaksi jika nomor tujuan sudah benar.',
+          confirmButtonColor: '#10b981',
+        });
+      }
+      return null;
+    } finally {
+      setIsCheckingTarget(false);
+    }
+  };
 
   // Inisialisasi Fitur "Beli Lagi" (Repeat Order 1-Klik) dari Query URL
   useEffect(() => {
@@ -433,7 +669,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       });
       return;
     }
-    if (activeTab === 'game' && selectedGame.needZone && !gameZoneId) {
+    if (activeTab === 'game' && selectedGame.needZone && !selectedGame.zoneOptional && !gameZoneId) {
       Swal.fire({
         icon: 'warning',
         title: 'Zone / Server ID Diperlukan',
@@ -471,6 +707,8 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
         });
         return;
       }
+    } else if (['pln', 'game', 'ewallet'].includes(activeTab) && !targetCheckResult && !isCheckingTarget) {
+      handleCheckTarget(product, true);
     }
 
     setCheckoutModal(true);
@@ -532,6 +770,10 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
           product_code: selectedProduct.code,
           product_name: selectedProduct.name,
           customer_id: currentTargetNumber,
+          customer_name:
+            (targetCheckResult?.status === 'success' ? targetCheckResult.customer_name : '') ||
+            tagihanInquiryResult?.summary?.customerName ||
+            '',
           amount: selectedProduct.price,
           payment_method: paymentMethod,
           inquiry_key: selectedProduct.inquiryKey,
@@ -552,13 +794,23 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       if (res.ok && data.status === 'success') {
         const normalizedOrder = {
           ...data,
+          order_id: data.order_id || data.invoice_number,
+          invoice_number: data.invoice_number || data.order_id,
           product_name: data.product_name || selectedProduct?.name || 'Layanan PPOB',
+          customer_id: data.customer_id || currentTargetNumber,
+          customer_name:
+            data.customer_name ||
+            (targetCheckResult?.status === 'success' ? targetCheckResult.customer_name : null) ||
+            tagihanInquiryResult?.summary?.customerName ||
+            null,
           total_amount: data.total_amount ?? data.total_nominal ?? selectedProduct?.price ?? 0,
+          token: extractTokenFromUrl(data.invoice_url),
         };
         if (!user) rememberGuestOrder(normalizedOrder);
         if (typeof data.user_balance === 'number') {
           setUserBalance(data.user_balance);
         }
+        syncPpobOrderUrlAndStorage(normalizedOrder);
         if (paymentMethod === 'balance') {
           setCheckoutModal(false);
           if (BILL_TABS.includes(activeTab)) {
@@ -570,7 +822,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
           // QRIS mode (20 Menit = 1200 detik)
           setCheckoutModal(false);
           setQrisData(normalizedOrder);
-          setQrisTimer(1200);
+          setQrisTimer(Number(data.remaining_seconds || 1200));
         }
       } else {
         Swal.fire({
@@ -602,6 +854,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       }, 1000);
     } else if (qrisTimer === 0 && qrisData) {
       setQrisData(null);
+      clearPpobOrderUrlAndStorage();
       Swal.fire({
         icon: 'warning',
         title: 'Waktu Habis',
@@ -617,14 +870,18 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
     let disposed = false;
     let inFlight = false;
     const controller = new AbortController();
+    const orderToken = qrisData.token || extractTokenFromUrl(qrisData.invoice_url);
     const poller = setInterval(async () => {
       if (inFlight) return;
       inFlight = true;
       try {
-        const res = await fetch(`/ppob/status/${encodeURIComponent(qrisData.order_id)}`, { signal: controller.signal });
+        const res = await fetch(buildPpobStatusUrl(qrisData.order_id, orderToken), { signal: controller.signal });
         const data = await res.json();
         if (disposed || !res.ok) return;
-        if (data.status === 'completed' || data.payment_status === 'paid') {
+        if (typeof data.remaining_seconds === 'number' && data.remaining_seconds >= 0 && ['pending', 'unpaid'].includes(String(data.payment_status || '').toLowerCase())) {
+          setQrisTimer(data.remaining_seconds);
+        }
+        if (data.status === 'completed' || ['paid', 'success', 'settlement', 'lunas'].includes(String(data.payment_status || '').toLowerCase())) {
           clearInterval(poller);
           setQrisData(null);
           setCheckoutModal(false);
@@ -632,13 +889,16 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
             setTagihanInquiryResult(null);
             setSelectedProduct(null);
           }
-          setSuccessOrder({
+          const completedOrder = {
             ...qrisData,
             ...data,
-          });
-        } else if (['expired', 'failed', 'canceled'].includes(data.payment_status)) {
+          };
+          setSuccessOrder(completedOrder);
+          syncPpobOrderUrlAndStorage(completedOrder);
+        } else if (['expired', 'failed', 'canceled'].includes(String(data.payment_status || '').toLowerCase())) {
           clearInterval(poller);
           setQrisData(null);
+          clearPpobOrderUrlAndStorage();
           Swal.fire({ icon: 'warning', title: 'Pembayaran berakhir', text: 'Silakan buat pesanan baru.' });
         }
       } catch (e) {
@@ -658,21 +918,25 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
     if (!qrisData?.order_id || isCheckingQris) return;
     setIsCheckingQris(true);
     try {
-      const res = await fetch(`/ppob/status/${encodeURIComponent(qrisData.order_id)}?manual=1`);
+      const orderToken = qrisData.token || extractTokenFromUrl(qrisData.invoice_url);
+      const res = await fetch(buildPpobStatusUrl(qrisData.order_id, orderToken, true));
       const data = await res.json();
-      if (data.status === 'completed' || data.payment_status === 'paid') {
+      if (data.status === 'completed' || ['paid', 'success', 'settlement', 'lunas'].includes(String(data.payment_status || '').toLowerCase())) {
         setQrisData(null);
         setCheckoutModal(false);
         if (BILL_TABS.includes(activeTab)) {
           setTagihanInquiryResult(null);
           setSelectedProduct(null);
         }
-        setSuccessOrder({
+        const completedOrder = {
           ...qrisData,
           ...data,
-        });
-      } else if (['expired', 'failed', 'canceled'].includes(data.payment_status)) {
+        };
+        setSuccessOrder(completedOrder);
+        syncPpobOrderUrlAndStorage(completedOrder);
+      } else if (['expired', 'failed', 'canceled'].includes(String(data.payment_status || '').toLowerCase())) {
         setQrisData(null);
+        clearPpobOrderUrlAndStorage();
         Swal.fire({ icon: 'warning', title: 'Pembayaran berakhir', text: 'Silakan buat pesanan baru.', confirmButtonColor: '#10b981' });
       } else {
         Swal.fire({
@@ -828,6 +1092,10 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
               setTagihanPeriod={setTagihanPeriod}
               tagihanPdamSearch={tagihanPdamSearch}
               setTagihanPdamSearch={setTagihanPdamSearch}
+              targetCheckResult={targetCheckResult}
+              isCheckingTarget={isCheckingTarget}
+              onCheckTarget={handleCheckTarget}
+              cutoff={cutoff}
             />
           </div>
 
@@ -838,6 +1106,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
               isInquiring={isTagihanInquiring}
               onOpenCheckout={handleOpenCheckout}
               serviceLabel={activeBillService.label}
+              cutoff={cutoff}
             />
           ) : (
             <PpobProductGrid
@@ -846,6 +1115,7 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
               isLoadingProducts={isLoadingProducts}
               selectedProduct={selectedProduct}
               onOpenCheckout={handleOpenCheckout}
+              cutoff={cutoff}
             />
           )}
         </div>
@@ -871,11 +1141,14 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
         onClose={() => setCheckoutModal(false)}
         selectedProduct={selectedProduct}
         currentTargetNumber={currentTargetNumber}
+        targetCheckResult={targetCheckResult}
+        isCheckingTarget={isCheckingTarget}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
         userBalance={userBalance}
         isSubmitting={isSubmitting}
         onConfirmPayment={handleConfirmPayment}
+        cutoff={cutoff}
       />
 
       {/* LOADING OVERLAY SAAT MENYIAPKAN QRIS PPOB */}
@@ -901,7 +1174,10 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       {/* QRIS POPUP DISPLAY */}
       <PpobQrisModal
         qrisData={qrisData}
-        onClose={() => setQrisData(null)}
+        onClose={() => {
+          setQrisData(null);
+          clearPpobOrderUrlAndStorage();
+        }}
         qrisTimer={qrisTimer}
         copyToClipboard={copyToClipboard}
         isCopied={isCopied}
@@ -912,9 +1188,13 @@ export default function PpobIndex({ store, initialPulsa, cutoff }) {
       {/* SUCCESS MODAL POPUP */}
       <PpobSuccessModal
         successOrder={successOrder}
-        onClose={() => setSuccessOrder(null)}
+        onClose={() => {
+          setSuccessOrder(null);
+          clearPpobOrderUrlAndStorage();
+        }}
         onOrderUpdated={(updatedOrder) => {
           setSuccessOrder(updatedOrder);
+          syncPpobOrderUrlAndStorage(updatedOrder);
           if (typeof updatedOrder?.user_balance === 'number') {
             setUserBalance(updatedOrder.user_balance);
           }

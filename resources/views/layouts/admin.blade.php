@@ -231,10 +231,20 @@
 
                 <a href="{{ route('admin.ppob.settings') }}" 
                    @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
-                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && $currentSection !== 'cutoff' ? 'active' : '' }}">
+                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && !in_array($currentSection, ['cutoff', 'uat']) ? 'active' : '' }}">
                     <svg class="w-5 h-5 shrink-0 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
                     <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
                         <span class="whitespace-nowrap">Akun Kiosbank</span>
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.ppob.settings', ['section' => 'uat']) }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.ppob.settings*') && $currentSection === 'uat' ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">UAT &amp; Launching</span>
+                        <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">PUSAT</span>
                     </span>
                 </a>
 
@@ -354,6 +364,23 @@
                             <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500 text-white shadow-xs">
                                 GRATIS
                             </span>
+                        @endif
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.open_api.index') }}" 
+                   @click="if (window.innerWidth < 1024) mobileMenuOpen = false"
+                   class="sidebar-link {{ request()->routeIs('admin.open_api.*') ? 'active' : '' }}">
+                    <svg class="w-5 h-5 shrink-0 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    <span :class="(sidebarOpen || window.innerWidth < 1024) ? 'flex' : 'hidden'" class="min-w-0 flex-1 items-center justify-between gap-2 font-bold">
+                        <span class="whitespace-nowrap">Open API Reseller</span>
+                        @php
+                            $isOpenApiSidebar = (\App\Models\Setting::where('key', 'open_api_enabled')->value('value') ?? '1') === '1';
+                        @endphp
+                        @if($isOpenApiSidebar)
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">ON</span>
+                        @else
+                            <span class="shrink-0 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-rose-500 text-white">OFF</span>
                         @endif
                     </span>
                 </a>

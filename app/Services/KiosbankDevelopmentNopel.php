@@ -49,9 +49,15 @@ class KiosbankDevelopmentNopel
         '8888802437858912' => '22', // BPJS KESEHATAN (900001) - RC 22
         '523370420000'     => '65', // BPJS TK PU (999971) - RC 65
 
-        // PGN GAS (Main/Nopel/GAS)
+        // PGN GAS (Main/Nopel/GAS - kode 100401 / 100411 / 850001)
         '000000501881'     => '65', // PGN (850001) - RC 65
         '000005161029'     => '64', // PGN (850001) - RC 64
+        '024778882'        => '17', // PGN (100401) - RC 17
+        '016088038'        => '38', // PGN (100401) - RC 38
+        '00017270'         => '64', // PGN (100401) - RC 64
+        '09128867'         => '65', // PGN (100401) - RC 65
+        '9091929390001'    => '17', // PGN PREPAID (100411) - RC 17
+        '9091929390065'    => '65', // PGN PREPAID (100411) - RC 65
 
         // TV BERBAYAR & MULTIFINANCE
         '127200005324'     => '64', // INDOVISION (350001) - RC 64
@@ -257,7 +263,127 @@ class KiosbankDevelopmentNopel
             ];
         }
 
-        // 3. Simulasi PLN Pascabayar (100301) & Non-Taglis (100311)
+        // 3. Simulasi PLN Prepaid / Token Listrik (100392 s/d 100362)
+        $plnPrepaidMap = [
+            '100392' => ['amount' => 5000,     'label' => 'PLN PREPAID 5.000'],
+            '1003A2' => ['amount' => 10000,    'label' => 'PLN PREPAID 10.000'],
+            '1003B2' => ['amount' => 15000,    'label' => 'PLN PREPAID 15.000'],
+            '100302' => ['amount' => 20000,    'label' => 'PLN PREPAID 20.000'],
+            '100312' => ['amount' => 20000,    'label' => 'PLN PREPAID 20.000'],
+            '1003C2' => ['amount' => 30000,    'label' => 'PLN PREPAID 30.000'],
+            '100322' => ['amount' => 50000,    'label' => 'PLN PREPAID 50.000'],
+            '100332' => ['amount' => 100000,   'label' => 'PLN PREPAID 100.000'],
+            '100342' => ['amount' => 200000,   'label' => 'PLN PREPAID 200.000'],
+            '100352' => ['amount' => 500000,   'label' => 'PLN PREPAID 500.000'],
+            '100362' => ['amount' => 1000000,  'label' => 'PLN PREPAID 1.000.000'],
+        ];
+        if (isset($plnPrepaidMap[$productId])) {
+            $amount = $plnPrepaidMap[$productId]['amount'];
+            $admin = 3000;
+            $total = $amount + $admin;
+            $fee = max(0, $grandTotal - 52500);
+            return [
+                'status'        => 'success',
+                'rc'            => '00',
+                'product_id'    => $productId,
+                'customer_id'   => $customerId,
+                'customer_name' => $customerLabel,
+                'tarif_daya'    => 'R1 / 1300 VA',
+                'product_name'  => $plnPrepaidMap[$productId]['label'],
+                'amount'        => $amount,
+                'admin_fee'     => $admin,
+                'penalty'       => 0,
+                'total'         => $total,
+                'service_fee'   => $fee,
+                'grand_total'   => $total + $fee,
+                'reference_id'  => $refId,
+                'data'          => [
+                    'ID' => $customerId,
+                    'MN' => $customerId,
+                    'NM' => $customerLabel,
+                    'TF' => 'R1',
+                    'DY' => '000000001300',
+                    'TG' => str_pad((string) $amount, 12, '0', STR_PAD_LEFT),
+                    'AB' => str_pad((string) $admin, 12, '0', STR_PAD_LEFT),
+                    'TT' => str_pad((string) $total, 12, '0', STR_PAD_LEFT),
+                ],
+            ];
+        }
+
+        // 3b. Simulasi Voucher Game (60****, 61****, 63****, 64****, 65****, 67****) sesuai Main/Inquiry/VOUCHER GAME
+        if (preg_match('/^(60|61|63|64|65|67)/i', $productId)) {
+            $dbProduct = \App\Models\PpobProduct::where('code', $productId)->first();
+            $prodName = $dbProduct ? $dbProduct->name : ('VOUCHER GAME ' . $productId);
+            $amount = $dbProduct && (int) $dbProduct->base_price > 0 ? (int) $dbProduct->base_price : 15000;
+            $fee = max(0, $grandTotal - 52500);
+            $additionalId = trim((string) ($extraParams['additional_id'] ?? ''));
+
+            if (str_starts_with(strtoupper($productId), '6707')) {
+                $gameCustomerLabel = 'PLAYER MLBB #' . $customerId . ($additionalId !== '' ? ' (Zone: ' . $additionalId . ')' : '');
+            } elseif (preg_match('/^67(0[1-9]|10)BK$/i', $productId)) {
+                $gameCustomerLabel = 'SURVIVOR FF #' . $customerId;
+            } elseif (str_ends_with(strtoupper($productId), 'BV')) {
+                $gameCustomerLabel = 'TRAVELER GENSHIN #' . $customerId . ($additionalId !== '' ? ' (' . $additionalId . ')' : '');
+            } else {
+                $gameCustomerLabel = 'AKUN GAME #' . $customerId . ($additionalId !== '' ? ' (' . $additionalId . ')' : '');
+            }
+
+            return [
+                'status'        => 'success',
+                'rc'            => '00',
+                'product_id'    => $productId,
+                'customer_id'   => $customerId,
+                'additional_id' => $additionalId !== '' ? $additionalId : null,
+                'customer_name' => $gameCustomerLabel,
+                'product_name'  => $prodName,
+                'amount'        => $amount,
+                'admin_fee'     => 0,
+                'penalty'       => 0,
+                'total'         => $amount,
+                'service_fee'   => $fee,
+                'grand_total'   => $amount + $fee,
+                'reference_id'  => $refId,
+                'data'          => [
+                    'noHandphone' => str_pad($customerId, 20, ' '),
+                    'produk'      => str_pad($prodName, 30, ' '),
+                    'harga'       => str_pad((string) $amount, 12, '0', STR_PAD_LEFT),
+                ],
+            ];
+        }
+
+        // 3c. Simulasi Uang Elektronik / E-Wallet (75****) sesuai Main/Inquiry/UANG ELEKTRONIK
+        if (str_starts_with($productId, '75')) {
+            $dbProduct = \App\Models\PpobProduct::where('code', $productId)->first();
+            $prodName = $dbProduct ? $dbProduct->name : ('TopUp E-Wallet ' . $productId);
+            $operatorName = $dbProduct && $dbProduct->operator ? strtoupper($dbProduct->operator) : 'E-WALLET';
+            $amount = $dbProduct && (int) $dbProduct->base_price > 0 ? (int) $dbProduct->base_price : 20000;
+            $fee = max(0, $grandTotal - 52500);
+            $ewalletCustomerLabel = $operatorName . ' - ' . $customerLabel . ' (' . $customerId . ')';
+
+            return [
+                'status'        => 'success',
+                'rc'            => '00',
+                'product_id'    => $productId,
+                'customer_id'   => $customerId,
+                'customer_name' => $ewalletCustomerLabel,
+                'product_name'  => $prodName,
+                'amount'        => $amount,
+                'admin_fee'     => 0,
+                'penalty'       => 0,
+                'total'         => $amount,
+                'service_fee'   => $fee,
+                'grand_total'   => $amount + $fee,
+                'reference_id'  => $refId,
+                'data'          => [
+                    'noHandphone'   => $customerId,
+                    'nama'          => $prodName,
+                    'nominalProduk' => str_pad((string) $amount, 12, '0', STR_PAD_LEFT),
+                    'harga'         => str_pad((string) $amount, 12, '0', STR_PAD_LEFT),
+                ],
+            ];
+        }
+
+        // 4. Simulasi PLN Pascabayar (100301) & Non-Taglis (100311)
         if ($productId === '100301' || $productId === '100311') {
             $basePerPeriod = 50000;
             $adminPerPeriod = 2500;
@@ -373,7 +499,7 @@ class KiosbankDevelopmentNopel
         string $refId,
         KiosbankService $service
     ): array {
-        // 1. Cek apakah nomor pelanggan termasuk skenario Pending (RC 71) pada saat Payment
+        // 1. Cek apakah nomor pelanggan termasuk skenario Pending (RC 71) atau Gagal (RC 62/67) pada saat Payment
         if (isset(self::$paymentPendingNopel[$customerId])) {
             $rc = self::$paymentPendingNopel[$customerId];
             return [
@@ -392,13 +518,67 @@ class KiosbankDevelopmentNopel
             ];
         }
 
+        if (isset(self::$singlePaymentTestNopel[$customerId])) {
+            $override = self::$singlePaymentTestNopel[$customerId];
+            $rc = $override['rc'] ?? '67';
+            if (($override['status'] ?? '') === 'failed') {
+                return [
+                    'status'     => 'failed',
+                    'rc'         => $rc,
+                    'message'    => $service->getResponseCodeMessage($rc) . " (RC {$rc})",
+                    'is_sandbox' => true,
+                ];
+            }
+            return [
+                'status'       => 'processing',
+                'rc'           => $rc,
+                'reference_id' => $refId,
+                'sn'           => null,
+                'message'      => $service->getResponseCodeMessage($rc) . " (RC {$rc})",
+                'data'         => [
+                    'customerID'  => $customerId,
+                    'productID'   => $productId,
+                    'noReferensi' => $refId,
+                    'status'      => 'SEDANG DIPROSES',
+                ],
+                'is_sandbox'   => true,
+            ];
+        }
+
         // 2. Kurangi saldo sandbox jika mencukupi
         $currentSandbox = (int) (Setting::where('key', 'kiosbank_sandbox_deposit')->value('value') ?? 11251850);
+        if (!app()->runningUnitTests() && $currentSandbox < $total) {
+            $currentSandbox = 50000000;
+            Setting::updateOrCreate(['key' => 'kiosbank_sandbox_deposit'], ['value' => (string) $currentSandbox]);
+        }
         if ($currentSandbox >= $total && $total > 0) {
             Setting::updateOrCreate(
                 ['key' => 'kiosbank_sandbox_deposit'],
                 ['value' => (string) max(0, $currentSandbox - $total)]
             );
+        }
+
+        $isPlnPrepaid = in_array($productId, ['100392', '1003A2', '1003B2', '100302', '100312', '1003C2', '100322', '100332', '100342', '100352', '100362'], true);
+        if ($isPlnPrepaid) {
+            $rawToken = str_pad((string) random_int(1000000000, 9999999999) . (string) random_int(1000000000, 9999999999), 20, '0');
+            $sn = implode('-', str_split($rawToken, 4));
+            return [
+                'status'       => 'success',
+                'rc'           => '00',
+                'reference_id' => $refId,
+                'sn'           => $sn,
+                'message'      => 'Pembelian Token PLN berhasil.',
+                'data'         => [
+                    'status'      => 'BERHASIL',
+                    'ID'          => $customerId,
+                    'MN'          => $customerId,
+                    'NM'          => 'PELANGGAN ' . substr($customerId, -4),
+                    'TK'          => $rawToken,
+                    'RF'          => '0BAG' . strtoupper(bin2hex(random_bytes(8))),
+                    'TT'          => str_pad((string) $total, 12, '0', STR_PAD_LEFT),
+                ],
+                'is_sandbox'   => true,
+            ];
         }
 
         $sn = 'SANDBOX-' . strtoupper(bin2hex(random_bytes(5)));

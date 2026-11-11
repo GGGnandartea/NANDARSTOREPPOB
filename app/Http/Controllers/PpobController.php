@@ -111,6 +111,9 @@ class PpobController extends Controller
                 'message'   => $cutoff['message'],
             ], 503);
         }
+        if (!$request->filled('product_id') && $request->filled('product_code')) {
+            $request->merge(['product_id' => $request->input('product_code')]);
+        }
         $request->validate([
             'product_id'  => 'required|string',
             'customer_id' => 'required|string',
@@ -120,6 +123,17 @@ class PpobController extends Controller
         $customerId  = trim($request->input('customer_id'));
         $zoneId      = $request->input('zone_id'); // opsional (misal MLBB zone)
         $referenceId = $request->input('reference_id');
+
+        $dbProduct = \App\Models\PpobProduct::where('code', $productId)->first();
+        if ($dbProduct && $dbProduct->status !== 'active') {
+            return response()->json([
+                'status'  => 'error',
+                'rc'      => '10',
+                'message' => $dbProduct->status === 'maintenance'
+                    ? 'Produk sedang gangguan.'
+                    : 'Produk sedang dinonaktifkan sementara.',
+            ], 503);
+        }
 
         try {
             $result = $this->kiosbank->inquiry($productId, $customerId, $referenceId, $zoneId, [
@@ -196,6 +210,7 @@ class PpobController extends Controller
         $productCode   = $request->input('product_code');
         $productName   = $request->input('product_name');
         $customerId    = trim($request->input('customer_id'));
+        $customerName  = trim((string) $request->input('customer_name', ''));
         $nominal       = (int) $request->input('amount');
         $paymentMethod = $request->input('payment_method');
         $buyerName     = $request->input('buyer_name') ?: (Auth::user()?->name ?: 'Pelanggan PPOB');
@@ -245,6 +260,9 @@ class PpobController extends Controller
             $billPenalty   = (int) ($cachedInquiry['penalty'] ?? 0);
             $billTotal     = (int) $cachedInquiry['total'];
             $billReference = $cachedInquiry['reference_id'];
+            if ($customerName === '' && !empty($cachedInquiry['customer_name'])) {
+                $customerName = trim((string) $cachedInquiry['customer_name']);
+            }
             // Harga jual ke pelanggan = total biller + markup toko.
             $nominal       = (int) ($cachedInquiry['grand_total'] ?? $billTotal);
             $isBillPayment = true;
@@ -257,7 +275,7 @@ class PpobController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Pilih pulsa atau paket data dari katalog produk.'], 422);
         }
         if ($isBillPayment) $officialProduct = null;
-        if (!$isBillPayment && (!$officialProduct || $officialProduct->status !== 'active')) {
+        if (!$isBillPayment && !$officialProduct) {
             return response()->json(['status' => 'error', 'message' => 'Produk tidak tersedia. Pilih ulang produk PPOB.'], 422);
         }
         $resolvedPricing = null;
@@ -268,6 +286,16 @@ class PpobController extends Controller
                     ? []
                     : $this->kiosbank->mobileProviderStatus(true);
                 $availability = $this->kiosbank->mobileAvailability($officialProduct, $providerStatus);
+                if (!$availability['can_purchase']) {
+                    return response()->json(['status' => 'error', 'message' => $availability['availability_message']], 422);
+                }
+            } else {
+                try {
+                    $providerStatus = $this->kiosbank->mobileProviderStatus();
+                } catch (\Throwable $e) {
+                    $providerStatus = [];
+                }
+                $availability = $this->kiosbank->catalogAvailability($officialProduct, $providerStatus);
                 if (!$availability['can_purchase']) {
                     return response()->json(['status' => 'error', 'message' => $availability['availability_message']], 422);
                 }
@@ -352,7 +380,7 @@ class PpobController extends Controller
                 'whatsapp'       => $whatsapp,
                 'voucher_code'   => $voucherCode,
                 'discount_amount'=> (int) round($discount),
-                'notes'          => "No Tujuan: " . $customerId . " | Kode: " . $productCode,
+                'notes'          => "No Tujuan: " . $customerId . " | Kode: " . $productCode . ($customerName !== '' ? " | Atas Nama: " . $customerName : ""),
             ]);
 
             // Eksekusi Fulfillment ke KIOSBANK
@@ -374,8 +402,15 @@ class PpobController extends Controller
 
             return response()->json([
                 'status'         => 'success',
+                'order_id'       => $order->invoice_number,
                 'invoice_number' => $order->invoice_number,
                 'invoice_url'    => $order->invoiceUrl(),
+                'product_name'   => $order->product_name,
+                'product_code'   => $productCode,
+                'customer_id'    => $customerId,
+                'customer_name'  => $customerName ?: null,
+                'total_nominal'  => (int) $order->total_amount,
+                'payment_status' => $order->payment_status,
                 'order_status'   => $order->order_status,
                 'is_refunded'    => !empty($fulfillResult['is_refunded']) || $isFailed,
                 'user_balance'   => (int) $user->balance,
@@ -460,19 +495,27 @@ class PpobController extends Controller
             'whatsapp'       => $whatsapp,
             'voucher_code'   => $voucherCode,
             'discount_amount'=> (int) round($discount),
-            'notes'          => "No Tujuan: " . $customerId . " | Kode: " . $productCode,
+            'notes'          => "No Tujuan: " . $customerId . " | Kode: " . $productCode . ($customerName !== '' ? " | Atas Nama: " . $customerName : ""),
         ]);
 
+        OrderFulfillmentService::storeOrderQrisUrl($orderIdGateway, $urlQris);
         \App\Services\OrderAccessService::grantGuestSession($request, $order);
 
         return response()->json([
-            'status'         => 'success',
-            'invoice_number' => $orderIdGateway,
-            'invoice_url' => $order->invoiceUrl(),
-            'total_nominal'  => $totalNominal,
-            'url_qris'       => $urlQris,
-            'order_id'       => $orderIdGateway,
-            'message'        => 'Tagihan QRIS berhasil dibuat. Silakan selesaikan pembayaran.',
+            'status'            => 'success',
+            'invoice_number'    => $orderIdGateway,
+            'invoice_url'       => $order->invoiceUrl(),
+            'total_nominal'     => $totalNominal,
+            'url_qris'          => $urlQris,
+            'order_id'          => $orderIdGateway,
+            'order_status'      => $order->order_status,
+            'payment_status'    => $order->payment_status,
+            'product_name'      => $order->product_name,
+            'product_code'      => $productCode,
+            'customer_id'       => $customerId,
+            'customer_name'     => $customerName ?: null,
+            'remaining_seconds' => 1200,
+            'message'           => 'Tagihan QRIS berhasil dibuat. Silakan selesaikan pembayaran.',
         ]);
     }
 
@@ -517,18 +560,31 @@ class PpobController extends Controller
         }
 
         $isFailed = in_array(strtolower((string) $order->order_status), ['failed', 'refunded'], true);
+        $customerName = null;
+        if (!empty($order->notes) && preg_match('/Atas Nama:\s*([^|]+)/i', $order->notes, $mName)) {
+            $customerName = trim($mName[1]);
+        }
 
         return response()->json([
-            'status'         => $order->order_status,
-            'order_status'   => $order->order_status,
-            'payment_status' => $order->payment_status,
-            'is_refunded'    => $isFailed && (bool) $order->user_id,
-            'user_balance'   => Auth::check() ? (int) Auth::user()->fresh()->balance : null,
-            'invoice_number' => $order->invoice_number,
-            'invoice_url'    => $order->invoiceUrl(),
-            'sn'             => $order->sn_or_account,
-            'sn_or_account'  => $order->sn_or_account,
-            'notes'          => $order->notes,
+            'status'            => $order->order_status,
+            'order_id'          => $order->invoice_number,
+            'order_status'      => $order->order_status,
+            'payment_status'    => $order->payment_status,
+            'is_refunded'       => $isFailed && (bool) $order->user_id,
+            'user_balance'      => Auth::check() ? (int) Auth::user()->fresh()->balance : null,
+            'invoice_number'    => $order->invoice_number,
+            'invoice_url'       => $order->invoiceUrl(),
+            'product_name'      => $order->product_name,
+            'product_code'      => $order->provider_product_code,
+            'customer_id'       => $order->provider_customer_id,
+            'customer_name'     => $customerName,
+            'total_nominal'     => (int) ($order->total_amount ?: $order->price),
+            'total_amount'      => (int) ($order->total_amount ?: $order->price),
+            'url_qris'          => OrderFulfillmentService::resolveOrderQrisUrl($order),
+            'remaining_seconds' => OrderFulfillmentService::remainingQrisSeconds($order),
+            'sn'                => $order->sn_or_account,
+            'sn_or_account'     => $order->sn_or_account,
+            'notes'             => $order->notes,
         ]);
     }
 
@@ -564,7 +620,7 @@ class PpobController extends Controller
             'sn'             => $order->sn_or_account,
             'sn_or_account'  => $order->sn_or_account,
             'notes'          => $order->notes,
-            'message'        => $res['message'] ?? 'Status pesanan telah diperiksa ke server Kiosbank.',
+            'message'        => $res['message'] ?? 'Status pesanan telah diperiksa ke server PremiumKita.',
         ]);
     }
 }

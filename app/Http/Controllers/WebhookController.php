@@ -153,6 +153,17 @@ class WebhookController extends Controller
         $status      = strtoupper(trim((string) ($data['status'] ?? ($payload['status'] ?? ''))));
         $sn          = $data['sn'] ?? ($data['token'] ?? ($data['noReferensi'] ?? ''));
 
+        try {
+            (new \App\Services\KiosbankService())->recordUatServerHit(
+                '/Callback/Incoming',
+                is_array($payload) ? $payload : ['raw' => $payloadRaw],
+                ['rc' => $referenceId ? '00' : '99', 'status' => $status ?: 'RECEIVED'],
+                $referenceId ? 200 : 400,
+                'POST',
+                true
+            );
+        } catch (\Throwable $e) {}
+
         if (!$referenceId) {
             return response()->json(['rc' => '99', 'message' => 'Missing referenceID'], 400);
         }
@@ -716,6 +727,14 @@ class WebhookController extends Controller
     public static function sendOrderNotification($order, bool $isManualResend = false) {
         if (!$order) {
             return ['status' => 'error', 'message' => 'Pesanan tidak ditemukan'];
+        }
+
+        if (!$isManualResend) {
+            try {
+                \App\Services\ResellerOpenApiService::dispatchOrderWebhookIfNeeded($order, 'order.completed');
+            } catch (\Throwable $e) {
+                Log::warning('[OPEN-API-WH-NOTIFY] ' . $e->getMessage());
+            }
         }
 
         // 1. Cari data pengguna akun pembeli

@@ -2526,8 +2526,12 @@ class AdminController extends Controller
         $order->update($data);
 
         // Kirim notifikasi WhatsApp ke pembeli jika status completed & WA terverifikasi
-        if (in_array($targetStatus, ['completed', 'success', 'lunas'], true) && $order->whatsapp) {
-            \App\Http\Controllers\WebhookController::sendOrderNotification($order);
+        if (in_array($targetStatus, ['completed', 'success', 'lunas'], true)) {
+            if ($order->whatsapp) {
+                \App\Http\Controllers\WebhookController::sendOrderNotification($order);
+            } else {
+                \App\Services\ResellerOpenApiService::dispatchOrderWebhookIfNeeded($order->fresh(), 'order.completed');
+            }
         }
 
         return back()->with('success', 'Status pesanan berhasil diperbarui!');
@@ -3441,7 +3445,11 @@ class AdminController extends Controller
      */
     public function syncPpobProducts(Request $request, KiosbankService $kiosbankService)
     {
-        $request->validate(['prefix' => ['nullable', \Illuminate\Validation\Rule::in(array_map('strval', array_keys(\App\Services\KiosbankPulsaCatalog::OPERATORS)))]]);
+        $allowedPrefixes = array_merge(
+            array_map('strval', array_keys(\App\Services\KiosbankPulsaCatalog::OPERATORS)),
+            array_keys(\App\Services\KiosbankOfficialCatalog::PREFIX_METADATA)
+        );
+        $request->validate(['prefix' => ['nullable', \Illuminate\Validation\Rule::in($allowedPrefixes)]]);
         try {
             $res = $kiosbankService->syncWithKiosbankApi();
             $priceRes = ['updated_count' => 0];
@@ -3456,7 +3464,11 @@ class AdminController extends Controller
             $created = $priceRes['created_count'] ?? 0;
             $message = "Status produk diperiksa: {$res['total_products']}. Harga diperbarui: {$priceRes['updated_count']}. Produk baru: {$created}.";
             if ($failedCount > 0) {
-                $failedNames = implode(', ', array_map(fn ($prefix) => \App\Services\KiosbankPulsaCatalog::OPERATORS[$prefix] ?? $prefix, $priceRes['failed_prefixes']));
+                $failedNames = implode(', ', array_map(
+                    fn ($prefix) => \App\Services\KiosbankPulsaCatalog::OPERATORS[$prefix]
+                        ?? (\App\Services\KiosbankOfficialCatalog::PREFIX_METADATA[$prefix]['operator'] ?? $prefix),
+                    $priceRes['failed_prefixes']
+                ));
                 $reason = implode(' ', array_unique($priceRes['failed_reasons'] ?? []));
                 return back()->with('error', $message." Harga belum berhasil diambil: {$failedNames}. ".$reason);
             }
